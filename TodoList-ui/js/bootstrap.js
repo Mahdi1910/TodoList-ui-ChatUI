@@ -36,16 +36,18 @@ function reportBootstrapError(stage, error) {
 }
 
 async function runStage(stage, work) {
-  try {
-    return await work();
-  } catch (error) {
+  try { return await work(); }
+  catch (error) {
     reportBootstrapError(stage, error);
     throw error;
   }
 }
 
 async function bootstrap() {
-  document.getElementById('app')?.classList.add('todo-app');
+  const appRoot = document.getElementById('app');
+  appRoot?.classList.add('todo-app');
+  Object.assign(document.documentElement.style, { width: '100%', height: '100%' });
+  Object.assign(document.body.style, { width: '100%', height: '100%', margin: '0', overflow: 'hidden', background: '#121214' });
   let application;
   try {
     application = await runStage('MODULE_LOAD', () => import('./app-main.js'));
