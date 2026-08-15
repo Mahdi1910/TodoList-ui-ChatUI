@@ -1,439 +1,526 @@
-# STOP — CHAT UI AGENT ONLY
+# STOP — CHAT UI AGENT WORKING DOCUMENT
 
-**If you are not the Chat UI agent, do not read this document.**
+**Primary owner: Chat UI agent.**
 
-**If you are the To-Do List UI agent, stop here and do not read further.**
-
-The Chat UI agent and the To-Do List UI agent are intentionally creating two separate implementation plans independently. The user will compare those plans later and then create a new, better combined implementation plan. Reading this plan now would contaminate that independent comparison.
+If you are the To-Do List UI agent, do not use this document as an implementation authority unless the user explicitly asks you to review it or compare it. The final integration plan will be created later from both agents' work.
 
 ---
 
-# Chat UI Agent — Independent Implementation Plan
+# Chat UI Agent — Revised Implementation Plan
 
 ## Join ChatUI + To-Do List into one routed application
 
-**Status:** Independent planning draft only. This is not authorization to implement runtime changes yet.
+**Revision:** 2 — improved after cross-review with the To-Do List agent
+
+**Status:** Planning only. Do not implement runtime integration merely because this document exists.
 
 **Repository:** `Mahdi1910/TodoList-ui-ChatUI`
 
-**Source revision audited for this plan:**
+**Runtime source architecture originally audited at:**
 
 ```text
 36fac471bcd4a7c0d5506749139e1dca92b475b5
 ```
 
-**Canonical target URLs:**
+**Cross-review inputs used for Revision 2:**
 
 ```text
-/                         -> canonicalize to /todo-list-ui
-/todo-list-ui             -> To-Do List application
-/chat-ui                  -> ChatUI home/new-chat surface
-/chat-ui/chat/<chatId>    -> specific ChatUI conversation
+implementation plan/Implementation Plan ID 1.md
+
+to-do list agent/chat UI agent implementation plan review ID 1.md
+
+chat UI agent/review of Implementation Plan ID 1.md
 ```
 
-This plan was created independently by the Chat UI agent. I intentionally did **not** read the To-Do List agent's implementation plan.
+This revision intentionally incorporates the strongest verified ideas from both independent plans and both reviews while remaining the Chat UI agent's working plan.
 
 ---
 
-# 1. Goal
+# 1. Final target
 
-The goal is not merely to place two source folders in one repository. The goal is to turn the current two standalone browser applications into **one application experience** with:
-
-1. one production root page;
-2. one shared application launcher;
-3. URL-based module navigation;
-4. one active module mounted at a time;
-5. preserved ChatUI behavior;
-6. preserved To-Do behavior;
-7. preserved existing local user data;
-8. independent storage schemas;
-9. safe browser Back/Forward and direct deep links;
-10. a migration that can be tested and rolled back after every stage.
-
-The desired experience is:
+The final product is one combined website with one neutral application shell and two independent application modules.
 
 ```text
 Combined website
-│
-├── /todo-list-ui
-│    └── To-Do module
-│         ├── Inbox / Today / Completed
-│         ├── Projects / Tags
-│         ├── Tasks / Subtasks
-│         ├── List / Kanban
-│         ├── Drag hierarchy
-│         ├── Schedule / Repeat / Reminders
-│         └── To-Do settings / backup
-│
-└── /chat-ui
-     └── ChatUI module
-          ├── /chat-ui
-          ├── /chat-ui/chat/<id>
-          ├── Chat projects/search
-          ├── Gemini generation/tools
-          ├── Attachments / Files API
-          ├── Workspace
-          ├── Voice / Read Aloud
-          └── Chat settings / backup
+        |
+        v
+/index.html
+        |
+        v
+Shared application shell
+  |-- shared desktop application rail
+  |-- shared mobile application navigation
+  |-- one top-level router
+  |-- one active-module host
+  |-- one lifecycle manager
+  `-- shell-level error/fallback UI
+        |
+        +--> /todo-list-ui
+        |       |
+        |       `--> To-Do module
+        |             `--> TodoListDB
+        |
+        `--> /chat-ui...
+                |
+                `--> ChatUI module
+                      `--> ChatUI_DB
 ```
 
----
-
-# 2. Core architectural decision
-
-## 2.1 Neither current `index.html` becomes the final production root
-
-Today both applications own a complete page:
-
-```text
-ChatUI/index.html
-TodoList-ui/index.html
-```
-
-The safest final architecture is to create a **new repository-root `index.html`**.
-
-Final ownership should become:
-
-```text
-/index.html                         <- production root shell
-/shell/...                          <- shared app navigation/router/lifecycle
-/ChatUI/...                         <- Chat module source
-/TodoList-ui/...                    <- To-Do module source
-```
-
-The existing application index files should remain temporarily as **standalone verification harnesses** while migration is in progress. They should not be deleted early.
-
-Why:
-
-- ChatUI's index is intentionally a small Chat-specific loader shell.
-- To-Do's index contains the entire To-Do DOM plus a launcher rail that looks suitable for a shared shell, but it is still tightly coupled to To-Do CSS, IDs, settings, and bootstrap.
-- Making either existing page the parent of the other would force one application's assumptions onto the other.
-- A new neutral root creates a clear ownership boundary.
-
-## 2.2 Final shell structure
-
-Recommended final DOM:
-
-```html
-<body>
-  <div id="shell-app">
-    <nav id="shell-primary-nav">
-      <!-- To-Do, Chat, future modules, shared active state -->
-    </nav>
-
-    <main id="shell-module-host"></main>
-  </div>
-
-  <div id="shell-status-root"></div>
-</body>
-```
-
-Desktop target:
-
-```text
-To-Do route:
-[ Shared Rail ][ To-Do Secondary Sidebar ][ To-Do Workspace ]
-
-Chat route:
-[ Shared Rail ][ Chat Left Sidebar ][ Chat Main ][ Chat Right Sidebar optional ]
-```
-
-Mobile target:
-
-```text
-[ active module content ]
-[ shared mobile application navigation ]
-```
-
-The existing To-Do primary rail/mobile app navigation is the best **visual starting point**, but it must become **root-shell-owned markup and CSS**, not remain owned by the To-Do module.
-
-## 2.3 Only one application module mounted at a time
-
-This is a hard safety requirement for the first combined version.
-
-Do this:
-
-```text
-shell
-  ↓
-mount To-Do
-  ↓ switch
-unmount To-Do
-  ↓
-mount ChatUI
-```
-
-Do **not** do this:
-
-```text
-load To-Do + ChatUI together
-hide one with display:none
-```
-
-The current applications have real collision risks:
-
-- duplicate IDs such as `#project-list`;
-- duplicate `#settings-modal`;
-- generic classes such as `.modal-overlay`, `.modal-card`, `.header-left`, `.sidebar-header`, `.empty-state`;
-- both define generic CSS variables such as `--bg-primary`, `--text-primary`, `--border-color`;
-- both globally style `body`, `*`, buttons/inputs;
-- both attach document/window listeners;
-- both assume viewport-level overlays;
-- To-Do exposes several component objects on `window`;
-- ChatUI has multiple once-per-page `initialized` flags.
-
-Mounting only one module at a time drastically reduces risk and makes DOM IDs internally reusable.
-
----
-
-# 3. Source understanding and boundaries
-
-## 3.1 ChatUI entry and bootstrap
-
-Important current files:
-
-```text
-ChatUI/index.html
-ChatUI/js/layout-loader.js
-ChatUI/js/app.js
-```
-
-Current behavior:
-
-```text
-ChatUI/index.html
-   ↓
-loads root-absolute Chat CSS + CDN libraries
-   ↓
-#app-container + #overlay-root
-   ↓
-/js/layout-loader.js
-   ↓
-fetch /html/*.html fragments
-   ↓
-insert layout
-   ↓
-import ./app.js
-   ↓
-auto bootstrap every Chat subsystem
-```
-
-`ChatUI/js/app.js` currently auto-starts when imported. It does not expose a true `mount()` / `unmount()` contract.
-
-The combined app must change that page lifecycle without changing Chat's domain behavior.
-
-## 3.2 ChatUI routing
-
-Current file:
-
-```text
-ChatUI/js/router/chat-router.js
-```
-
-Current routes:
-
-```text
-/               -> Chat home
-/chat/<chatId>  -> chat
-```
-
-Current `initChatRouter()` adds `window.popstate` and returns a cleanup function, but `app.js` currently does not retain/use that cleanup.
-
-Current route writes are called by:
-
-```text
-ChatUI/js/chat/conversation.js
-```
-
-The combined app needs a shared top-level router and Chat-specific route parsing under `/chat-ui`.
-
-## 3.3 ChatUI layout fragments
-
-Chat should keep its focused fragment architecture:
-
-```text
-ChatUI/html/left-sidebar.html
-ChatUI/html/main-chat.html
-ChatUI/html/workspace.html
-ChatUI/html/right-sidebar.html
-ChatUI/html/chat-modals.html
-ChatUI/html/settings-modal.html
-ChatUI/html/voice-overlay.html
-ChatUI/html/read-aloud-player.html
-ChatUI/html/global-ui.html
-```
-
-There is no reason to collapse those back into one giant HTML file.
-
-## 3.4 ChatUI durable data
-
-Current database:
-
-```text
-ChatUI_DB
-```
-
-Current stores include:
-
-```text
-projects
-chats
-messages
-attachments
-settings
-readAudio
-workspaceNodes
-workspaceFiles
-```
-
-Important files:
-
-```text
-ChatUI/js/storage/database.js
-ChatUI/js/storage/load.js
-ChatUI/js/storage/records.js
-ChatUI/js/storage/mutations.js
-ChatUI/js/storage/backup-restore.js
-ChatUI/js/storage/write-coordinator.js
-```
-
-This database must remain independent and keep the same database name/schema unless a future unrelated feature specifically requires migration.
-
-## 3.5 ChatUI APIs and generation are not merge targets
-
-The integration should not rewrite:
-
-```text
-ChatUI/js/api/gemini.js
-ChatUI/js/api/gemini-files.js
-ChatUI/js/api/gemini-live-audio.js
-ChatUI/js/chat/attachment-transport.js
-ChatUI/js/chat/generation-runner.js
-ChatUI/js/chat/generation-lifecycle.js
-ChatUI/js/tools/function-tool-registry.js
-```
-
-Those systems already implement important application behavior: High thinking, SSE streaming, tool rounds, Files API reuse, attachment Blob ownership, abort state, Workspace tools, and voice/audio behavior.
-
-Integration changes should touch them only if a lifecycle hook is genuinely needed, not redesign their protocol.
-
-## 3.6 To-Do entry and bootstrap
-
-Important current files:
-
-```text
-TodoList-ui/index.html
-TodoList-ui/js/bootstrap.js
-TodoList-ui/js/app-main.js
-```
-
-The To-Do index currently owns:
-
-- primary application rail;
-- mobile application navigation;
-- secondary To-Do sidebar;
-- workspace;
-- all task/schedule/project/tag/settings modal markup;
-- the bootstrap script.
-
-`bootstrap.js` already has useful staged startup failure categories. `app-main.js` already separates application startup steps. These are good foundations for a mountable module.
-
-## 3.7 To-Do durable data
-
-Current database:
-
-```text
-TodoListDB
-```
-
-Important files:
-
-```text
-TodoList-ui/js/storage/db-schema.js
-TodoList-ui/js/storage/db.js
-TodoList-ui/js/storage/repositories.js
-TodoList-ui/js/storage/mappers.js
-TodoList-ui/js/storage/persistence.js
-TodoList-ui/js/storage/data-service.js
-TodoList-ui/js/storage/data-service-*.js
-TodoList-ui/js/storage/backup-service.js
-```
-
-The data/service layer is already well isolated from the Chat database. Keep it that way.
-
-`AppDataService` serializes writes and exposes `whenIdle()`. The shell must use that before unmounting To-Do.
-
-## 3.8 To-Do domain systems are not merge targets
-
-Do not redesign during app integration:
-
-```text
-RepeatEngine
-TaskModel
-TaskFilter
-TaskOrder
-TaskRelations
-TaxonomyOrder
-AppDataService CRUD
-hierarchy persistence
-taxonomy drag persistence
-reminder definitions
-backup format
-```
-
-The goal is page/shell integration, not a simultaneous To-Do architecture rewrite.
-
----
-
-# 4. Canonical routing design
-
-## 4.1 Routes
-
-Use these canonical public routes:
+Canonical public routes:
 
 ```text
 /                         -> replace/canonicalize to /todo-list-ui
-/todo-list-ui             -> To-Do
-/chat-ui                  -> Chat home
-/chat-ui/chat/<chatId>    -> specific Chat conversation
+/todo-list-ui             -> To-Do application
+/chat-ui                  -> ChatUI home/new-chat surface
+/chat-ui/chat/<chatId>    -> exact ChatUI conversation
 ```
 
-Do not expose physical source directories as user navigation routes.
-
-These are source locations:
+The physical source folders remain:
 
 ```text
-/ChatUI/...
-/TodoList-ui/...
+/ChatUI
+/TodoList-ui
 ```
 
-These are user routes:
+Those folder names are source organization, not public navigation paths.
+
+---
+
+# 2. Core architecture decisions
+
+## 2.1 A new root `index.html` is the main application
+
+Neither current standalone page becomes the final production owner.
+
+Do not choose:
 
 ```text
-/chat-ui
+TodoList-ui/index.html as parent + paste ChatUI into it
+```
+
+and do not choose:
+
+```text
+ChatUI/index.html as parent + paste To-Do into it
+```
+
+Create:
+
+```text
+/index.html
+```
+
+as the canonical root document.
+
+The current standalone indexes remain during migration as verification/rollback harnesses:
+
+```text
+ChatUI/index.html
+TodoList-ui/index.html
+```
+
+Only after the shared modules are proven should those files become thin developer harnesses around the same module entry points used by the root shell.
+
+## 2.2 Exactly one full application runtime is active at a time
+
+Hard rule for the first combined architecture:
+
+```text
+shell
+  |
+  +--> mount To-Do
+  |
+  `--> OR mount ChatUI
+```
+
+Never:
+
+```text
+mount To-Do + ChatUI
+hide inactive one with display:none
+```
+
+Why this rule exists:
+
+```text
+duplicate IDs such as #project-list
+generic CSS classes
+global CSS variables
+document/window listeners
+body/documentElement writes
+full-screen overlays
+module-level initialized flags
+viewport drag layers
+media/audio sessions
+```
+
+Only one module DOM/runtime should exist in the combined host at a time.
+
+## 2.3 First combined release uses full-page app switching
+
+Do not immediately attempt perfect single-page unmount/remount behavior.
+
+Stage A:
+
+```text
+/todo-list-ui
+  -> root shell loads
+  -> only To-Do mounts
+
+click Chat link
+  -> normal browser navigation to /chat-ui
+  -> new document
+  -> only ChatUI mounts
+```
+
+This already gives:
+
+```text
+one website
+one shared launcher
+correct URLs
+one app runtime at a time
+safe listener destruction through page reload
+```
+
+Stage B comes later, only after explicit lifecycle cleanup is tested.
+
+## 2.4 Databases stay independent
+
+Preserve:
+
+```text
+TodoListDB
+ChatUI_DB
+```
+
+Do not merge them.
+
+Do not change either database version merely because the UI is joined.
+
+Do not create shell logic that directly reads/writes either application's database.
+
+---
+
+# 3. Shell boundary — strict ownership rule
+
+This revision makes the shell/application boundary stricter than Revision 1.
+
+## 3.1 Shell may import only module entry points
+
+Allowed conceptual imports:
+
+```text
+TodoList-ui/js/module.js
+ChatUI/js/module.js
+```
+
+The shell must not directly import or call:
+
+```text
+AppDataService
+AppState
+RepeatEngine
+TodoDb
+Todo repositories
+Chat state/store
+Gemini generation lifecycle
+MediaRecorder logic
+Voice controller
+Read Aloud services
+Workspace internals
+Chat storage internals
+```
+
+The shell knows lifecycle contracts, not application internals.
+
+Correct relationship:
+
+```text
+shell
+  -> todoModule.prepareDeactivate()
+       -> Todo internally waits AppDataService.whenIdle()
+
+shell
+  -> chatModule.prepareDeactivate()
+       -> Chat internally checks generation/recording/voice state
+```
+
+Incorrect relationship:
+
+```text
+shell -> AppDataService.whenIdle()
+shell -> abortActiveGeneration()
+shell -> stopLiveVoiceMode()
+```
+
+Those calls belong inside each module boundary.
+
+## 3.2 Shell owns only cross-application concerns
+
+Shell owns:
+
+```text
+root HTML document
+html/body layout
+shared desktop application rail
+shared mobile app navigation
+top-level route recognition
+one popstate listener
+active module selection
+module mount/deactivate/unmount sequence
+shell loading/error UI
+shared page-title boundary
+focus after app switches
+shell-only CSS variables
+root build/deployment
+root local SPA server
+```
+
+Shell does not own:
+
+```text
+Tasks
+Projects/Tags domain logic
+Repeat/reminders
+Chat messages/projects
+Gemini
+attachments
+voice/audio
+Workspace
+application backup formats
+application appearance persistence
+```
+
+---
+
+# 4. Standard application module contract
+
+Both applications should expose the same external lifecycle shape.
+
+Recommended conceptual contract:
+
+```js
+export async function mount(context) {
+  return {
+    appId,
+    handleRoute,
+    prepareDeactivate,
+    beforeLeave,
+    unmount,
+    openSettings,
+    getAppearance
+  };
+}
+```
+
+Exact function names may change if implementation discovers a clearer API, but these responsibilities must remain explicit.
+
+## 4.1 `mount(context)`
+
+Receives only shell-level services:
+
+```text
+module host/root
+module overlay root if required
+initial parsed route
+navigate(path, options)
+setTitle(title)
+reportFatalError(error)
+notifyAppearance(optional)
+```
+
+It must not receive the other application's state/service.
+
+## 4.2 `handleRoute(route)`
+
+Used for route changes while the same module is already active.
+
+Example:
+
+```text
+/chat-ui/chat/A
+   -> /chat-ui/chat/B
+```
+
+should call Chat's route handler rather than remounting the whole Chat application.
+
+## 4.3 `prepareDeactivate({ targetRoute })`
+
+**New normative requirement from the cross-review.**
+
+This runs before any destructive cleanup.
+
+Its purpose is to decide whether leaving is safe.
+
+Possible conceptual result:
+
+```js
+{ allow: true }
+{ allow: false, reason: 'user-cancelled' }
+{ allow: false, reason: 'restore-in-progress' }
+```
+
+It may:
+
+```text
+allow immediately
+ask user to confirm discarding unsaved work
+block while destructive restore is active
+ask before aborting active generation
+ask before discarding unsent recording
+```
+
+Nothing should be destroyed before this decision resolves.
+
+## 4.4 `beforeLeave()`
+
+Runs after leaving has been approved but before DOM removal.
+
+It performs application-specific shutdown operations that may be asynchronous.
+
+Examples:
+
+```text
+abort approved Chat generation
+stop approved recording/Live Voice
+stop Read Aloud
+cancel drag sessions
+wait for To-Do write queue
+close transient UI
+```
+
+## 4.5 `unmount()`
+
+Deterministic cleanup only.
+
+Must:
+
+```text
+remove owned global listeners
+cancel timers/RAF
+remove app-owned overlays/portals
+remove body/root classes owned by module
+clear stale window globals owned by module
+reset/remodel remount guards
+remove module DOM
+release detached DOM references
+```
+
+Do not put user confirmation logic here.
+
+## 4.6 Hard-navigation fallback
+
+If `beforeLeave()` or `unmount()` throws, times out, or cannot prove cleanup:
+
+```text
+DO NOT mount the next module over the uncertain old runtime.
+```
+
+Fallback:
+
+```js
+window.location.assign(targetRoute)
+```
+
+or equivalent hard navigation.
+
+The new document guarantees old listeners/timers/runtime are gone.
+
+This is a required safety escape hatch even after seamless switching is enabled.
+
+---
+
+# 5. Shared navigation semantics
+
+## 5.1 Use real links for application routes
+
+Application switches are navigation, so use anchors:
+
+```html
+<a href="/todo-list-ui">...</a>
+<a href="/chat-ui">...</a>
+```
+
+Do not model primary app navigation as JavaScript-only buttons.
+
+Benefits:
+
+```text
+normal browser semantics
+open in new tab
+copy link
+keyboard accessibility
+full-reload fallback without JavaScript interception
+progressive enhancement
+```
+
+Settings remains a button because it is an action, not a route.
+
+## 5.2 Shared rail design donor
+
+Use the current To-Do primary rail/mobile bottom navigation as the visual donor.
+
+After integration, ownership moves to shell-specific markup/classes:
+
+```text
+.shell-primary-rail
+.shell-app-link
+#shell-app-todo
+#shell-app-chat
+.shell-mobile-nav
+#shell-open-settings
+```
+
+Do not leave root shell styling dependent on `.primary-rail` or To-Do variables.
+
+## 5.3 Remember last Chat route
+
+Improvement adopted from the To-Do plan/review.
+
+If user leaves:
+
+```text
+/chat-ui/chat/A
+```
+
+for:
+
+```text
 /todo-list-ui
 ```
 
-## 4.2 Why `/todo-list-ui` is the default root target
+then clicking Chat later should preferably return to:
 
-The final main application is the **root shell**, not To-Do itself. However `/` should canonicalize to `/todo-list-ui` because:
+```text
+/chat-ui/chat/A
+```
 
-- the current To-Do application already contains the intended multi-app launcher concept;
-- Tasks is the current main productivity surface;
-- the route remains explicit after canonicalization;
-- users always know which application is active from the URL.
+unless that remembered route is invalid/deleted.
 
-If the final merged plan later chooses Chat as default, changing one root-route constant is easy. The architecture must not depend on that choice.
+During full-reload Stage A, shell may store only the route string in namespaced `sessionStorage`, for example:
 
-## 4.3 Root router responsibility
+```text
+combined-shell:last-chat-route
+```
 
-Create one shell router, for example:
+Do not store this in `ChatUI_DB` or `TodoListDB`.
+
+ChatUI remains authoritative for whether the remembered chat exists.
+
+---
+
+# 6. Routing design
+
+## 6.1 Top-level route parser
+
+Create:
 
 ```text
 shell/js/router.js
 ```
 
-It should provide pure helpers similar to:
+Pure conceptual helpers:
 
 ```js
 parseShellRoute(pathname)
@@ -442,7 +529,7 @@ buildChatHomePath()
 buildChatPath(chatId)
 ```
 
-Example parsed results:
+Expected results:
 
 ```js
 { app: 'todo', type: 'todo-home' }
@@ -451,597 +538,581 @@ Example parsed results:
 { app: 'unknown' }
 ```
 
-The root shell should own exactly one `window.popstate` listener.
+## 6.2 Root canonicalization
 
-## 4.4 Chat router refactor
+For `/`:
 
-`ChatUI/js/router/chat-router.js` should stop treating `/` as Chat home.
+```text
+history.replaceState(..., '/todo-list-ui')
+```
 
-It can either:
+not `pushState`.
 
-A. become a pure Chat route helper using `/chat-ui`, or
-B. receive route information from the root shell and stop parsing `window.location` itself.
+Back should not bounce through a meaningless root entry.
 
-Recommended: keep Chat route helpers but make the root shell authoritative.
+## 6.3 Unknown route policy
 
-Chat public helpers should build:
+Do not silently mount an arbitrary application.
+
+Recommended:
+
+```text
+unknown route
+ -> shell error/fallback state
+ -> log rejected route
+ -> replace/canonicalize to /todo-list-ui
+```
+
+## 6.4 One `popstate` owner
+
+Final seamless mode:
+
+```text
+window.popstate
+   -> shell router
+   -> determine active application
+   -> same app? delegate route
+   -> different app? lifecycle switch
+```
+
+ChatUI and To-Do must not retain independent permanent top-level `popstate` ownership.
+
+## 6.5 Chat route base
+
+ChatUI's current route assumptions must become base-path aware.
+
+Combined routes:
 
 ```text
 /chat-ui
 /chat-ui/chat/<encodedChatId>
 ```
 
-`ChatUI/js/chat/conversation.js` should call a shell-provided navigation function rather than own top-level History independently.
+Keep strict malformed route rejection.
 
-## 4.5 Same-module route changes should not remount Chat
-
-When user goes:
-
-```text
-/chat-ui/chat/A
-→ /chat-ui/chat/B
-```
-
-root shell should call Chat's route handler, not tear down/reinitialize all ChatUI.
-
-When user goes:
-
-```text
-/chat-ui/chat/A
-→ /todo-list-ui
-```
-
-root shell should run Chat's leave/unmount lifecycle and then mount To-Do.
-
-## 4.6 Legacy route compatibility
-
-If the new combined deployment replaces an existing Chat deployment, optionally support:
-
-```text
-/chat/<id> -> replace /chat-ui/chat/<id>
-```
-
-Do not make this permanent internal routing logic. It is a cutover compatibility rule.
-
-The old Chat `/` route is ambiguous after the shared root begins defaulting to To-Do. If old Chat `/` must be preserved for an existing production origin, handle that explicitly during deployment migration rather than silently guessing.
+For standalone harness testing, use the same router helpers with an explicitly configured standalone base rather than maintaining a separate router implementation.
 
 ---
 
-# 5. Root shared shell
+# 7. Final repository shape
 
-## 5.1 New files
+Keep current application folders stable.
 
-Recommended new root structure:
-
-```text
-/index.html
-/shell/
-  css/
-    shell.css
-  js/
-    app-shell.js
-    router.js
-    module-registry.js
-    dependency-loader.js
-/scripts/
-  build-static.mjs
-/wrangler.jsonc
-```
-
-Do not move the existing source folders in the first integration. Keeping `/ChatUI` and `/TodoList-ui` stable avoids hundreds of unnecessary import/path changes.
-
-## 5.2 Shell responsibilities
-
-The root shell owns only cross-application behavior:
-
-- desktop app rail;
-- mobile app navigation;
-- top-level URL parsing;
-- active module selection;
-- History/popstate;
-- module host;
-- module mount/unmount sequencing;
-- shared route transitions;
-- shell-level error UI;
-- optional active-module Settings delegation;
-- document title delegation;
-- focus after app switch;
-- shared safe-area/layout variables.
-
-It should **not** own:
-
-- Chat state;
-- Todo state;
-- either IndexedDB schema;
-- task CRUD;
-- Gemini networking;
-- Repeat rules;
-- Chat projects;
-- Todo projects/tags.
-
-## 5.3 Shared app launcher
-
-Move the concept currently implemented by To-Do's:
+Recommended final structure:
 
 ```text
-.primary-rail
-.mobile-bottom-nav
+TodoList-ui-ChatUI/
+|
+|-- index.html
+|-- shell/
+|   |-- css/
+|   |   `-- shell.css
+|   `-- js/
+|       |-- app-shell.js
+|       |-- router.js
+|       |-- module-registry.js
+|       |-- navigation.js
+|       `-- dependency-loader.js
+|
+|-- ChatUI/
+|   |-- index.html
+|   |-- css/
+|   |-- html/
+|   `-- js/
+|       `-- module.js
+|
+|-- TodoList-ui/
+|   |-- index.html
+|   |-- css/
+|   |-- html/
+|   |   `-- todo-app.html
+|   `-- js/
+|       `-- module.js
+|
+|-- scripts/
+|   `-- build-static.mjs
+|-- server.py
+|-- wrangler.jsonc
+|
+|-- implementation plan/
+|-- to-do list agent/
+`-- chat UI agent/
 ```
 
-into shell markup/styles.
-
-Use shell-specific names to avoid inheriting old Todo CSS accidentally, for example:
-
-```text
-.shell-app-rail
-.shell-app-nav-item
-.shell-mobile-nav
-```
-
-Recommended buttons/links:
-
-```text
-Tasks -> /todo-list-ui
-Chat  -> /chat-ui
-Habit -> disabled/coming soon
-Diary -> disabled/coming soon
-Settings -> active-module Settings
-```
-
-Use real anchors (`href`) even after SPA switching is enabled so browser semantics and fallback navigation remain correct.
-
-## 5.4 Shared Settings button behavior
-
-Do not try to combine the two Settings systems yet.
-
-Shell calls active module contract:
-
-```js
-activeModule.openSettings?.()
-```
-
-Expected behavior:
-
-```text
-Todo active -> To-Do Settings modal
-Chat active -> ChatUI Settings modal
-```
-
-This keeps API keys/Chat backup settings separate from Todo theme/data controls.
+Do not move everything into `/apps/chat` and `/apps/todo` during this integration. That would create import/path churn with no user benefit.
 
 ---
 
-# 6. Module lifecycle contract
+# 8. ChatUI current architecture to preserve
 
-Define one small shared contract.
+Current Chat entry/lifecycle is centered on:
 
-Suggested shape:
-
-```js
-const instance = await mountModule({
-  host,
-  route,
-  shell
-});
-
-instance.handleRoute?.(route);
-instance.openSettings?.();
-await instance.beforeLeave?.();
-await instance.unmount?.();
+```text
+ChatUI/index.html
+ChatUI/js/layout-loader.js
+ChatUI/js/app.js
 ```
 
-The shell object may expose:
+Current data remains in:
 
-```js
-shell.navigate(path, { replace })
-shell.setDocumentTitle(title)
-shell.getActiveRoute()
-shell.reportError(error)
+```text
+ChatUI_DB
 ```
 
-Do not expose application internals through the shell.
+Important current feature invariants that shell integration must not redesign:
+
+```text
+chat/project persistence
+lazy message hydration
+search
+pinned chats
+message editing/deletion/regeneration
+streamGenerateContent/SSE behavior
+HIGH thinking behavior
+model response parts/thought signatures
+Google Search
+URL Context
+Code Execution
+custom Workspace tool rounds
+Gemini Files API attachment reuse
+local attachment Blob durability
+attachment File URI reuse/expiry repair
+normal audio recording
+Live Voice
+Read Aloud
+selected-text Read Aloud
+Workspace manual UI
+right sidebar
+Chat backup/restore
+API settings/base URLs
+```
+
+Integration may add lifecycle hooks around these systems, but must not rewrite their protocol/domain behavior.
 
 ---
 
-# 7. ChatUI conversion to a mountable module
+# 9. ChatUI asset-path refactor
 
-## 7.1 Add Chat module entry
+ChatUI currently assumes it owns website-root paths in several places.
 
-Recommended new file:
+The combined app must make assets module-relative.
 
-```text
-ChatUI/js/module.js
-```
+## 9.1 Fragment loader
 
-Responsibilities:
-
-1. create `.chatui-app` root;
-2. create Chat app/overlay mount points;
-3. load Chat HTML fragments;
-4. start Chat bootstrap;
-5. pass initial shell route;
-6. retain cleanup functions;
-7. return lifecycle API.
-
-Recommended mounted DOM:
-
-```html
-<div class="chatui-app" id="chatui-module-root">
-  <div class="chatui-app-container" id="chatui-app-container"></div>
-  <div id="chatui-overlay-root"></div>
-</div>
-```
-
-Avoid reusing shell IDs such as `#app-container` as global root ownership. Internal old code can be migrated gradually with root-scoped helpers.
-
-## 7.2 Refactor `layout-loader.js`
-
-Current `layout-loader.js` executes immediately and fetches `/html/...` absolute URLs.
-
-Convert it into exported functions, e.g.:
+Refactor `ChatUI/js/layout-loader.js` into an explicit function such as:
 
 ```js
-export async function loadChatUILayout({ appContainer, overlayRoot })
+loadChatUILayout({ appContainer, overlayRoot, assetBase })
 ```
 
-Use module-relative fragment URLs:
+Use module-relative URL resolution where practical:
 
 ```js
 new URL('../html/left-sidebar.html', import.meta.url)
 ```
 
-Do the same for every fragment.
+or one explicit module asset base.
 
-This guarantees direct route `/chat-ui/chat/<id>` does not accidentally request:
-
-```text
-/chat-ui/chat/html/...
-```
-
-## 7.3 Refactor `app.js`
-
-Current `app.js` auto-runs on import.
-
-Change to explicit lifecycle:
-
-```js
-export async function startChatUI(context)
-```
-
-It should return cleanup/instance state instead of being a one-shot page script.
-
-Preserve current startup deadline and staged startup names.
-
-Do not remove startup error handling; scope error overlays to Chat root/overlay instead of `document.body`.
-
-## 7.4 Route restoration
-
-Initial Chat mount should receive the already parsed shell route:
+Never derive fragment URLs from `window.location.pathname`, because deep route:
 
 ```text
-/chat-ui
-or
-/chat-ui/chat/<id>
+/chat-ui/chat/A
 ```
 
-`app.js` should not attach another global `popstate` owner.
-
-Root shell calls Chat's `handleRoute()` for later Chat-route changes.
-
-## 7.5 Chat document title
-
-Replace direct global title writes in:
+must not cause requests such as:
 
 ```text
-ChatUI/js/chat/conversation.js
-ChatUI/js/workspace/workspace-ui.js
-ChatUI/js/workspace/workspace-navigation-bridge.js
+/chat-ui/chat/html/left-sidebar.html
 ```
 
-with shell title delegation.
+## 9.2 Standalone index
 
-Examples:
+`ChatUI/index.html` should eventually become a thin harness that loads the same `ChatUI/js/module.js` used by root shell.
 
-```text
-ChatUI
-<chat title> — ChatUI
-Workspace — ChatUI
-```
+Do not maintain separate standalone and combined Chat bootstraps long term.
 
 ---
 
-# 8. ChatUI global lifecycle cleanup
+# 10. ChatUI module boundary
 
-This is one of the most important phases. Hiding Chat is not enough.
-
-## 8.1 Generation
-
-Before leaving Chat:
-
-- abort `runtime.activeAbortController` through existing generation lifecycle;
-- ensure current generation becomes safely interrupted/persisted using existing semantics;
-- do not leave a Gemini request running invisibly in first version.
-
-Relevant:
+Create:
 
 ```text
-ChatUI/js/chat/generation-lifecycle.js
-ChatUI/js/chat/generation-runner.js
+ChatUI/js/module.js
 ```
 
-## 8.2 Composer recording
+Recommended root DOM:
 
-Before leave:
+```html
+<div class="chatui-app" id="chatui-module-root">
+  <div id="chatui-app-container"></div>
+  <div id="chatui-overlay-root"></div>
+</div>
+```
 
-- cancel active normal MediaRecorder;
-- stop MediaStream tracks;
-- clear recording runtime.
-
-Relevant:
+Responsibilities:
 
 ```text
-ChatUI/js/composer/recorder.js
+create module root
+load Chat fragments
+load/verify Chat dependencies
+start Chat application explicitly
+accept initial shell route
+return lifecycle instance
+own cleanup registrations
 ```
 
-## 8.3 Live Voice
+Refactor `ChatUI/js/app.js` away from import-time auto-start toward explicit startup.
 
-Call existing:
+Preserve the current startup ordering unless a reviewed reason requires change.
 
-```js
+---
+
+# 11. ChatUI lifecycle inventory — formal checklist
+
+Every item below must have a named mount owner and named cleanup/remount path before seamless switching.
+
+## 11.1 Router/history
+
+Current Chat router global listener must be removed/delegated.
+
+Final shell owns top-level `popstate`.
+
+## 11.2 Markdown
+
+Document-level Markdown interaction handlers need cleanup.
+
+## 11.3 Action menu/modals
+
+Global pointer/click/keydown/Escape handlers must be per-mount owned.
+
+## 11.4 Sidebar
+
+Document/window close behavior and mobile listeners must not survive unmount.
+
+## 11.5 Composer
+
+Document click/keydown/menu listeners must clean up.
+
+## 11.6 Attachment drag/drop
+
+Must clean:
+
+```text
+document dragenter/dragover/dragleave/drop
+window blur
+drag depth/state
+Chat drop overlay
+```
+
+A file dragged over To-Do must never trigger Chat's drop overlay after Chat unmount.
+
+## 11.7 Normal recorder
+
+On approved leave:
+
+```text
+stop/cancel MediaRecorder
+stop every MediaStream track
+clear recorder timers/state
+release detached references
+```
+
+Unsent recording requires `prepareDeactivate()` confirmation before discard.
+
+## 11.8 Active Gemini generation
+
+`prepareDeactivate()` determines policy first.
+
+If user confirms leaving:
+
+```text
+abort active generation through existing lifecycle
+persist interrupted state according to current semantics
+wait for cleanup boundary
+```
+
+No invisible background generation in v1.
+
+## 11.9 Live Voice
+
+After leave is approved:
+
+```text
 stopLiveVoiceMode()
 ```
 
-This must close detector/audio context/queue/timers/recording state.
+and verify microphone/audio/session/timers are closed.
 
-Relevant:
+## 11.10 Read Aloud
 
-```text
-ChatUI/js/voice/live-voice-controller.js
-ChatUI/js/voice/voice-ui.js
-```
-
-## 8.4 Read Aloud
-
-Call:
-
-```js
-stopActiveReadAloud()
-```
-
-Then remove hourly cleanup interval and page-level listener during true module unmount.
-
-Relevant:
+After leave is approved, stop active playback/generation and clean:
 
 ```text
-ChatUI/js/voice/read-aloud.js
-ChatUI/js/voice/read-selection.js
+Audio/AudioContext/session
+hourly cleanup interval
+pagehide listener
+selection listeners
 ```
 
-## 8.5 Attachment drag/drop
+Read Aloud may be safe to stop automatically after switch is approved; it does not normally require the same discard warning as an unsent recording.
 
-Current attachment handling installs document-wide drag/drop and window blur listeners and creates a body overlay.
+## 11.11 Workspace
 
-Refactor to:
-
-- register through Chat lifecycle cleanup;
-- scope drop reaction to active Chat module;
-- put drag overlay in Chat overlay root;
-- remove it on unmount;
-- reset `dragDropInitialized` so remount can bind again.
-
-Relevant:
+Audit:
 
 ```text
-ChatUI/js/composer/attachments.js
+workspace-ui
+workspace-mobile
+workspace-navigation-bridge
+search timers
+document pagination timers
+window resize listeners
+cached DOM references
+module initialized flags
 ```
 
-## 8.6 Menus/modal global listeners
+Import-time listeners must become explicit init/cleanup functions.
 
-Lifecycle-manage document listeners in:
+## 11.12 Model/thinking/right sidebar/settings controls
+
+All global listeners need cleanup/remount ownership.
+
+## 11.13 Timers/RAF/WebSocket/media
+
+Every:
 
 ```text
-ChatUI/js/chat/markdown.js
-ChatUI/js/ui/action-menu.js
-ChatUI/js/ui/modals.js
-ChatUI/js/ui/model-thinking-menu.js
-ChatUI/js/ui/chat-controls.js
-ChatUI/js/composer/composer.js
-ChatUI/js/sidebar/sidebar-layout.js
+setInterval
+long-lived setTimeout
+requestAnimationFrame loop
+WebSocket/Live session
+AudioContext
+Audio
+MediaRecorder
+MediaStream
+AbortController
 ```
 
-Do not leave Escape/click/pointer handlers alive while Todo is active.
+must have a named cleanup path.
 
-## 8.7 Workspace lifecycle
+## 11.14 `initialized` flags
 
-Current `workspace-ui.js` has:
+Do not make `initialized = false` resetting the preferred architecture.
 
-- cached directory state;
-- search timer;
-- document pagination timer;
-- window event listeners;
-- resize listener;
-- `initialized` flag.
-
-On unmount:
-
-- cancel timers;
-- detach window listeners;
-- close active Workspace surface;
-- reset `initialized` for later remount;
-- caches may be retained if safe, but no detached DOM references may remain.
-
-Relevant:
+Preferred order:
 
 ```text
-ChatUI/js/workspace/workspace-ui.js
-ChatUI/js/workspace/workspace-mobile.js
-ChatUI/js/workspace/workspace-navigation-bridge.js
+1. per-mount state
+2. init() returns cleanup()
+3. per-mount AbortController/cleanup bag
+4. reset legacy flag only as a focused transition when a larger refactor is unnecessary
 ```
 
-`workspace-navigation-bridge.js` and `workspace-mobile.js` currently install listeners as top-level module side effects. Convert them to explicit init/cleanup functions.
-
-## 8.8 Recommended listener mechanism
-
-Use one per-mount `AbortController` for global listeners wherever practical:
-
-```js
-const lifecycle = new AbortController();
-const { signal } = lifecycle;
-
-document.addEventListener('click', handler, { signal });
-window.addEventListener('resize', handler, { signal });
-```
-
-Unmount:
-
-```js
-lifecycle.abort();
-```
-
-Preserve `capture`, `passive`, etc. alongside `signal` where needed.
-
-For timers/RAF/WebSocket/MediaRecorder, explicit cleanup is still required.
-
-## 8.9 Reset one-shot flags
-
-Several Chat modules use module-level `initialized` booleans.
-
-When the Chat DOM is removed and recreated, leaving these flags `true` would mean new DOM gets no listeners.
-
-Every lifecycle-managed module must either:
-
-- stop using permanent module-level initialized flags; or
-- reset its flag during destroy.
-
-This is mandatory for reliable repeated switching.
+No module may remain permanently “initialized” while its DOM has been destroyed.
 
 ---
 
-# 9. ChatUI CSS isolation
+# 12. Exact Chat leave sequence
 
-## 9.1 Shell owns page-level CSS
+After `prepareDeactivate()` returns allow:
 
-Move page-level ownership to shell:
+```text
+1. mark Chat as leaving / block new Chat actions
+2. abort active Gemini generation if approved/needed
+3. cancel approved normal audio recording
+4. stop Live Voice
+5. stop Read Aloud
+6. close Workspace transient UI
+7. close menus/modals/sidebars
+8. clear attachment drag/drop state + overlay
+9. cancel timers/RAF and pending delayed work
+10. detach document/window/visualViewport listeners
+11. clear module-owned page/body state
+12. remove Chat-created body-level portals
+13. release detached DOM references
+14. remove Chat module root
+```
+
+If any step cannot complete safely, use hard-navigation fallback rather than mounting To-Do over it.
+
+---
+
+# 13. ChatUI CSS/theme isolation
+
+Do CSS isolation **after the real `.chatui-app` module root exists**.
+
+This is a Revision 2 phase-order correction.
+
+## 13.1 Shell owns document-level layout
+
+Final module CSS must not own:
 
 ```text
 html
 body
-box sizing
-viewport height
-root overflow
-safe areas
+:root
+root viewport overflow
+shared safe areas
 ```
 
-Chat module CSS must stop globally controlling the whole document.
+Those belong to shell.
 
-## 9.2 Namespace Chat variables
+## 13.2 Chat variables move to module root
 
-Current `ChatUI/css/main.css` puts Chat variables on `:root`.
-
-Move them to:
+Example:
 
 ```css
 .chatui-app {
   --bg-primary: ...;
   --text-primary: ...;
   --sidebar-width: ...;
-  ...
 }
 ```
 
-## 9.3 Scope Chat selectors
+## 13.3 Generic selectors are root-scoped
 
 Examples:
 
 ```css
 .chatui-app button { ... }
-.chatui-app input:focus { ... }
-.chatui-app .sidebar { ... }
 .chatui-app .modal-overlay { ... }
+.chatui-app .sidebar { ... }
+.chatui-app .empty-state { ... }
 ```
 
-Do not mechanically rename every class. Namespace through the module root first.
+Do not mass-rename every internal class/ID unless needed.
 
-## 9.4 Height behavior
+## 13.4 Theme/accent
 
-Replace module assumptions such as:
+Current Chat appearance logic must stop writing app values to `document.documentElement`.
 
-```css
-height: 100vh;
-height: 100dvh;
-```
+Apply them to `.chatui-app` or module-owned data attributes.
 
-for main module layout with:
+Persisted Chat settings remain in `ChatUI_DB` unchanged.
 
-```css
-height: 100%;
-min-height: 0;
-```
+## 13.5 Mobile height
 
-The shell module host owns viewport height.
-
-Full-screen Chat modal/voice overlays may still use `position: fixed` because only Chat is active, but they must be Chat-owned and removed on unmount.
-
-## 9.5 Mobile Chat + shared bottom nav
-
-Chat mobile composer must not sit underneath shared app navigation.
-
-Shell should expose a variable such as:
-
-```css
---shell-mobile-nav-height
-```
-
-Chat mobile composer should include the shell bottom inset when the shared mobile nav is present.
-
----
-
-# 10. ChatUI theme isolation
-
-Current Chat Settings applies theme/accent CSS variables to `document.documentElement.style`.
-
-That would recolor Todo and shell.
-
-Refactor `ChatUI/js/settings/settings.js` so:
+Main module layout should generally fill shell host:
 
 ```text
-Chat theme variables -> #chatui-module-root / .chatui-app
-not -> document.documentElement
+height: 100%
+min-height: 0
 ```
 
-Also change broad queries such as `.tab-pane` to query inside the Chat root/settings modal.
+rather than owning page `100vh/100dvh` globally.
 
-Keep Chat's persisted settings exactly where they are now.
-
-When Chat unmounts, its CSS variables disappear with the module root automatically.
+True full-screen Chat overlays may remain `position: fixed` if lifecycle ownership is explicit.
 
 ---
 
-# 11. To-Do conversion to a mountable module
+# 14. Chat external dependencies
 
-## 11.1 Do not keep giant production ownership in `TodoList-ui/index.html`
+Current working Chat libraries must remain functionally the same.
 
-Extract the To-Do-owned DOM to a reusable fragment, for example:
+Create/centralize a dependency loader, e.g.:
+
+```text
+shell/js/dependency-loader.js
+```
+
+or Chat-owned equivalent.
+
+Requirements:
+
+```text
+load Chat-only dependencies only when Chat is first needed
+cache dependency Promise
+mount waits until required globals/styles are ready
+pin currently used unpinned dependency versions to tested versions
+keep Highlight.js behavior stable
+do not replace Markdown/highlighting libraries during integration
+```
+
+Pinning is a reproducibility improvement, not permission for a dependency rewrite.
+
+---
+
+# 15. To-Do current architecture to preserve
+
+Current To-Do startup:
+
+```text
+TodoList-ui/index.html
+ -> js/bootstrap.js
+ -> js/app-main.js
+ -> IndexedDB initialize/hydrate/repair
+ -> components initialize
+```
+
+Current database:
+
+```text
+TodoListDB
+```
+
+Do not redesign during integration:
+
+```text
+TaskModel
+Task CRUD
+Subtask hierarchy
+RepeatEngine
+Repeat Ends
+Projects/Sub-projects
+Tags/Sub-tags
+TaxonomyOrder
+TaskOrder/Filter/Relations
+AppDataService serialized writes
+custom ordering
+reminder definitions
+backup format
+persistence schema
+```
+
+Keep existing staged bootstrap error categories.
+
+---
+
+# 16. To-Do DOM extraction and module boundary
+
+First create the real To-Do module root, then scope CSS around it.
+
+## 16.1 Extract reusable To-Do fragment
+
+Create:
 
 ```text
 TodoList-ui/html/todo-app.html
 ```
 
-This fragment should contain:
+It keeps:
 
-- To-Do secondary sidebar;
-- To-Do workspace;
-- task/subtask UI;
-- schedule UI;
-- project/tag modals;
-- Todo settings/backup UI;
-- Todo dynamic overlay host.
+```text
+secondary To-Do sidebar/backdrop
+workspace/header
+List/Kanban hosts
+FAB
+workspace/task menus
+Task editor
+Subtask editor
+Schedule UI
+Repeat UI
+Project/Tag dialogs
+To-Do Settings/backup UI
+To-Do-owned overlays
+```
 
-It should **not** contain the shared primary application rail/mobile app launcher after those are moved to shell.
+It does not keep:
 
-## 11.2 Add To-Do module entry
+```text
+primary cross-app rail
+shared mobile app navigation
+```
 
-Recommended:
+## 16.2 Create module entry
+
+Create:
 
 ```text
 TodoList-ui/js/module.js
@@ -1049,148 +1120,196 @@ TodoList-ui/js/module.js
 
 Responsibilities:
 
-- create `.todo-app` root;
-- load Todo fragment;
-- initialize Todo application using existing `app-main.js` stages;
-- return lifecycle methods.
+```text
+create .todo-app root
+load todo-app.html
+run current startup stages
+retain module root
+return lifecycle contract
+```
 
-## 11.3 Preserve standalone Todo harness
-
-Refactor `TodoList-ui/index.html` to use the same `module.js` in standalone mode during migration.
-
-This avoids having separate integration code and standalone code drift apart.
+`TodoList-ui/index.html` later becomes a thin standalone harness around this same module.
 
 ---
 
-# 12. To-Do lifecycle cleanup
+# 17. To-Do `prepareDeactivate()` policy
 
-## 12.1 Wait for persistent writes
+This is mandatory before seamless switching.
 
-Before leaving Todo:
+## 17.1 Unsaved editors
+
+If Task/Subtask/Project/Tag editor has unsaved user input:
+
+```text
+Switch applications?
+Unsaved changes will be discarded.
+[Stay] [Switch]
+```
+
+Do not destroy user input merely because Chat was clicked.
+
+## 17.2 Destructive restore
+
+If To-Do backup restore is actively replacing data:
+
+```text
+block app switch
+```
+
+Do not interrupt a destructive transaction halfway.
+
+## 17.3 Pending writes
+
+The shell does not know `AppDataService`.
+
+Inside To-Do `beforeLeave()`:
 
 ```js
 await AppDataService.whenIdle();
 ```
 
-This protects its serialized write queue.
-
-Do not simply remove Todo DOM while a task/project/tag drag commit or CRUD write is pending.
-
-## 12.2 Cancel drag sessions
-
-Before unmount:
-
-- cancel active task drag safely;
-- cancel pending touch drag timers;
-- stop drag RAF auto-scroll;
-- remove task drag floating/placeholder DOM;
-- cancel taxonomy drag;
-- remove taxonomy drag layer;
-- clear body/module drag classes;
-- remove global pointer/touch listeners.
-
-Relevant:
-
-```text
-TodoList-ui/js/components/task-drag.js
-TodoList-ui/js/components/task-drag-touch.js
-TodoList-ui/js/components/task-drag-hierarchy.js
-TodoList-ui/js/components/task-drag-commit.js
-TodoList-ui/js/components/sidebar-taxonomy-drag.js
-TodoList-ui/js/components/sidebar-taxonomy-drag-touch.js
-TodoList-ui/js/components/sidebar-taxonomy-drag-hierarchy.js
-TodoList-ui/js/components/sidebar-taxonomy-drag-commit.js
-```
-
-Do not commit an unfinished preview automatically when switching modules. Cancel it.
-
-## 12.3 Global To-Do listeners
-
-Lifecycle-manage listeners installed by:
-
-```text
-SidebarComponent
-WorkspaceControls
-TasksComponent
-SubtaskEditorComponent
-ModalFocusManager
-Task action/menu systems
-visualViewport resize/scroll hooks
-window resize/blur hooks
-document click/keydown/touch/pointer hooks
-```
-
-The same per-mount `AbortController`/cleanup-bag strategy should be used.
-
-## 12.4 `window.*` component bridges
-
-Current To-Do code uses globals such as:
-
-```text
-window.SidebarComponent
-window.WorkspaceControls
-window.TasksComponent
-window.SubtaskEditorComponent
-```
-
-For the first integration, they may temporarily remain because many existing modules use them.
-
-Rules:
-
-1. assign them only while Todo is mounted;
-2. clear them on unmount if they point to the Todo instance;
-3. do not create similarly named Chat globals;
-4. later replacement by direct ES imports can be a separate maintainability task.
-
-Do not combine this integration with a giant global-removal rewrite.
-
-## 12.5 Dynamic Todo body portals
-
-Current code appends several things to `document.body`, including:
-
-- taxonomy drag layer;
-- task parent picker;
-- dynamic Repeat Ends modal;
-- storage error banner;
-- temporary backup download anchor.
-
-Create a Todo overlay/portal root and move persistent UI portals there:
-
-```html
-<div data-todo-overlay-root></div>
-```
-
-Transient download anchors may still use `document.body` if removed immediately, but no persistent Todo UI should survive Todo unmount.
+after drag/editor transitions are made safe.
 
 ---
 
-# 13. To-Do CSS isolation
+# 18. To-Do lifecycle inventory
 
-## 13.1 Move To-Do variables from root
+## 18.1 Task drag
 
-Current:
+On approved leave:
 
 ```text
-TodoList-ui/css/variables.css
+cancel active drag
+cancel pending long-press/touch timers
+cancel pointer/touch session
+stop drag RAF/auto-scroll
+remove floating drag unit
+remove placeholder
+remove task drag layer
+clear body/module drag classes
+remove document pointer/touch/key/contextmenu handlers
+remove window blur handler
 ```
 
-uses `:root`, `[data-theme="dark"]`, `[data-theme="light"]` with names that collide with Chat.
+Do not auto-commit an unfinished preview simply because app switching started.
 
-Change to module namespace, e.g.:
+## 18.2 Taxonomy drag
+
+Clean the equivalent Project/Tag hierarchy drag state:
+
+```text
+active/pending session
+touch timers
+RAF/auto-scroll
+floating node
+placeholder
+body drag layer/classes
+document/window handlers
+drag-reveal attributes
+```
+
+## 18.3 ModalFocusManager
+
+Make modal registration/remount safe.
+
+Preferred explicit lifecycle:
+
+```text
+init(root)
+destroy()
+```
+
+Destroy must clear focus stack and remove global key handler.
+
+## 18.4 Sidebar/Workspace/Tasks/Subtask/Schedule
+
+Audit every:
+
+```text
+document listener
+window listener
+visualViewport listener
+resize/scroll callback
+long-lived timer
+```
+
+and give it a cleanup path.
+
+## 18.5 `window.*` compatibility bridges
+
+Current temporary bridges may remain during first integration if removing them would expand scope.
+
+Examples:
+
+```text
+window.TasksComponent
+window.SidebarComponent
+window.WorkspaceControls
+window.ScheduleComponent
+window.SubtaskEditorComponent
+```
+
+Rules:
+
+```text
+assign only while To-Do is mounted
+shell never uses them
+clear only references owned by that mounted instance on unmount
+no stale detached DOM references
+```
+
+---
+
+# 19. To-Do portals and viewport drag layers
+
+Revision 2 adds an important nuance.
+
+Prefer a To-Do-owned overlay root for ordinary persistent module UI.
+
+However, do **not** blindly force every drag layer into the module root.
+
+Some drag layers use viewport coordinates and may require body-level positioning to avoid clipping.
+
+For body-level nodes that are technically necessary:
+
+```text
+namespace class/id
+tag ownership as To-Do
+retain direct node reference
+remove on unmount
+remove related body classes/attributes
+never leave anonymous persistent To-Do DOM behind
+```
+
+Same principle applies to ChatUI body-level portals if any are truly required.
+
+---
+
+# 20. To-Do CSS/theme isolation
+
+Do this after `.todo-app` and the reusable To-Do fragment/module exist.
+
+## 20.1 Variables
+
+Move:
+
+```text
+:root
+[data-theme="dark"]
+[data-theme="light"]
+```
+
+ownership to:
 
 ```css
-.todo-app {
-  --font-family: ...;
-  --spacing-xs: ...;
-}
-
+.todo-app { ... }
 .todo-app[data-theme="dark"] { ... }
 .todo-app[data-theme="light"] { ... }
 ```
 
-## 13.2 Remove global body ownership
+## 20.2 Global resets/layout
 
-`TodoList-ui/css/layout/app-shell.css` currently styles:
+Move page-global To-Do rules from:
 
 ```text
 *
@@ -1198,41 +1317,35 @@ body
 #app
 ```
 
-Move resets/styles into `.todo-app` or shell as appropriate.
+into module scope or shell, depending on true ownership.
 
-## 13.3 Shared rail no longer belongs to Todo
+## 20.3 Shared rail extraction
 
-Remove `.primary-rail` and `.mobile-bottom-nav` production ownership from Todo CSS after their shell equivalents exist.
+Once shell launcher exists, To-Do CSS must no longer own shared app-rail/mobile-nav layout.
 
-Todo secondary sidebar should no longer offset itself using the old internal rail width because shell already takes that space.
+Its secondary sidebar coordinates start from the module host, not from an internally-owned primary rail.
 
-For example, its desktop module coordinate should start at module-host left `0`, not `left: var(--primary-rail-width)`.
+## 20.4 `body.modal-open`
 
-## 13.4 `body.modal-open`
+Move module-specific modal state toward:
 
-Current quick-task CSS uses:
-
-```css
-body.modal-open ...
+```text
+.todo-app.modal-open
 ```
 
-Move this state to the Todo root:
+where technically practical.
 
-```css
-.todo-app.modal-open ...
-```
+If a body-level state remains temporarily necessary, it must be owned/removed by lifecycle cleanup.
 
-Todo code should add/remove `modal-open` on Todo root, not body.
+## 20.5 Generic classes
 
-## 13.5 Generic component selectors
+Namespace through `.todo-app` rather than a giant rename.
 
-Namespace generic Todo selectors:
+Examples:
 
 ```text
 .modal-overlay
 .modal-card
-.modal-title
-.setting-row
 .btn-primary
 .context-menu
 .calendar-day
@@ -1240,1299 +1353,1223 @@ Namespace generic Todo selectors:
 .header-left
 ```
 
-under `.todo-app`.
-
 ---
 
-# 14. To-Do theme isolation
+# 21. Optional appearance bridge
 
-Current `TodoList-ui/js/theme.js` writes:
+First safe combined release may use a stable neutral shell theme.
+
+Later, modules may report appearance:
 
 ```js
-document.documentElement.setAttribute('data-theme', ...)
+getAppearance() -> { theme, accent }
 ```
 
-and uses localStorage key:
+or notify shell on changes.
+
+Boundary:
 
 ```text
-theme
+module reports appearance
+shell maps it to --shell-* variables
 ```
 
-Change theme rendering to the Todo root:
+Never:
 
-```js
-todoRoot.dataset.theme = themeName;
+```text
+shell directly reads application settings database
+module writes its CSS variables onto shell/html root
 ```
 
-Keep the existing `localStorage` key during this integration to avoid unnecessary preference migration.
-
-The shell should use its own neutral theme or a separate shell setting; it must not depend on Todo's generic `theme` variable.
+This is polish, not a blocker for first combined release.
 
 ---
 
-# 15. DOM ID strategy
+# 22. DOM ID collision strategy
 
-Because only one application is mounted at a time, we do **not** need a dangerous mass rename of every internal ID.
+Confirmed overlapping names are safe only because one module is mounted at a time.
 
-However new shell/module-owned IDs must be unique and clearly prefixed.
+Do not mass-rename every existing internal ID.
 
-Recommended:
+New integration IDs must be prefixed:
 
 ```text
 #shell-app
-#shell-primary-nav
 #shell-module-host
 #shell-status-root
-
 #chatui-module-root
 #chatui-app-container
 #chatui-overlay-root
-
 #todo-module-root
 ```
 
-Internal existing IDs like Chat's `#project-list` and Todo's `#project-list` can coexist safely in source because their DOM trees are never mounted together.
+For newly refactored lifecycle-sensitive code, prefer root-scoped query methods over global lookups where reasonable.
 
-Prefer root-scoped lookup helpers over `document.getElementById` for newly refactored module code.
-
-Example:
-
-```js
-function chatById(id) {
-  return chatRoot.querySelector(`#${CSS.escape(id)}`);
-}
-```
-
-Do not rewrite every lookup in a single phase; migrate the lifecycle-sensitive/common ones first.
+Do not create a giant mechanical `document.getElementById` rewrite solely for aesthetics.
 
 ---
 
-# 16. External/global dependency handling
+# 23. Data/origin migration — critical
 
-ChatUI currently depends on global CDN resources from its standalone `index.html`:
+Browser storage is origin-scoped:
 
 ```text
-Lucide
-marked
-highlight.js
-highlight.js CSS
+scheme + hostname + port
 ```
 
-Todo mostly uses inline SVG and does not require the same globals.
+Current local development origins are different:
 
-Recommended root design:
-
-```js
-await loadChatDependencies();
-await mountChatUI(...);
+```text
+To-Do:  http://localhost:6846
+ChatUI: http://localhost:8000
 ```
 
-Requirements:
+Therefore:
 
-- load Chat-only dependencies only when Chat is first needed;
-- cache dependency Promise so switching back does not duplicate scripts;
-- pin Lucide to an exact tested version instead of `@latest`;
-- pin marked/highlight versions;
-- preferably vendor or scope Highlight's stylesheet so it does not unexpectedly affect Todo;
-- keep `lucide.createIcons()` behavior for Chat.
+```text
+TodoListDB at localhost:6846
+!=
+TodoListDB at localhost:8000
+```
 
-Do not introduce React/Vite/Webpack/etc. merely to combine these vanilla applications.
+Same database name does not move data across origins.
+
+## 23.1 Before cutover
+
+Create and verify:
+
+```text
+To-Do backup from old To-Do origin
+ChatUI backup from old Chat origin
+```
+
+Chat backups may contain API credentials and must remain private.
+
+## 23.2 Combined local origin
+
+If combined local development uses:
+
+```text
+http://localhost:8000
+```
+
+then Chat data on that exact origin may already exist, but old To-Do data from `6846` must be restored into the new origin.
+
+Verify; do not assume.
+
+## 23.3 Production origin
+
+If deployment hostname changes, both applications require backup/restore migration.
+
+Do not create cross-origin browser hacks to read old IndexedDB.
+
+## 23.4 Rollback
+
+Keep old deployments/origins and backups available until:
+
+```text
+counts verified
+messages/attachments verified
+tasks/projects/tags verified
+settings verified
+backup/restore re-tested
+combined application stable
+```
+
+Never automatically delete old browser data during cutover.
 
 ---
 
-# 17. Data ownership and persistence
+# 24. Backup architecture
 
-## 17.1 Keep databases separate
-
-Final combined application should still have:
+First combined release keeps backups separate:
 
 ```text
-ChatUI_DB
-TodoListDB
+To-Do Settings -> To-Do backup/restore
+Chat Settings  -> ChatUI backup/restore
 ```
 
-No merge.
+Do not create a new combined backup schema in this integration plan.
 
-Benefits:
-
-- no destructive schema migration;
-- each app's backup stays understandable;
-- rollback remains simple;
-- app changes stay isolated;
-- less chance of losing existing data.
-
-## 17.2 Do not bump DB versions for shell integration
-
-Routing/CSS/mounting changes do not require a database version bump.
-
-Only change a database schema if a separate data requirement demands it.
-
-## 17.3 localStorage ownership
-
-Known Chat keys include legacy migration/temporary diagnostics such as:
-
-```text
-chat_app_data
-chat_app_data_indexeddb_migrated
-chatui_temp_performance_diagnostics_v1
-```
-
-Todo uses:
-
-```text
-theme
-```
-
-Do not reuse those names in shell.
-
-Shell keys, if any, should use a namespace, e.g.:
-
-```text
-combined_app_...
-```
-
-Avoid creating a shell preference unless it is actually needed.
+A combined backup can be a separate future project after shell integration stabilizes.
 
 ---
 
-# 18. Origin migration — critical data warning
+# 25. Root local SPA server
 
-IndexedDB and localStorage are **origin-scoped**.
-
-This means:
-
-```text
-same database name + different website origin
-≠ same data
-```
-
-If the new combined app is deployed at a new hostname/domain, it cannot directly read the old application's IndexedDB from another origin.
-
-Therefore production cutover must include backup/restore.
-
-## 18.1 Before cutover
-
-On old Chat deployment:
-
-```text
-Create ChatUI full backup
-```
-
-On old Todo deployment:
-
-```text
-Create Todo backup
-```
-
-## 18.2 New combined origin
-
-Deploy combined app, then restore:
-
-```text
-Chat backup -> ChatUI_DB on new origin
-Todo backup -> TodoListDB on new origin
-```
-
-## 18.3 If combined app reuses one existing origin
-
-Only data belonging to that exact origin will already be visible.
-
-Example:
-
-```text
-Combined app replaces old Chat origin
-→ ChatUI_DB may already be there
-→ TodoListDB from a different old origin will not be there
-```
-
-Todo still needs backup/restore.
-
-## 18.4 Rollback
-
-Keep old deployments available until:
-
-- data counts verified;
-- messages/attachments verified;
-- Todo tasks/projects/tags verified;
-- backup/restore verified;
-- combined app stable for rollback window.
-
-Do not delete the old deployments immediately after first successful load.
-
----
-
-# 19. Build and Cloudflare deployment
-
-## 19.1 Current Chat build is standalone-specific
-
-Current:
-
-```text
-ChatUI/scripts/build-static.mjs
-ChatUI/wrangler.jsonc
-```
-
-The Chat build copies standalone `index.html`, `css`, `html`, `js` into Chat's own `dist/`.
-
-Final production needs a root build instead.
-
-## 19.2 New root build
-
-Add:
-
-```text
-/scripts/build-static.mjs
-```
-
-It should create:
-
-```text
-dist/
-  index.html
-  shell/
-  ChatUI/
-    css/
-    html/
-    js/
-  TodoList-ui/
-    css/
-    html/
-    js/
-```
-
-Include only runtime assets actually needed.
-
-## 19.3 Do not deploy internal agent/planning files
-
-The root build must **not** copy the repository blindly.
-
-Do not publish:
-
-```text
-chat UI agent/
-to-do list agent/
-implementation plans
-handoff/internal notes
-unneeded local server scripts
-secrets
-```
-
-Use an allow-list build.
-
-## 19.4 Root Wrangler
+**New required area in Revision 2.**
 
 Create root:
 
 ```text
+/server.py
+```
+
+Requirements:
+
+```text
+serve root/runtime files normally
+serve extensionless known SPA routes with root index.html
+support /todo-list-ui
+support /chat-ui
+support /chat-ui/chat/<id>
+configurable port
+clear startup URL output
+LAN binding option for real-phone testing
+safe static path handling
+```
+
+A plain server that treats `/chat-ui/chat/A` as a physical file path will fail direct refresh.
+
+This local server is required independently of Cloudflare's production SPA fallback.
+
+---
+
+# 26. Root build and deployment
+
+Create root:
+
+```text
+/scripts/build-static.mjs
 /wrangler.jsonc
 ```
 
-with static assets pointing to root `dist/` and:
+## 26.1 Build is a strict allow-list
+
+Do not copy repository root wholesale and try to subtract internal files later.
+
+Explicitly include only runtime assets:
+
+```text
+index.html
+shell runtime assets
+ChatUI runtime css/html/js/assets
+TodoList-ui runtime css/html/js/assets
+required runtime metadata
+```
+
+Explicitly do not deploy:
+
+```text
+chat UI agent/
+to-do list agent/
+implementation plan/
+implementation-plan review docs
+internal handoff notes
+local-only diagnostics not required at runtime
+source-control metadata
+secrets
+backup files
+```
+
+## 26.2 Output shape
+
+Recommended:
+
+```text
+dist/
+|-- index.html
+|-- shell/
+|-- ChatUI/
+`-- TodoList-ui/
+```
+
+Do not flatten both apps into generic `dist/css`, `dist/js`, `dist/html` folders.
+
+## 26.3 Cloudflare
+
+Root deployment becomes production owner.
+
+Preserve SPA fallback:
 
 ```json
 "not_found_handling": "single-page-application"
 ```
 
-This is necessary so a direct browser request to:
+Direct requests must return root shell for:
 
 ```text
-/chat-ui/chat/<id>
-```
-
-returns root `index.html`, then client router mounts ChatUI and opens that conversation.
-
----
-
-# 20. Migration implementation phases
-
-Every phase should be independently reviewable and reversible. Do not combine these into one giant commit.
-
----
-
-## Phase 0 — Freeze baseline, route contract, and acceptance baseline
-
-### Purpose
-
-Create a known-good reference before structural work.
-
-### Actions
-
-1. Record source commit being migrated.
-2. Confirm standalone Chat works from `ChatUI/index.html`.
-3. Confirm standalone Todo works from `TodoList-ui/index.html`.
-4. Record database names/versions.
-5. Confirm backups can be created before structural changes.
-6. Approve canonical route contract:
-
-```text
-/ -> /todo-list-ui
 /todo-list-ui
 /chat-ui
 /chat-ui/chat/<id>
 ```
 
-7. Decide production combined origin before final cutover.
-
-### Runtime files changed
-
-None unless a baseline diagnostic is strictly needed.
-
-### Acceptance
-
-Both current apps remain unchanged and independently usable.
+Keep old standalone deployment configs during migration until root deployment is verified.
 
 ---
 
-## Phase 1 — Add neutral root shell skeleton
+# 27. Agent/file ownership during implementation
 
-### Add
+Revision 2 makes coordination explicit.
+
+This is not a permission model enforced by code; it is a workflow boundary to reduce accidental cross-domain edits.
+
+## 27.1 Shared integration owner
+
+Owns/co-ordinates:
+
+```text
+/index.html
+/shell/**
+/scripts/build-static.mjs
+/server.py
+/wrangler.jsonc
+shared route contract
+shared navigation
+module registry
+cross-module verification
+```
+
+Changes to these files should be coordinated because both applications depend on them.
+
+## 27.2 Chat UI agent primary ownership
+
+```text
+ChatUI/index.html
+ChatUI/js/module.js
+ChatUI/js/layout-loader.js
+ChatUI/js/app.js
+ChatUI/js/router/**
+ChatUI/js/chat/conversation.js
+ChatUI lifecycle cleanup
+ChatUI CSS/theme scoping
+Chat dependencies
+Chat Settings bridge
+Chat route/base path changes
+Chat generation/voice/audio leave handling
+ChatUI_DB preservation
+```
+
+## 27.3 To-Do agent primary ownership
+
+```text
+TodoList-ui/index.html
+TodoList-ui/html/todo-app.html
+TodoList-ui/js/module.js
+TodoList-ui/js/bootstrap.js
+TodoList-ui/js/app-main.js
+TodoList-ui lifecycle cleanup
+TodoList-ui CSS/theme scoping
+To-Do Settings bridge
+To-Do drag/taxonomy drag cleanup
+TodoListDB preservation
+```
+
+## 27.4 Coordination rule
+
+Neither agent should modify the other's domain/persistence internals merely because an integration file references them.
+
+If a shared contract requires change, coordinate through agreed integration docs/questions first.
+
+---
+
+# 28. Revised implementation phase order
+
+This phase order supersedes Revision 1 where it conflicts.
+
+The critical improvement is:
+
+```text
+create real module roots first
+THEN scope CSS/themes around those actual roots
+```
+
+Do not create broad CSS namespaces around a wrapper that does not yet exist as the real module boundary.
+
+---
+
+# Phase 0 — Baseline, data safety, and branch
+
+## Goal
+
+Freeze a known-good starting point.
+
+## Actions
+
+```text
+confirm latest main
+create dedicated integration branch
+confirm standalone ChatUI works
+confirm standalone To-Do works
+record DB names/versions
+record local origins/ports
+create To-Do backup
+create ChatUI backup
+approve route contract
+do not change DB schema
+```
+
+## Gate
+
+Stop if either standalone app is already broken.
+
+---
+
+# Phase 1 — Root shell skeleton/router only
+
+Create:
 
 ```text
 /index.html
 /shell/css/shell.css
+/shell/js/app-shell.js
 /shell/js/router.js
 /shell/js/module-registry.js
-/shell/js/app-shell.js
+/shell/js/navigation.js
 ```
 
-### Requirements
+At this phase:
 
-- shell has no Chat/Todo business logic;
-- shell CSS uses only `--shell-*` variables;
-- root `/` canonicalizes to `/todo-list-ui`;
-- root router recognizes all target routes;
-- shared nav exists but may initially use ordinary page navigation/fallback;
-- no current module code needs to be destroyed in this phase.
+```text
+no module cutover
+no DB changes
+no lifecycle rewrite
+```
 
-### Acceptance
-
-Route parser tests/manual checks correctly identify Todo/Chat/deep Chat route/unknown.
+Verify route parser/canonicalization and neutral shell structure.
 
 ---
 
-## Phase 2 — Make ChatUI asset loading base-path safe
+# Phase 2 — Make ChatUI assets relocatable
 
-### Change
+Primary files:
 
 ```text
 ChatUI/index.html
 ChatUI/js/layout-loader.js
 ```
 
-### Requirements
+Requirements:
 
-- remove reliance on root `/css`, `/js`, `/html` for Chat's standalone loader;
-- fragments resolve relative to module source, not browser route;
-- expose reusable layout loading function;
-- preserve current fragment order;
-- preserve `#app-container`/overlay semantics in standalone harness until module mount is ready.
+```text
+module-relative/configurable CSS/fragment paths
+no browser-route-relative fragment fetches
+standalone Chat still works
+```
 
-### Acceptance
+Gate:
 
-Chat standalone still starts and all fragments load.
-
-Test from paths that prove route depth cannot break fragment resolution.
+```text
+Chat fragments load
+new/open chat
+settings
+attachments
+Workspace basic UI
+voice/read surfaces open
+```
 
 ---
 
-## Phase 3 — Prefix Chat routes
+# Phase 3 — Make Chat routing base-path aware
 
-### Change
+Primary files:
 
 ```text
 ChatUI/js/router/chat-router.js
 ChatUI/js/chat/conversation.js
-ChatUI/js/app.js
-ChatUI/js/workspace/workspace-navigation-bridge.js
+related route bridge code
 ```
 
-### Requirements
-
-- Chat canonical home becomes `/chat-ui`;
-- conversations become `/chat-ui/chat/<id>`;
-- parsing/building works with encoded IDs;
-- Chat internal operations no longer reset top-level route to `/`;
-- prepare shell navigation injection;
-- preserve Back/Forward behavior in standalone test harness.
-
-### Acceptance
-
-Direct Chat home, open chat, new chat, Back, Forward all use new paths.
-
----
-
-## Phase 4 — Isolate Chat CSS and theme
-
-### Change
-
-Main Chat CSS aggregators/subfiles as required, especially:
+Support:
 
 ```text
-ChatUI/css/main.css
-ChatUI/css/responsive.css
-ChatUI/css/sidebar/shell.css
-ChatUI/css/chat/layout.css
-ChatUI/css/components/modals.css
-ChatUI/css/components/right-sidebar.css
-ChatUI/js/settings/settings.js
+/chat-ui
+/chat-ui/chat/<id>
 ```
 
-### Requirements
-
-- `.chatui-app` owns Chat vars;
-- no Chat global body/reset/theme ownership;
-- global button/input rules scoped;
-- Chat theme/accent writes to module root;
-- mobile layout uses module host;
-- Chat standalone harness applies `.chatui-app` root so appearance remains equivalent.
-
-### Acceptance
-
-Chat looks and behaves the same standalone.
-
-A neutral element outside `.chatui-app` must not receive Chat button/modal/theme styling.
-
----
-
-## Phase 5 — Create explicit Chat mount/bootstrap
-
-### Add/change
+Preserve:
 
 ```text
-ChatUI/js/module.js
-ChatUI/js/app.js
-ChatUI/js/layout-loader.js
-ChatUI/index.html
+new chat
+open chat
+Back/Forward
+missing/deleted chat behavior
+deep-link refresh semantics
 ```
 
-### Requirements
-
-- importing module does not auto-bootstrap page;
-- `mountChatUI()` creates/loads Chat DOM;
-- startup receives route/shell interface;
-- returns module instance;
-- standalone Chat index simply mounts the same module;
-- preserve staged startup deadline/error UI.
-
-### Acceptance
-
-Mount Chat into arbitrary host div without Chat owning complete body.
+Do not yet require seamless cross-app switching.
 
 ---
 
-## Phase 6 — Extract To-Do-owned markup
+# Phase 4 — Extract To-Do module DOM
 
-### Add/change
+Create:
 
 ```text
 TodoList-ui/html/todo-app.html
-TodoList-ui/index.html
+```
+
+Separate:
+
+```text
+shared app navigation -> shell future ownership
+To-Do application DOM -> reusable fragment
+```
+
+Standalone To-Do must remain visually/functionally equivalent.
+
+---
+
+# Phase 5 — Create To-Do mount entry
+
+Create:
+
+```text
 TodoList-ui/js/module.js
-TodoList-ui/js/bootstrap.js
-TodoList-ui/js/app-main.js
 ```
 
-### Requirements
+Refactor:
 
-- remove shared app rail/mobile launcher from Todo-owned fragment;
-- keep all Todo task/sidebar/modal markup intact;
-- standalone Todo index mounts same Todo module;
-- preserve staged bootstrap categories;
-- no CRUD/repeat/storage rewrite.
+```text
+bootstrap.js -> standalone harness wrapper
+app-main.js -> reusable To-Do startup owner
+```
 
-### Acceptance
+Establish real:
 
-Standalone Todo remains behaviorally equivalent without depending on duplicated markup.
+```text
+.todo-app
+#todo-module-root
+```
+
+before broad CSS namespace work.
 
 ---
 
-## Phase 7 — Isolate To-Do CSS and theme
+# Phase 6 — Create ChatUI mount entry
 
-### Change
-
-At minimum:
+Create:
 
 ```text
-TodoList-ui/css/variables.css
-TodoList-ui/css/layout/app-shell.css
-TodoList-ui/css/layout/sidebar-layout.css
-TodoList-ui/css/layout/workspace-layout.css
-TodoList-ui/css/components/modal-controls.css
-TodoList-ui/css/components/quick-task.css
-TodoList-ui/js/theme.js
+ChatUI/js/module.js
 ```
 
-plus other CSS files containing generic selectors as discovered during implementation.
+Refactor:
 
-### Requirements
+```text
+layout-loader -> explicit loader
+app.js -> explicit start function
+index.html -> standalone harness
+```
 
-- `.todo-app` owns Todo vars;
-- Todo theme on module root;
-- body/modal state moved to module root;
-- secondary sidebar no longer assumes Todo owns primary rail;
-- shell owns desktop rail/mobile nav space;
-- generic CSS scoped under `.todo-app`.
+Establish real:
 
-### Acceptance
+```text
+.chatui-app
+#chatui-module-root
+```
 
-Todo standalone appearance/behavior preserved.
-
-Neutral elements outside `.todo-app` remain unaffected by Todo CSS.
+before broad CSS namespace work.
 
 ---
 
-## Phase 8 — Move app launcher ownership into shell
+# Phase 7 — Isolate ChatUI CSS/theme
 
-### Move/recreate from Todo design
+Scope Chat styling to `.chatui-app`.
 
-- desktop primary rail;
-- mobile app bottom nav;
-- app active states;
-- shared app Settings trigger.
+Move Chat theme/accent away from `document.documentElement`.
 
-### Requirements
+Keep shell/neutral elements unaffected.
 
-- Tasks navigates `/todo-list-ui`;
-- Chat navigates `/chat-ui`;
-- Chat replaces current placeholder AI app role;
-- Habit/Diary can remain disabled placeholders;
-- shell app nav is available regardless of active module;
-- shell nav CSS is independent from Todo theme variables.
+Verify standalone Chat behavior including mobile.
 
-### Acceptance
-
-Both routes show same persistent launcher but correct module-specific secondary layout.
+This is a separate rollback checkpoint from To-Do CSS work.
 
 ---
 
-## Phase 9 — Root shell mounts one module by URL
+# Phase 8 — Isolate To-Do CSS/theme
 
-### Change
+Scope To-Do styling to `.todo-app`.
 
-```text
-shell/js/app-shell.js
-shell/js/module-registry.js
-```
+Move To-Do theme away from `document.documentElement`.
 
-### First safe version
+Remove To-Do ownership assumptions for primary rail/mobile app nav.
 
-It is acceptable initially for app launcher anchors to perform a **full page reload** between `/todo-list-ui` and `/chat-ui`.
+Keep shell/neutral elements unaffected.
 
-Why this intermediate step is valuable:
-
-- immediately proves root routing/build/deep links;
-- guarantees only one module initialization;
-- avoids pretending unmount lifecycle is ready before it is;
-- provides a safe combined website early.
-
-### Acceptance
-
-- `/todo-list-ui` loads Todo through root shell;
-- `/chat-ui` loads Chat through root shell;
-- `/chat-ui/chat/<id>` direct reload works;
-- both data stores are visible on same origin;
-- shared navigation remains present.
+This is a separate rollback checkpoint from Chat CSS work.
 
 ---
 
-## Phase 10 — Complete Chat `beforeLeave()` / `unmount()`
+# Phase 9 — Move shared launcher ownership to shell
 
-### Refactor lifecycle-sensitive Chat files
+Create the real shared desktop/mobile launcher using To-Do design as donor.
 
-Including at least:
-
-```text
-ChatUI/js/app.js
-ChatUI/js/chat/markdown.js
-ChatUI/js/ui/action-menu.js
-ChatUI/js/ui/modals.js
-ChatUI/js/ui/model-thinking-menu.js
-ChatUI/js/ui/chat-controls.js
-ChatUI/js/sidebar/sidebar-layout.js
-ChatUI/js/composer/composer.js
-ChatUI/js/composer/attachments.js
-ChatUI/js/composer/recorder.js
-ChatUI/js/voice/read-selection.js
-ChatUI/js/voice/read-aloud.js
-ChatUI/js/voice/live-voice-controller.js
-ChatUI/js/workspace/workspace-ui.js
-ChatUI/js/workspace/workspace-mobile.js
-ChatUI/js/workspace/workspace-navigation-bridge.js
-```
-
-### `beforeLeave()` sequence
-
-Recommended:
+Use real links:
 
 ```text
-1. block new Chat actions
-2. abort active Gemini generation safely
-3. cancel normal audio recording
-4. stop Live Voice
-5. stop Read Aloud
-6. close Workspace transient UI
-7. close menus/modals
-8. clear attachment drag state/overlay
-9. cancel timers/RAF
-10. detach document/window listeners
-11. remove Chat root
+Tasks -> /todo-list-ui
+Chat -> remembered Chat route or /chat-ui
 ```
 
-### Acceptance
+Keep Habit/Diary as disabled placeholders if still desired.
 
-Mount -> unmount -> mount Chat repeatedly and every action fires once.
+Settings delegates to active module.
 
 ---
 
-## Phase 11 — Complete Todo `beforeLeave()` / `unmount()`
+# Phase 10 — First canonical combined release with full reload switching
 
-### Relevant components
+Root `index.html` becomes canonical.
 
-- Sidebar
-- WorkspaceControls
-- Tasks
-- Task/subtask menu/drag
-- taxonomy drag
-- Schedule
-- ModalFocusManager
-- Settings
-- dynamic portals
-
-### `beforeLeave()` sequence
+Behavior:
 
 ```text
-1. block new Todo actions
-2. cancel pending/active task drag
-3. cancel pending/active taxonomy drag
-4. close task/taxonomy/context menus
-5. close modals without committing draft changes
-6. await AppDataService.whenIdle()
-7. cancel timers/RAF/viewport hooks
-8. detach global listeners
-9. clear window Todo component references
-10. remove Todo root
+/todo-list-ui -> root shell + only To-Do
+/chat-ui... -> root shell + only ChatUI
 ```
 
-### Acceptance
+Cross-app links perform full browser navigation.
 
-Mount -> unmount -> mount Todo repeatedly with no duplicate click/touch/keyboard behavior and no lost writes.
+This phase is intentionally shippable even if true `unmount()` does not yet exist.
+
+Verify:
+
+```text
+URLs
+deep links
+shared rail
+styles
+data visibility on combined origin
+no two module DOMs
+```
 
 ---
 
-## Phase 12 — Enable soft SPA application switching
+# Phase 11 — To-Do `prepareDeactivate()` + lifecycle cleanup
 
-Only after Phases 10 and 11 pass.
-
-### Shell behavior
-
-Intercept same-origin shell nav anchors.
-
-Switch algorithm:
+Add:
 
 ```text
-user clicks Chat
-  ↓
-active Todo.beforeLeave()
-  ↓
-active Todo.unmount()
-  ↓
-history.pushState(/chat-ui)
-  ↓
+unsaved-editor guard
+restore-operation blocker
+pending-write handling
+full drag/taxonomy cleanup
+listener/timer cleanup
+window-global cleanup
+portal cleanup
+remount safety
+```
+
+Required test in one page lifetime:
+
+```text
+mount To-Do
+unmount To-Do
+mount To-Do
+repeat
+```
+
+Every action must fire once.
+
+---
+
+# Phase 12 — Chat `prepareDeactivate()` + lifecycle cleanup
+
+Add:
+
+```text
+generation leave policy
+recording confirmation
+Live Voice stop
+Read Aloud stop
+Workspace cleanup
+attachment drag cleanup
+all global listener cleanup
+timer/RAF/media cleanup
+remount-safe initialized state
+```
+
+Use exact Chat leave sequence from this plan.
+
+Required test:
+
+```text
 mount Chat
+unmount Chat
+mount Chat
+repeat
 ```
 
-Back button uses root shell's one popstate path.
-
-### Important
-
-If lifecycle cleanup fails in testing, retain full-page navigation. Full reload is preferable to hidden duplicate listeners/data corruption.
-
-### Acceptance
-
-Switch Todo ↔ Chat at least 20 times without duplicate handlers, stale overlays, or CSS bleed.
+Every send/click/key action must fire once.
 
 ---
 
-## Phase 13 — Shared settings delegation, focus, accessibility, title
+# Phase 13 — Enable seamless SPA app switching
 
-### Shell responsibilities
+Only after Phases 11 and 12 pass.
 
-- update app nav `aria-current`;
-- focus active module heading/host after module switch;
-- keep browser Back/Forward predictable;
-- delegate Settings;
-- update page title via module callback;
-- ensure inactive module DOM is absent;
-- ensure mobile nav is keyboard/touch accessible.
-
-### Acceptance
-
-Keyboard-only module switching works and focus never lands in removed DOM.
-
----
-
-## Phase 14 — Root production build and deep-link deployment
-
-### Add/change
+Algorithm:
 
 ```text
+user activates target app link
+        |
+        v
+activeModule.prepareDeactivate({ targetRoute })
+        |
+        +--> denied -> stay
+        |
+        `--> allowed
+               |
+               v
+        activeModule.beforeLeave()
+               |
+               v
+        activeModule.unmount()
+               |
+               v
+        history.pushState/replaceState
+               |
+               v
+        mount target module
+```
+
+If cleanup fails:
+
+```text
+hard navigate target URL
+```
+
+Never mount over uncertain old runtime.
+
+Intercept only appropriate normal same-origin left-click navigation. Preserve browser behaviors such as modified-click/open-in-new-tab.
+
+---
+
+# Phase 14 — Settings, focus, accessibility, title, last-route, appearance
+
+Finish shell UX:
+
+```text
+Settings -> activeModule.openSettings()
+aria-current on active app link
+focus not left in removed DOM
+page title reset/delegation
+last Chat route remembered
+optional shell appearance bridge
+unknown-route fallback UI
+```
+
+---
+
+# Phase 15 — Dedicated mobile/safe-area pass
+
+Use real phone testing.
+
+Verify:
+
+```text
+shared mobile app navigation
+To-Do mobile sidebar
+To-Do FAB
+To-Do keyboard/visualViewport behavior
+Schedule keyboard transitions
+Chat mobile drawer
+Chat composer keyboard
+attachment picker/drop behavior
+Voice Mode
+Read Aloud
+settings
+safe-area bottom spacing
+orientation/resize
+pinch zoom
+```
+
+Do not treat desktop success as proof of mobile success.
+
+---
+
+# Phase 16 — Root local server + root build + Cloudflare
+
+Implement:
+
+```text
+/server.py
 /scripts/build-static.mjs
 /wrangler.jsonc
 ```
 
-### Requirements
+Verify direct request/refresh for every canonical path locally and in deployment.
 
-- allow-list runtime assets;
-- no agent/internal docs in dist;
-- SPA fallback enabled;
-- Chat CDN dependencies pinned or vendored as decided;
-- `/chat-ui/chat/<id>` direct request works after deploy;
-- cache behavior does not break fresh HTML/module version transitions.
+Build must be allow-list based.
 
-### Acceptance
-
-Test deployment from clean browser session and direct deep links.
+Keep old standalone deployment files until root deployment passes.
 
 ---
 
-## Phase 15 — Production data migration/cutover
+# Phase 17 — Origin/data cutover
 
-### Before switch
+Before normal usage moves:
 
-- backup old Chat;
-- backup old Todo;
-- record expected counts;
-- keep old origins available.
+```text
+re-confirm old backups
+record expected counts
+open combined To-Do route
+restore To-Do if origin changed
+refresh and verify
+open combined Chat route
+restore Chat if needed
+refresh and verify
+re-create backups from combined origin
+```
 
-### New origin
-
-- restore needed Chat/Todo data;
-- verify chats/messages/projects/attachments/Workspace;
-- verify tasks/subtasks/projects/tags/repeats/reminders;
-- verify both backups can be re-created from combined origin.
-
-### Rollback
-
-If any data issue occurs, revert deployment and keep old-origin data untouched.
+Keep old origins/backups during stabilization.
 
 ---
 
-## Phase 16 — Regression and cleanup
+# Phase 18 — Transitional cleanup
 
-Only after full pass:
+Only after complete verification:
 
-- decide whether standalone production entry points are still needed;
-- keep dev harnesses if useful;
-- remove obsolete root-absolute Chat assumptions;
-- remove temporary compatibility redirects after migration window;
-- remove any duplicated old shell nav markup/styles from Todo;
-- document final architecture.
+```text
+remove duplicate old shared-nav markup/styles
+retire obsolete root-absolute Chat assumptions
+remove temporary reload-switch compatibility code if no longer needed
+convert standalone indexes to documented thin harnesses
+retire old production deployment ownership
+update final architecture docs
+```
 
-Do not remove old source boundaries just for cosmetic folder organization.
+Do not collapse application source boundaries for cosmetics.
 
 ---
 
-# 21. Detailed test matrix
+# 29. Chat-specific regression matrix
 
-## 21.1 Shell/routing
+The combined application is not accepted unless current Chat behavior survives.
 
 Test:
 
 ```text
-/
-/todo-list-ui
-/chat-ui
-/chat-ui/chat/<valid id>
-/chat-ui/chat/<invalid id>
-unknown path
+Chat home/new chat
+open existing chat
+lazy conversation load
+message/chat search
+pinned chats
+Chat projects
+rename/move/delete chat
+send streaming message
+stop generation
+regenerate
+edit/delete message
+HIGH thinking preservation
+thought/model response metadata preservation
+Google Search
+URL Context
+Code Execution
+Workspace custom-function rounds
+Workspace manual UI
+attachment file picker
+attachment drag/drop
+Gemini Files API first upload
+Gemini File URI reuse on later messages
+local Blob remains durable
+after-refresh attachment reuse
+image attachment path
+audio attachment path
+video attachment path
+text/data attachment path
+PDF attachment path
+right sidebar
+left sidebar desktop/mobile
+Chat Settings/API config
+Chat theme/accent isolation
+backup creation/restore validation
+normal audio recording
+Live Voice
+Read Aloud cached/live
+selected-text Read Aloud
+mobile composer/safe areas
+modal focus/Escape
 ```
 
-Verify:
+The shell integration must not change Gemini transport behavior merely to make mounting easier.
 
-- direct address load;
-- reload;
-- Back;
-- Forward;
-- module nav click;
-- URL always describes active app;
-- only one module root exists.
+---
 
-## 21.2 Chat regression
+# 30. To-Do regression matrix
 
-Verify all current behaviors:
-
-- Chat home/new chat;
-- open existing chat;
-- lazy conversation load;
-- search chats/messages;
-- pinned chats;
-- Chat projects;
-- rename/move/delete chats;
-- new/send streaming;
-- stop generation;
-- regenerate;
-- edit/delete message;
-- High thinking preservation;
-- Google Search/URL Context/Code Execution;
-- Workspace tool rounds;
-- Chat Workspace manual UI;
-- attachment picker;
-- attachment drag/drop;
-- Files API first upload;
-- File URI reuse on later requests;
-- attachment local Blob persistence;
-- image/audio/video/text/PDF paths;
-- right sidebar;
-- left sidebar desktop/mobile;
-- Chat Settings;
-- API key/base URL settings;
-- Chat theme/accent isolation;
-- Chat backup/restore;
-- voice message recorder;
-- Live Voice;
-- Read Aloud cached/live;
-- selected-text Read Aloud;
-- mobile composer/safe area;
-- modal focus/Escape.
-
-## 21.3 Todo regression
-
-Verify:
-
-- Inbox/Today/Completed;
-- create/edit/delete task;
-- complete/uncomplete;
-- subtasks;
-- link/unlink hierarchy;
-- projects/sub-projects;
-- tags/sub-tags;
-- taxonomy ordering;
-- project/tag delete repairs;
-- list view;
-- Kanban;
-- sort/group;
-- custom sort activation;
-- pointer task drag;
-- touch task drag;
-- root/subtask hierarchy drag;
-- taxonomy pointer drag;
-- taxonomy touch drag;
-- quick task modal;
-- full task edit;
-- priority;
-- due date/time;
-- reminders/custom reminders;
-- repeat presets;
-- custom weekly/monthly/yearly repeat;
-- repeat end Never/On date/After count;
-- repeat next occurrence generation;
-- Todo Settings;
-- theme isolation;
-- backup/restore;
-- mobile sidebar;
-- mobile FAB;
-- mobile keyboard/visual viewport behavior;
-- focus traps/Escape.
-
-## 21.4 Cross-module isolation
-
-Repeated switching tests:
+Test:
 
 ```text
-Todo -> Chat -> Todo -> Chat ... 20+ cycles
+Inbox/Today/Completed
+create/edit/delete task
+complete/uncomplete
+subtasks
+link/unlink hierarchy
+projects/sub-projects
+tags/sub-tags
+taxonomy ordering
+project/tag delete repair
+List view
+Kanban
+sort/group
+custom order
+pointer task drag
+touch task drag
+root/subtask hierarchy drag
+project/tag pointer drag
+project/tag touch drag
+quick task
+full task editor
+priority
+due date/time
+reminders/custom reminders
+repeat presets
+custom repeat
+Repeat Ends Never/Date/Count
+next occurrence generation
+To-Do Settings/theme
+backup/restore
+mobile sidebar/FAB
+keyboard/visualViewport behavior
+focus traps/Escape
+hard refresh persistence
 ```
 
-Verify:
+---
 
-- one click causes one action;
-- one Escape event causes one active-module response;
-- no duplicate popstate handling;
-- no inactive drag handlers;
-- dragging a file over Todo does not open Chat drop overlay;
-- To-Do touch drag listeners absent while Chat active;
-- no detached modal receives focus;
-- inactive module root removed;
-- no duplicate IDs across mounted DOM;
-- no stale portal elements in body;
-- no stale body classes;
-- Chat theme does not recolor Todo;
-- Todo theme does not recolor Chat;
-- shell rail does not inherit module variable values.
+# 31. Cross-module isolation tests
 
-## 21.5 Active-work switch tests
-
-### Switch away during Chat generation
-
-Expected first-version behavior:
+After seamless switching is enabled, perform at least:
 
 ```text
-active generation safely aborted/interrupted
-state persisted
-then Chat unmounts
+20+ To-Do <-> ChatUI switches in one document lifetime
 ```
 
-No invisible background generation.
+Then verify:
 
-### Switch away during normal recording
+```text
+one click -> one action
+one key event -> one response
+one task creation -> one task
+one Chat send -> one network/send action
+one popstate -> one route reaction
+inactive Chat file-drop handler absent
+inactive To-Do touch-drag handler absent
+no stale portal DOM
+no stale body classes
+no detached modal focus
+no microphone after Chat leave
+no Read Aloud after Chat leave
+no stale drag layer after To-Do leave
+no CSS/theme bleed
+only one application root mounted
+```
+
+---
+
+# 32. Active-work switch tests
+
+## 32.1 Unsaved To-Do editor
 
 Expected:
 
 ```text
-recording cancelled
-microphone tracks stop
-Todo mounts
+prepareDeactivate warns
+Stay -> editor/data untouched
+Switch -> cleanup begins only after confirmation
 ```
 
-### Switch away during Live Voice
+## 32.2 To-Do restore in progress
 
 Expected:
 
 ```text
-Live Voice closes
-speech queue/audio context/mic stop
-Todo mounts
+switch blocked until restore reaches safe completion/failure
 ```
 
-### Switch away during Read Aloud
+## 32.3 Chat generation
 
 Expected:
 
 ```text
-playback/generation stop safely
+prepareDeactivate applies agreed confirmation policy
+if leaving approved -> abort/persist interrupted state
+then cleanup
 ```
 
-### Switch away during Todo drag
+## 32.4 Unsent recording
 
 Expected:
 
 ```text
-drag cancelled
-no hierarchy mutation unless already committed
+warn before discard
+if approved -> stop MediaRecorder + tracks
 ```
 
-### Switch away immediately after Todo mutation
+## 32.5 Live Voice
 
 Expected:
 
 ```text
-await data-service write queue
-then unmount
+once switch approved -> stop mic/session/audio before unmount
 ```
 
-## 21.6 Persistence
+## 32.6 Read Aloud
 
-After switching and refresh:
+Expected:
 
-- ChatUI_DB intact;
-- TodoListDB intact;
-- no shell-created accidental DB;
-- no schema bump merely from integration;
-- backups still validate;
-- settings stay app-specific.
+```text
+stop playback/session before unmount
+```
+
+## 32.7 To-Do drag
+
+Expected:
+
+```text
+cancel preview/session
+no accidental hierarchy mutation merely because switch started
+```
+
+## 32.8 Cleanup failure
+
+Expected:
+
+```text
+no next module mount
+hard navigation fallback
+```
 
 ---
 
-# 22. Performance considerations
+# 33. Static verification gates
 
-Do not preload the entire inactive application unnecessarily.
-
-Recommended:
+Before manual acceptance for each phase, inspect source/diff for:
 
 ```text
-shell HTML/CSS/JS first
-       ↓
-load only route's module
-       ↓
-load Chat CDN deps only if Chat route
+one top-level popstate owner in final mode
+shell imports only module entry points
+no shell imports of app service/domain internals
+one active module root
+no unintended app ownership of html/body/:root
+TodoListDB name/version preserved
+ChatUI_DB name/version preserved
+no cross-database imports
+no integration-only schema bump
+every added document/window/visualViewport listener has cleanup
+every long-lived timer/media/session has cleanup
+root build excludes internal planning/agent files
 ```
 
-Once loaded, browser module/cache can make later switching fast.
+Small pure route/parser tests are allowed where helpful.
 
-Do not keep both application DOMs active for perceived speed. Listener/CSS correctness matters more.
-
-Chat's current long-history/API performance work and Files API should remain untouched by shell integration.
+The user will perform real browser/phone behavior testing; do not depend on headless Chrome for this project.
 
 ---
 
-# 23. Error handling requirements
+# 34. Performance/resource-loading rules
 
-## Shell failure
+Do not preload an entire inactive application merely to make switching look instant.
 
-Root shell shows neutral error with retry/navigation options.
-
-## Chat mount failure
-
-Preserve Chat's staged startup error concept and 15-second deadline, but render error inside Chat/shell-owned status surface.
-
-## Todo mount failure
-
-Preserve Todo's current staged categories:
+Preferred:
 
 ```text
-MODULE_LOAD
-INTEGRATION
-DATABASE_OPEN
-DATABASE_REPAIR
-HYDRATION
-UI_INIT
+shell first
+ -> load only route's application module
+ -> if Chat, load Chat-only dependencies
 ```
 
-A Todo mount failure must not corrupt Chat or shell.
+Once loaded, browser module/cache may make later switches fast.
 
-## Unmount failure
+Do not keep inactive DOM/listeners alive for perceived speed.
 
-Shell should not mount the next module over an incompletely cleaned previous module.
-
-Safer fallback:
-
-```text
-cleanup failure
-→ hard navigate/reload target URL
-```
-
-This provides a robust escape hatch during migration.
+Do not mix this integration with Chat context-performance redesign, Files API redesign, or To-Do architecture cleanup unrelated to mounting.
 
 ---
 
-# 24. Accessibility requirements
+# 35. Security/privacy invariants
 
-- shared nav uses anchors/buttons with labels;
-- active module uses `aria-current`;
-- module host gets focus after cross-app switch when appropriate;
-- do not leave focus inside removed module;
-- each module's own modal focus trap remains scoped to active module;
-- Escape handling only comes from active module;
-- disabled future app icons communicate unavailable state;
-- mobile app nav respects safe-area insets;
-- shared Settings announces active module context if needed.
+Do not expose through root build:
+
+```text
+Chat API keys
+backup files
+browser database exports
+agent working documents
+implementation plans/reviews
+internal handoff files
+local secrets
+```
+
+Keep Chat credential behavior inside Chat settings/storage as currently designed.
+
+The shared shell must never copy an API key into shell state merely for integration.
 
 ---
 
-# 25. Security/privacy invariants
+# 36. Explicit non-goals
 
-Integration must not accidentally expose:
+Do not:
 
-- Chat API keys;
-- Chat backups;
-- Todo backups;
-- local database data;
-- agent planning documents.
-
-Root build must remain an explicit runtime allow-list.
-
-Do not copy repository internals wholesale into static deployment.
-
-Chat API credentials remain in Chat settings/database exactly as current architecture intends.
+```text
+merge ChatUI_DB and TodoListDB
+bump DB versions for shell integration
+mount both complete apps and hide one
+use iframe as final architecture
+use Shadow DOM as first solution
+introduce React/Vue/Angular solely for integration
+mass-rename every internal ID/class
+flatten app assets into one generic css/js/html tree
+rewrite Gemini transport
+disable HIGH thinking
+remove Files API/local Blob behavior
+rewrite Workspace domain logic
+rewrite To-Do RepeatEngine/task CRUD
+auto-commit unfinished drag previews
+silently discard unsaved editor/recording work
+create combined backup format in this plan
+preload inactive full app runtime
+publish planning/agent docs in dist
+perform production origin cutover without verified backups
+```
 
 ---
 
-# 26. Things implementation must NOT do
+# 37. Rollback rules
 
-1. Do not merge `ChatUI_DB` and `TodoListDB`.
-2. Do not change DB versions just because the apps are joined.
-3. Do not rewrite Chat Gemini transport/generation/tool protocol.
-4. Do not remove Chat Files API/local Blob behavior.
-5. Do not reduce High thinking behavior.
-6. Do not rewrite Todo RepeatEngine/task CRUD/hierarchy algorithms.
-7. Do not remove `AppDataService` serialized writes.
-8. Do not load both complete app DOMs and only hide one.
-9. Do not use iframe as final architecture.
-10. Do not introduce Shadow DOM for this migration.
-11. Do not introduce a framework/build ecosystem solely for integration.
-12. Do not mass-rename every internal ID/class in one giant commit.
-13. Do not make Chat or Todo theme write global root variables after isolation.
-14. Do not leave inactive document/window listeners alive.
-15. Do not leave microphones/audio/WebSockets running after leaving Chat.
-16. Do not auto-commit incomplete Todo drag previews during module switch.
-17. Do not delete old standalone harnesses before the combined app is proven.
-18. Do not deploy `chat UI agent/` or `to-do list agent/` documents.
-19. Do not assume same DB name means data moves across origins.
-20. Do not perform production origin cutover without backups.
+Every phase should be separately reviewable.
+
+If a phase breaks unrelated behavior:
+
+```text
+stop
+revert that phase
+restore standalone behavior
+fix boundary
+retest
+continue only after green gate
+```
+
+Key fallbacks:
+
+```text
+soft-switch bug -> keep full-page switching
+unmount failure -> hard navigate
+CSS regression -> revert only that app's CSS isolation phase
+root deployment issue -> keep old deployment
+origin/data issue -> restore old deployment/backups
+```
+
+Never layer later integration phases on top of a known broken earlier phase.
 
 ---
 
-# 27. Expected important file changes
+# 38. Definition of done
 
-This list is intentionally broader than a final diff because exact scoping will be refined phase by phase.
-
-## New shared root
+Complete only when all are true:
 
 ```text
-index.html
-shell/css/shell.css
-shell/js/app-shell.js
-shell/js/router.js
-shell/js/module-registry.js
-shell/js/dependency-loader.js
-scripts/build-static.mjs
-wrangler.jsonc
-```
-
-## Chat primary integration files
-
-```text
-ChatUI/index.html
-ChatUI/js/module.js                       (new)
-ChatUI/js/layout-loader.js
-ChatUI/js/app.js
-ChatUI/js/router/chat-router.js
-ChatUI/js/chat/conversation.js
-ChatUI/js/settings/settings.js
-ChatUI/js/composer/attachments.js
-ChatUI/js/composer/recorder.js
-ChatUI/js/ui/action-menu.js
-ChatUI/js/ui/modals.js
-ChatUI/js/ui/model-thinking-menu.js
-ChatUI/js/ui/chat-controls.js
-ChatUI/js/sidebar/sidebar-layout.js
-ChatUI/js/chat/markdown.js
-ChatUI/js/voice/read-selection.js
-ChatUI/js/voice/read-aloud.js
-ChatUI/js/voice/live-voice-controller.js
-ChatUI/js/workspace/workspace-ui.js
-ChatUI/js/workspace/workspace-mobile.js
-ChatUI/js/workspace/workspace-navigation-bridge.js
-```
-
-Chat CSS files will require namespace edits across the aggregators/subfiles, especially page/global selectors.
-
-## Todo primary integration files
-
-```text
-TodoList-ui/index.html
-TodoList-ui/html/todo-app.html             (new)
-TodoList-ui/js/module.js                   (new)
-TodoList-ui/js/bootstrap.js
-TodoList-ui/js/app-main.js
-TodoList-ui/js/theme.js
-TodoList-ui/js/components/sidebar.js
-TodoList-ui/js/components/workspace-controls.js
-TodoList-ui/js/components/tasks.js
-TodoList-ui/js/components/subtask-editor.js
-TodoList-ui/js/components/modal-focus.js
-TodoList-ui/js/components/task-drag*.js
-TodoList-ui/js/components/sidebar-taxonomy-drag*.js
-TodoList-ui/js/components/task-actions.js
-TodoList-ui/js/components/task-menus.js
-TodoList-ui/js/components/schedule*.js
-TodoList-ui/js/components/settings.js
-TodoList-ui/js/storage/persistence.js
-```
-
-Todo CSS files require namespace and shared-nav extraction, particularly:
-
-```text
-TodoList-ui/css/variables.css
-TodoList-ui/css/layout/app-shell.css
-TodoList-ui/css/layout/sidebar-layout.css
-TodoList-ui/css/layout/workspace-layout.css
-TodoList-ui/css/components/modal-controls.css
-TodoList-ui/css/components/quick-task.css
-```
-
-Domain/service files should generally remain unchanged.
-
----
-
-# 28. Rollback strategy
-
-Every implementation phase should be its own coherent branch/commit set.
-
-Before enabling soft switching:
-
-```text
-full-page shell route switching
-```
-
-is a safe fallback.
-
-If soft switching produces lifecycle problems, revert only that phase and retain the combined URL/root deployment with full reloads.
-
-If CSS isolation causes regressions, revert that module's namespace phase without touching databases.
-
-If production origin migration has data problems, revert deployment and use old origins/backups. Never attempt emergency schema merging.
-
----
-
-# 29. Definition of done
-
-The integration is complete only when all of the following are true:
-
-```text
-[ ] root /index.html is production owner
-[ ] / redirects/canonicalizes to /todo-list-ui
-[ ] /todo-list-ui directly loads Todo
-[ ] /chat-ui directly loads Chat
-[ ] /chat-ui/chat/<id> directly loads exact chat
-[ ] browser Back/Forward works across and within modules
+[ ] root /index.html is canonical production entry
+[ ] / canonicalizes to /todo-list-ui using replace behavior
+[ ] /todo-list-ui opens To-Do
+[ ] /chat-ui opens ChatUI
+[ ] /chat-ui/chat/<id> opens exact persisted chat
 [ ] shared desktop rail works
-[ ] shared mobile nav works
-[ ] only one module DOM exists at a time
-[ ] Chat can unmount/remount repeatedly
-[ ] Todo can unmount/remount repeatedly
-[ ] no duplicate global listener behavior after repeated switching
-[ ] Chat generation/voice/audio stop safely on leave
-[ ] Todo pending writes complete before leave
-[ ] Todo drag state cancels safely on leave
-[ ] Chat CSS/theme does not affect Todo
-[ ] Todo CSS/theme does not affect Chat
+[ ] shared mobile app navigation works
+[ ] app route controls are real links
+[ ] shared Settings delegates to active module
+[ ] only one full application module is mounted at a time
+[ ] To-Do can mount/unmount/remount repeatedly
+[ ] Chat can mount/unmount/remount repeatedly
+[ ] prepareDeactivate protects unsaved/destructive work
+[ ] shell never imports application domain/service internals
+[ ] Back/Forward works across apps and Chat conversations
+[ ] direct deep-link refresh works locally
+[ ] direct deep-link refresh works in Cloudflare deployment
+[ ] local root SPA server works
 [ ] ChatUI_DB preserved
 [ ] TodoListDB preserved
-[ ] both backup/restore systems still work
-[ ] Chat Files API behavior unchanged
-[ ] Todo Repeat/task hierarchy behavior unchanged
-[ ] Cloudflare deep-link fallback works
-[ ] root dist excludes agent/internal planning documents
-[ ] production data migration is verified
-[ ] rollback path remains available through stabilization window
+[ ] no integration-only DB schema bump
+[ ] both app backup/restore systems still work
+[ ] old-origin data migration verified
+[ ] Chat theme does not overwrite shell/To-Do
+[ ] To-Do theme does not overwrite shell/Chat
+[ ] Chat generation/voice/audio/drag/timers do not survive leave
+[ ] To-Do drag/menu/modal/listeners do not survive leave
+[ ] Chat Files API behavior remains correct
+[ ] HIGH thinking behavior remains correct
+[ ] Workspace/tool behavior remains correct
+[ ] To-Do Repeat/hierarchy/order behavior remains correct
+[ ] 20+ seamless switches pass exact-once checks
+[ ] real phone mobile tests pass
+[ ] build is runtime allow-list only
+[ ] planning/agent docs are absent from dist
+[ ] hard-navigation fallback exists for cleanup failure
+[ ] standalone indexes remain useful until explicit retirement
 ```
 
 ---
 
-# 30. Final recommendation from Chat UI agent
+# 39. Final architecture summary
 
-The recommended end state is:
+The final model is:
 
 ```text
-                    ROOT APPLICATION
-                         /index.html
-                             │
-               ┌─────────────┴─────────────┐
-               │       Shared Shell        │
-               │ route + app launcher      │
-               └─────────────┬─────────────┘
-                             │
-                    one module at a time
-                  ┌──────────┴──────────┐
-                  │                     │
-          /todo-list-ui              /chat-ui
-                  │                     │
-            Todo module              Chat module
-                  │                     │
-            TodoListDB                ChatUI_DB
-                  │                     │
-       task/repeat system       Gemini/Workspace/Voice
-
-Chat conversation deep route:
-/chat-ui/chat/<chatId>
+                         ROOT APPLICATION
+                           /index.html
+                               |
+                    Shared Application Shell
+                               |
+             +-----------------+-----------------+
+             |                                   |
+      /todo-list-ui                         /chat-ui...
+             |                                   |
+        To-Do module                         ChatUI module
+             |                                   |
+        TodoListDB                           ChatUI_DB
 ```
 
-The safest migration is **not** to immediately create a sophisticated single-page mount/unmount system in one shot. First establish the shared root, canonical URLs, CSS namespaces, module entry points, and one-module-per-page behavior. Then add complete cleanup lifecycles. Only after repeated unmount/remount tests pass should the shell intercept navigation and switch applications without a full reload.
+The root shell is the main website.
 
-This approach gives the user the requested unified website early while preserving a reliable fallback at every stage.
+To-Do is the default application for `/` unless the later canonical merged plan explicitly chooses otherwise.
+
+The current To-Do rail/mobile navigation is the visual donor for shared navigation, but the shell owns it after integration.
+
+The AI position becomes the ChatUI launcher.
+
+The applications stay internally independent.
+
+The first combined version uses full reloads between applications for safety.
+
+Only after both apps can safely `prepareDeactivate()`, leave, unmount, and remount should navigation be intercepted for seamless switching.
+
+If seamless cleanup is ever uncertain, hard navigation is the safety fallback.
 
 ---
 
-# 31. Independence note
+# 40. Revision 2 cross-review decisions
 
-This document is intentionally the Chat UI agent's independent plan. It should be compared with the independently-created To-Do List UI agent plan **only after both agents have finished**.
+The following points are specifically changed or strengthened because of the To-Do agent implementation plan and its review of this plan:
 
-At that point, the user can identify:
+```text
+ADOPTED
+- separate prepareDeactivate() from cleanup/unmount
+- protect unsaved To-Do drafts and unsent Chat recordings
+- block destructive restore transitions
+- shell imports only module entry points, never AppDataService/Chat internals
+- create real module roots before broad CSS/theme namespace work
+- add root SPA-capable local server.py
+- explicitly account for localhost:6846 vs localhost:8000 origin data
+- remember last Chat route through shell-owned sessionStorage
+- define explicit shared/Chat/To-Do agent ownership boundaries
+- allow body-level viewport drag layers when technically necessary, with explicit ownership/cleanup
+- keep optional module -> shell appearance reporting
 
-- ideas both agents independently agree on;
-- conflicts that need a deliberate choice;
-- gaps found by only one agent;
-- duplicated work;
-- the best phase ordering.
+RETAINED FROM CHAT UI PLAN
+- real <a href> application navigation
+- exact Chat lifecycle inventory
+- exact Chat leave order
+- detailed To-Do drag cleanup inventory
+- per-mount AbortController/cleanup-bag preference
+- hard-navigation fallback after cleanup failure
+- strict allow-list production build
+- pin currently unpinned Chat dependencies without replacing libraries
+- lazy-load inactive application/dependencies
+- detailed Chat Files API/HIGH-thinking/Workspace regression coverage
+- 20+ exact-once switch test
+- separate Chat and To-Do CSS isolation checkpoints for easier rollback
+```
 
-Then this document and the other independent plan should be treated as inputs to a new final combined implementation plan rather than either one being implemented blindly as-is.
+Revision 2 should now be treated as the authoritative Chat UI agent plan. Earlier wording in Revision 1 is superseded where it conflicts with this document.
