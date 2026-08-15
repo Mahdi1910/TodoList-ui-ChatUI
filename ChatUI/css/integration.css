@@ -8,20 +8,20 @@
   isolation: isolate;
 }
 
-.chatui-app #chatui-app-container {
+.chatui-app #app-container {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
 }
 
-.chatui-app #chatui-overlay-root {
+.chatui-app [data-chatui-overlay-root] {
   position: absolute;
   inset: 0;
   z-index: 1000;
   pointer-events: none;
 }
 
-.chatui-app #chatui-overlay-root > * {
+.chatui-app [data-chatui-overlay-root] > * {
   pointer-events: auto;
 }
 
