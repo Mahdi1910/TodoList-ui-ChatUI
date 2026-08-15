@@ -1,60 +1,59 @@
 /* ==========================================================================
-   MAIN.CSS — Base Dark Theme, Typography & Layout Variables
+   MAIN.CSS — ChatUI module theme, typography & layout variables
    ========================================================================== */
 
-:root {
-  /* Color Palette */
+.chatui-app {
   --bg-primary: #000000;
   --bg-secondary: #000000;
   --bg-tertiary: #212121;
   --bg-hover: #2F2F2F;
-
   --text-primary: #FFFFFF;
   --text-secondary: #AFAFAF;
   --text-muted: #AFAFAF;
-
   --accent-blue: #2563EB;
   --accent-blue-hover: #1D4ED8;
   --border-color: rgba(255, 255, 255, 0.1);
   --border-light: rgba(255, 255, 255, 0.15);
-
-  /* Layout Sizes */
   --sidebar-width: 260px;
   --right-sidebar-width: 280px;
   --header-height: 60px;
   --chat-max-width: 880px;
-
-  /* Transitions */
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;
-}
 
-* {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-}
-
-body {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  height: 100vh;
-  overflow: hidden;
   font-family: -apple-system-body, ui-sans-serif, -apple-system, "system-ui", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
 }
 
-.app-container {
+.chatui-app *,
+.chatui-app *::before,
+.chatui-app *::after {
+  box-sizing: border-box;
+}
+
+.chatui-app .app-container,
+.chatui-app #chatui-app-container {
   display: flex;
   width: 100%;
-  height: 100dvh;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   position: relative;
 }
 
-/* Common Button Styles */
-button {
+.chatui-app button {
   background: none;
   border: none;
   color: inherit;
@@ -66,22 +65,20 @@ button {
   justify-content: center;
 }
 
-button:focus-visible,
-a:focus-visible,
-[tabindex]:focus-visible {
+.chatui-app button:focus-visible,
+.chatui-app a:focus-visible,
+.chatui-app [tabindex]:focus-visible {
   outline: 2px solid var(--accent-blue);
   outline-offset: 2px;
 }
 
-/* Text fields use their own focus treatment; don't show the browser-style
-   blue keyboard ring around the editable field itself. */
-input:focus,
-textarea:focus,
-select:focus {
+.chatui-app input:focus,
+.chatui-app textarea:focus,
+.chatui-app select:focus {
   outline: none;
 }
 
-.visually-hidden {
+.chatui-app .visually-hidden {
   position: absolute !important;
   width: 1px !important;
   height: 1px !important;
@@ -93,39 +90,32 @@ select:focus {
   border: 0 !important;
 }
 
-.icon-btn,
-.icon-btn-sm {
+.chatui-app .icon-btn,
+.chatui-app .icon-btn-sm {
   border-radius: 8px;
   color: var(--text-secondary);
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.icon-btn {
-  width: 36px;
-  height: 36px;
-}
+.chatui-app .icon-btn { width: 36px; height: 36px; }
+.chatui-app .icon-btn-sm { width: 24px; height: 24px; border-radius: 4px; }
 
-.icon-btn-sm {
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-}
-
-.icon-btn:hover,
-.icon-btn-sm:hover {
+.chatui-app .icon-btn:hover,
+.chatui-app .icon-btn-sm:hover {
   background-color: var(--bg-hover);
   color: var(--text-primary);
 }
 
-.empty-section-text {
+.chatui-app .empty-section-text {
   font-size: 12px;
   color: var(--text-muted);
   padding: 8px 10px;
   font-style: italic;
 }
 
-.startup-error-overlay {
-  position: fixed;
+.chatui-app .startup-error-overlay,
+#chatui-overlay-root > .startup-error-overlay {
+  position: absolute;
   inset: 0;
   z-index: 9999;
   display: flex;
@@ -137,7 +127,7 @@ select:focus {
   font-family: system-ui, sans-serif;
 }
 
-.startup-error-card {
+.chatui-app .startup-error-card {
   width: min(640px, 100%);
   padding: 24px;
   border: 1px solid #444;
@@ -145,17 +135,9 @@ select:focus {
   background: #111;
 }
 
-.startup-error-title {
-  margin: 0 0 12px;
-  font-size: 20px;
-}
-
-.startup-error-description {
-  margin: 0 0 12px;
-  color: #bbb;
-}
-
-.startup-error-details {
+.chatui-app .startup-error-title { margin: 0 0 12px; font-size: 20px; }
+.chatui-app .startup-error-description { margin: 0 0 12px; color: #bbb; }
+.chatui-app .startup-error-details {
   white-space: pre-wrap;
   overflow: auto;
   padding: 12px;
@@ -163,8 +145,7 @@ select:focus {
   background: #050505;
   color: #f88;
 }
-
-.startup-retry-btn {
+.chatui-app .startup-retry-btn {
   margin-top: 12px;
   padding: 9px 14px;
   border: 1px solid #666;
@@ -173,7 +154,4 @@ select:focus {
   color: #000;
 }
 
-/* Utilities */
-.hidden {
-  display: none !important;
-}
+.chatui-app .hidden { display: none !important; }
