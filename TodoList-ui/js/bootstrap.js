@@ -45,6 +45,7 @@ async function runStage(stage, work) {
 }
 
 async function bootstrap() {
+  document.getElementById('app')?.classList.add('todo-app');
   let application;
   try {
     application = await runStage('MODULE_LOAD', () => import('./app-main.js'));
