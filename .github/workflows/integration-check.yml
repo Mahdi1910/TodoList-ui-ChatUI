@@ -1,0 +1,35 @@
+name: Combined application checks
+
+on:
+  push:
+    branches:
+      - main
+      - agent/chat-ui-integrate-plan-r2
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  static-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check runtime JavaScript and architecture
+        run: node scripts/check-integration.mjs
+
+      - name: Build allow-listed static application
+        run: node scripts/build-static.mjs
+
+      - name: Verify built output
+        run: node scripts/check-integration.mjs --dist
+
+      - name: Check local SPA server syntax
+        run: python -m py_compile server.py
