@@ -1,5 +1,5 @@
 export const ModalFocusManager = (() => {
-  const records = new WeakMap();
+  let records = new WeakMap();
   const stack = [];
   let initialized = false;
 
@@ -118,5 +118,21 @@ export const ModalFocusManager = (() => {
     document.addEventListener('keydown', handleTab, true);
   }
 
-  return { init, register, open, close, getTopModal: top, setInert };
+  function destroy() {
+    if (!initialized) return;
+    document.removeEventListener('keydown', handleTab, true);
+    stack.splice(0).forEach(modal => {
+      const record = records.get(modal);
+      cancelFrame(record);
+      if (modal?.isConnected) {
+        modal.classList.remove('active');
+        modal.setAttribute('aria-hidden', 'true');
+        setInert(modal, true);
+      }
+    });
+    records = new WeakMap();
+    initialized = false;
+  }
+
+  return { init, destroy, register, open, close, getTopModal: top, setInert };
 })();
