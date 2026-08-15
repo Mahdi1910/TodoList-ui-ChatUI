@@ -1,0 +1,51 @@
+name: Combined application checks
+
+on:
+  push:
+    branches:
+      - main
+      - agent/chat-ui-integrate-plan-r2
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  static-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check runtime JavaScript and architecture
+        run: node scripts/check-integration.mjs
+
+      - name: Build allow-listed static application
+        run: node scripts/build-static.mjs
+
+      - name: Verify built output
+        run: node scripts/check-integration.mjs --dist
+
+      - name: Check local SPA server syntax
+        run: python -m py_compile server.py
+
+      - name: Smoke test local SPA deep links
+        shell: bash
+        run: |
+          python server.py --host 127.0.0.1 --port 8765 > /tmp/combined-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill $server_pid 2>/dev/null || true' EXIT
+          for attempt in {1..20}; do
+            if curl -fsS http://127.0.0.1:8765/todo-list-ui > /tmp/todo.html; then break; fi
+            sleep 0.25
+          done
+          curl -fsS http://127.0.0.1:8765/chat-ui > /tmp/chat.html
+          curl -fsS http://127.0.0.1:8765/chat-ui/chat/test-id > /tmp/chat-deep.html
+          grep -q 'id="shell-app"' /tmp/todo.html
+          grep -q 'id="shell-app"' /tmp/chat.html
+          grep -q 'id="shell-app"' /tmp/chat-deep.html

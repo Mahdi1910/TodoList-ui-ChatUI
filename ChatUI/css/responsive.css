@@ -1,117 +1,86 @@
 /* Responsive layout: preserve desktop, adapt only narrow screens. */
 @media (max-width: 767px) {
-  :root {
+  .chatui-app {
     --mobile-header-height: 52px;
     --mobile-sidebar-width: min(86vw, 320px);
   }
 
-  html, body {
-    width: 100%; height: 100%; height: 100dvh; overflow: hidden;
+  .chatui-app,
+  .chatui-app .app-container,
+  .chatui-app .main-content {
+    width: 100%; height: 100%; min-height: 0;
   }
+  .chatui-app .main-content { min-width: 0; }
 
-  .app-container, .main-content {
-    width: 100%; height: 100%; height: 100dvh; min-height: 0;
-  }
-  .main-content { min-width: 0; }
-
-  .top-header {
+  .chatui-app .top-header {
     height: var(--mobile-header-height);
     min-height: var(--mobile-header-height);
     padding: 0 10px;
   }
 
-  .open-sidebar-btn,
-  .sidebar.collapsed + .main-content .open-sidebar-btn { display: inline-flex; }
-  .header-action-btn { padding: 6px 8px; }
-  .header-action-btn span { display: none; }
+  .chatui-app .open-sidebar-btn,
+  .chatui-app .sidebar.collapsed + .main-content .open-sidebar-btn { display: inline-flex; }
+  .chatui-app .header-action-btn { padding: 6px 8px; }
+  .chatui-app .header-action-btn span { display: none; }
 
-  .chat-viewport {
+  .chatui-app .chat-viewport {
     min-height: 0; width: 100%; padding: 14px 10px;
     overscroll-behavior: contain;
   }
-  .conversation-thread, .message-row { max-width: 100%; }
-  .conversation-thread { gap: 20px; }
+  .chatui-app .conversation-thread,
+  .chatui-app .message-row { max-width: 100%; }
+  .chatui-app .conversation-thread { gap: 20px; }
 
-  .composer-container {
+  .chatui-app .composer-container {
     width: 100%; max-width: 100%; flex-shrink: 0;
     padding: 0 8px max(8px, env(safe-area-inset-bottom));
   }
-  .composer-bar {
+  .chatui-app .composer-bar {
     width: 100%; min-width: 0; border-radius: 20px; padding: 7px 9px;
   }
-  .composer-textarea { min-width: 0; font-size: 16px; }
+  .chatui-app .composer-textarea { min-width: 0; font-size: 16px; }
 
-  .sidebar {
-    position: fixed; inset: 0 auto 0 0;
-    width: var(--mobile-sidebar-width); height: 100%; height: 100dvh;
+  .chatui-app .sidebar {
+    position: absolute; inset: 0 auto 0 0;
+    width: var(--mobile-sidebar-width); height: 100%;
     margin-left: 0; z-index: 100;
     box-shadow: 12px 0 32px rgba(0, 0, 0, 0.35);
     transform: translateX(0);
     transition: transform var(--transition-normal);
   }
-  .sidebar.collapsed { margin-left: 0; transform: translateX(-100%); }
+  .chatui-app .sidebar.collapsed { margin-left: 0; transform: translateX(-100%); }
 
-  .sidebar:not(.collapsed)::after {
+  .chatui-app .sidebar:not(.collapsed)::after {
     content: ""; position: fixed;
     left: var(--mobile-sidebar-width); top: 0;
     width: 100vw; height: 100dvh;
     background: rgba(0, 0, 0, 0.45); pointer-events: none;
   }
 
-  .sidebar-scrollable { min-height: 0; }
-  .empty-state { width: 100%; padding: 0 12px; }
-  .landing-title { font-size: 26px; }
-}
+  .chatui-app .sidebar-scrollable { min-height: 0; }
+  .chatui-app .empty-state { width: 100%; padding: 0 12px; }
+  .chatui-app .landing-title { font-size: 26px; }
 
-@media (min-width: 768px) {
-  .responsive-mobile-only { display: none; }
-}
-
-@media (max-width: 767px) {
-  .settings-card {
+  .chatui-app .settings-card {
     width: calc(100vw - 20px);
     max-width: none;
     height: min(90dvh, 680px);
     flex-direction: column;
     border-radius: 14px;
   }
-
-  .settings-home {
-    padding: 20px 16px;
-  }
-
-  .settings-section-btn {
-    min-height: 52px;
-    padding: 13px 10px;
-  }
-
-  .settings-content {
+  .chatui-app .settings-home { padding: 20px 16px; }
+  .chatui-app .settings-section-btn { min-height: 52px; padding: 13px 10px; }
+  .chatui-app .settings-content {
     min-height: 0;
     padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
   }
+  .chatui-app .settings-pane-title { font-size: 18px; margin-bottom: 12px; }
+  .chatui-app .setting-row { align-items: flex-start; gap: 14px; padding: 12px 0; }
+  .chatui-app .setting-row > :last-child { flex-shrink: 0; }
+  .chatui-app .setting-desc { max-width: none; line-height: 1.4; }
+  .chatui-app .settings-close-btn { top: 8px; right: 8px; }
+}
 
-  .settings-pane-title {
-    font-size: 18px;
-    margin-bottom: 12px;
-  }
-
-  .setting-row {
-    align-items: flex-start;
-    gap: 14px;
-    padding: 12px 0;
-  }
-
-  .setting-row > :last-child {
-    flex-shrink: 0;
-  }
-
-  .setting-desc {
-    max-width: none;
-    line-height: 1.4;
-  }
-
-  .settings-close-btn {
-    top: 8px;
-    right: 8px;
-  }
+@media (min-width: 768px) {
+  .chatui-app .responsive-mobile-only { display: none; }
 }

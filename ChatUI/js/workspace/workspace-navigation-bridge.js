@@ -3,7 +3,7 @@
  */
 
 import { closeWorkspaceView } from './workspace-ui.js';
-import './workspace-mobile.js';
+import { initWorkspaceMobile, destroyWorkspaceMobile } from './workspace-mobile.js';
 
 const CHAT_NAVIGATION_SELECTORS = [
   '#new-chat-btn',
@@ -13,20 +13,36 @@ const CHAT_NAVIGATION_SELECTORS = [
   '.add-chat-to-proj-btn'
 ].join(',');
 
-function restoreChatSurface() {
-  closeWorkspaceView();
-  document.title = 'ChatUI';
+let cleanupCurrent = null;
+
+export function initWorkspaceNavigationBridge() {
+  cleanupCurrent?.();
+
+  const restoreChatSurface = () => {
+    closeWorkspaceView();
+  };
+  const onClick = event => {
+    if (event.target.closest(CHAT_NAVIGATION_SELECTORS)) restoreChatSurface();
+  };
+  const onKeydown = event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target.closest('#brand-new-chat, .chat-item')) restoreChatSurface();
+  };
+
+  document.addEventListener('click', onClick, true);
+  document.addEventListener('keydown', onKeydown, true);
+  const mobileCleanup = initWorkspaceMobile();
+
+  cleanupCurrent = () => {
+    document.removeEventListener('click', onClick, true);
+    document.removeEventListener('keydown', onKeydown, true);
+    mobileCleanup?.();
+    destroyWorkspaceMobile();
+    cleanupCurrent = null;
+  };
+  return cleanupCurrent;
 }
 
-document.addEventListener('click', event => {
-  if (event.target.closest(CHAT_NAVIGATION_SELECTORS)) restoreChatSurface();
-}, true);
-
-document.addEventListener('keydown', event => {
-  if (event.key !== 'Enter' && event.key !== ' ') return;
-  if (event.target.closest('#brand-new-chat, .chat-item')) restoreChatSurface();
-}, true);
-
-// Chat routes are not Workspace routes in the first version. Back/forward navigation
-// therefore always restores the normal chat surface before the router loads its content.
-window.addEventListener('popstate', restoreChatSurface);
+export function destroyWorkspaceNavigationBridge() {
+  cleanupCurrent?.();
+}

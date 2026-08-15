@@ -1,30 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5, user-scalable=yes, interactive-widget=resizes-content">
   <title>ChatUI</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%232563EB%22><path d=%22M22.28 9.82a6 6 0 0 0-.51-4.91 6.04 6.04 0 0 0-6.51-2.9 6.06 6.06 0 0 0-10.28 2.17 6 6 0 0 0-4 2.9 6.05 6.05 0 0 0 .74 7.1 6 6 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.51 2.9 6 6 0 0 0 10.28-2.17 6 6 0 0 0 4-2.9 6.05 6.05 0 0 0-.74-7.1z%22/></svg>" type="image/svg+xml" />
-
-  <!-- CSS Stylesheets -->
-  <link rel="stylesheet" href="/css/main.css" />
-  <link rel="stylesheet" href="/css/sidebar.css" />
-  <link rel="stylesheet" href="/css/chat.css" />
-  <link rel="stylesheet" href="/css/components.css" />
-  <link rel="stylesheet" href="/css/animations.css" />
-  <link rel="stylesheet" href="/css/responsive.css" />
-
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-
-  <!-- Markdown Parser (marked.js) & Highlight.js Syntax Highlighting -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    html, body, #standalone-chat-host { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #000; }
+  </style>
 </head>
 <body>
-  <div class="app-container" id="app-container"></div>
-  <div id="overlay-root"></div>
-  <script type="module" src="/js/layout-loader.js"></script>
+  <main id="standalone-chat-host"></main>
+  <script type="module">
+    import { mount } from './js/module.js';
+    const host = document.getElementById('standalone-chat-host');
+    const shell = {
+      setTitle(title) { document.title = title || 'ChatUI'; },
+      notifyAppearance() {},
+      reportFatalError(error) {
+        console.error('Standalone ChatUI failed:', error);
+        host.textContent = `ChatUI could not start: ${error?.message || error}`;
+        host.style.color = '#fff';
+        host.style.padding = '24px';
+      }
+    };
+    mount({
+      host,
+      route: { app: 'chat', type: 'chat-home', chatId: null },
+      standalone: true,
+      basePath: '/ChatUI',
+      shell
+    }).catch(shell.reportFatalError);
+  </script>
 </body>
 </html>
