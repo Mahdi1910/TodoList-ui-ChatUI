@@ -1,0 +1,35 @@
+.todo-app {
+  isolation: isolate;
+}
+
+/* The combined shell owns cross-application navigation. The module root is
+   created without these legacy controls, but keep this defensive rule so a
+   transitional standalone fragment can never create a second launcher. */
+#shell-module-host .todo-app > .primary-rail,
+#shell-module-host .todo-app > .mobile-bottom-nav {
+  display: none !important;
+}
+
+#shell-module-host .todo-app .secondary-sidebar {
+  left: 0;
+}
+
+#shell-module-host .todo-app .sidebar-backdrop {
+  left: 0;
+}
+
+#shell-module-host .todo-app .main-workspace {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  #shell-module-host .todo-app .secondary-sidebar {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  }
+  #shell-module-host .todo-app .fab-add-task {
+    bottom: 24px;
+  }
+  #shell-module-host .todo-app .workspace-content {
+    padding-bottom: 90px;
+  }
+}
