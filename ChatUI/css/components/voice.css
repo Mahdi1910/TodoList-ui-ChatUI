@@ -1,0 +1,245 @@
+/* 5. Full-Screen Live Voice Overlay */
+.voice-mode-overlay {
+  --voice-level: 0;
+  --voice-scale: 1;
+  --voice-wave-scale: 1;
+  --voice-glow-size: 48px;
+  --voice-wave-opacity: 0.20;
+  --voice-wave2-opacity: 0.12;
+  position: fixed;
+  inset: 0;
+  background-color: #000000;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px;
+}
+
+.voice-mode-center {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.glowing-voice-orb {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: opacity 180ms ease, filter 180ms ease;
+}
+
+.glowing-voice-orb:not(:disabled) {
+  cursor: pointer;
+}
+
+.glowing-voice-orb:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.glowing-voice-orb:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 8px;
+}
+
+.orb-core {
+  display: block;
+  flex: 0 0 auto;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  transform: scale(var(--voice-scale));
+  transition: transform 70ms linear, background 180ms ease, box-shadow 80ms linear;
+  background: radial-gradient(circle, #FFFFFF 0%, #F3F4F6 52%, #B8BDC6 100%);
+  box-shadow: 0 0 var(--voice-glow-size) rgba(255, 255, 255, 0.72);
+  will-change: transform, box-shadow;
+}
+
+.orb-wave {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(var(--voice-wave-scale));
+  transition: transform 85ms linear, opacity 85ms linear, border-color 180ms ease;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  opacity: var(--voice-wave-opacity);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.wave1 { width: 160px; height: 160px; }
+.wave2 { width: 180px; height: 180px; opacity: var(--voice-wave2-opacity); }
+
+/* WHITE — user owns the turn. Real microphone level drives scale/glow. */
+.voice-mode-overlay.is-listening .orb-core,
+.voice-mode-overlay.is-hearing-speech .orb-core {
+  background: radial-gradient(circle, #FFFFFF 0%, #F4F4F5 52%, #A1A1AA 100%);
+  box-shadow: 0 0 var(--voice-glow-size) rgba(255, 255, 255, 0.78);
+  animation: none;
+}
+
+.voice-mode-overlay.is-listening .orb-wave,
+.voice-mode-overlay.is-hearing-speech .orb-wave {
+  border-color: rgba(255, 255, 255, 0.42);
+  animation: none;
+}
+
+/* YELLOW — Tick Tock is audible and its real amplitude drives scale/glow. */
+.voice-mode-overlay.is-processing .orb-core {
+  background: radial-gradient(circle, #FEF3C7 0%, #FBBF24 52%, #B45309 100%);
+  box-shadow: 0 0 var(--voice-glow-size) rgba(245, 158, 11, 0.74);
+  animation: none;
+}
+
+.voice-mode-overlay.is-processing .orb-wave {
+  border-color: rgba(251, 191, 36, 0.52);
+  opacity: var(--voice-wave-opacity);
+  animation: none;
+}
+
+.voice-mode-overlay.is-processing .wave2 {
+  opacity: var(--voice-wave2-opacity);
+}
+
+/* BLUE — assistant is actually audible. Real PCM playback level drives scale/glow. */
+.voice-mode-overlay.is-speaking .orb-core {
+  background: radial-gradient(circle, #93C5FD 0%, #3B82F6 52%, #1D4ED8 100%);
+  box-shadow: 0 0 var(--voice-glow-size) rgba(59, 130, 246, 0.82);
+  animation: none;
+}
+
+.voice-mode-overlay.is-speaking .orb-wave {
+  border-color: rgba(147, 197, 253, 0.52);
+  animation: none;
+}
+
+/* KIWI — a finished user recording is queued behind an older Gemini text generation. */
+.voice-mode-overlay.is-queued-user-turn .orb-core {
+  background: radial-gradient(circle, #ECFCCB 0%, #A3E635 52%, #4D7C0F 100%);
+  box-shadow: 0 0 56px rgba(163, 230, 53, 0.62);
+  animation: voice-kiwi-pulse 1.6s ease-in-out infinite;
+}
+
+.voice-mode-overlay.is-queued-user-turn .orb-wave {
+  border-color: rgba(190, 242, 100, 0.50);
+  opacity: 0.38;
+  animation: voice-kiwi-ring 2.1s ease-in-out infinite;
+}
+
+@keyframes voice-kiwi-pulse {
+  0%, 100% { filter: brightness(0.96); }
+  50% { filter: brightness(1.10); }
+}
+
+@keyframes voice-kiwi-ring {
+  0%, 100% { opacity: 0.22; }
+  50% { opacity: 0.48; }
+}
+
+.voice-mode-overlay.is-muted .glowing-voice-orb {
+  opacity: 0.56;
+  filter: saturate(0.5);
+}
+
+.voice-mode-overlay.has-error .glowing-voice-orb {
+  opacity: 0.72;
+  filter: saturate(0.6);
+}
+
+.voice-mode-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.voice-mode-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.voice-auto-detect-btn,
+.voice-mic-btn,
+.voice-exit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  color: white;
+  cursor: pointer;
+}
+
+.voice-auto-detect-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.16);
+  transition: background-color 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.voice-auto-detect-btn:hover,
+.voice-auto-detect-btn:focus-visible {
+  background-color: rgba(255, 255, 255, 0.23);
+}
+
+.voice-auto-detect-btn.is-off {
+  opacity: 0.58;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.voice-mic-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--accent-blue);
+  font-size: 20px;
+}
+
+.voice-mic-btn.muted {
+  background-color: #EF4444;
+}
+
+.record-audio-btn.recording {
+  color: #EF4444;
+}
+
+.recording-icon {
+  fill: currentColor;
+}
+
+.voice-exit-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: var(--bg-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-mode-overlay {
+    --voice-scale: 1 !important;
+    --voice-wave-scale: 1 !important;
+  }
+
+  .voice-mode-overlay .orb-core,
+  .voice-mode-overlay .orb-wave {
+    animation: none !important;
+    transition-duration: 180ms;
+  }
+}

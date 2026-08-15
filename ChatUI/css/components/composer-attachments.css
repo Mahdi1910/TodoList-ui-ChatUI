@@ -1,0 +1,82 @@
+/* 6. Composer Attachments & Error Callouts */
+.composer-file-previews {
+  display: flex;
+  gap: 8px;
+  padding: 6px 12px;
+  flex-wrap: wrap;
+}
+
+.file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  font-size: 13px;
+  color: var(--text-primary);
+  max-width: 260px;
+}
+
+.attachment-drop-overlay {
+  position: fixed;
+  inset: 12px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  border: 2px dashed color-mix(in srgb, var(--accent-blue) 72%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
+  backdrop-filter: blur(5px);
+}
+
+.attachment-drop-overlay.hidden {
+  display: none;
+}
+
+.attachment-drop-card {
+  min-width: min(360px, calc(100vw - 56px));
+  padding: 26px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 38%, var(--border-color));
+  border-radius: 16px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.28);
+  text-align: center;
+}
+
+.attachment-drop-icon {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 3px;
+  color: var(--accent-blue);
+}
+
+.attachment-drop-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.attachment-drop-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 700px) {
+  .attachment-drop-overlay {
+    inset: 8px;
+    border-radius: 14px;
+  }
+
+  .attachment-drop-card {
+    min-width: min(300px, calc(100vw - 40px));
+    padding: 22px 18px;
+  }
+}

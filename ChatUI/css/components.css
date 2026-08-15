@@ -1,0 +1,14 @@
+@import url("components/model-menu.css");
+@import url("components/modals.css");
+@import url("components/settings.css");
+@import url("components/backup-restore.css");
+@import url("components/voice.css");
+@import url("components/read-aloud.css");
+@import url("components/composer-attachments.css");
+@import url("components/right-sidebar.css");
+@import url("components/message-attachments.css");
+@import url("components/thinking-menu.css");
+@import url("components/workspace.css");
+@import url("components/workspace-responsive.css");
+/* TEMP_PERF_DIAGNOSTICS */
+@import url("components/performance-diagnostics.css");

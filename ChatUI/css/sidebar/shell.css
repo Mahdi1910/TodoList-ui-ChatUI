@@ -1,0 +1,82 @@
+/* ==========================================================================
+   SIDEBAR.CSS — Left Collapsible Navigation Panel
+   ========================================================================== */
+
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  transition: margin-left var(--transition-normal);
+  z-index: 20;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed {
+  margin-left: calc(-1 * var(--sidebar-width));
+}
+
+/* Header */
+.sidebar-header {
+  height: var(--header-height);
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 4px;
+  margin-left: -4px;
+}
+
+.brand:hover {
+  background-color: var(--bg-hover);
+}
+
+.brand:focus-visible {
+  outline: 1px solid var(--border-color);
+}
+
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Quick Nav */
+.sidebar-nav {
+  padding: 0 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.new-chat-btn {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  margin-left: 0;
+  gap: 10px;
+  background-color: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.new-chat-btn:hover {
+  background-color: var(--bg-hover);
+}

@@ -1,0 +1,215 @@
+/* ========================================== */
+/* SEARCH, CITATIONS, CODE EXECUTION OUTPUTS */
+/* ========================================== */
+
+/* Grounding / Search Queries Badge */
+.grounding-section {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.grounding-queries {
+  color: var(--text-muted);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.grounding-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--accent-blue);
+  text-decoration: none;
+  font-size: 11px;
+  transition: background-color var(--transition-fast);
+}
+
+.source-badge:hover {
+  background-color: var(--bg-hover);
+  text-decoration: underline;
+}
+
+/* URL Context Badges */
+.url-context-section {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.url-status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  margin-right: 6px;
+  margin-bottom: 4px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.url-status-item.success {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.url-status-item.success:hover {
+  background-color: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.6);
+  text-decoration: underline;
+}
+
+.url-status-item.warning {
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #F59E0B;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Code Execution Result Terminal Block */
+.code-execution-wrapper {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  background-color: #0d1117;
+}
+
+.code-execution-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background-color: #161b22;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.code-execution-output {
+  padding: 10px 12px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background-color: #010409;
+}
+
+/* Sandbox Generated Files Cards & Downloads */
+.sandbox-file-card {
+  margin: 8px 12px;
+  padding: 10px 12px;
+  background-color: #161b22;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sandbox-image-preview {
+  width: 100%;
+  max-height: 400px;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: #010409;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sandbox-plot-img {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+}
+
+.sandbox-file-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sandbox-file-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sandbox-file-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sandbox-file-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background-color: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-blue);
+  flex-shrink: 0;
+}
+
+.sandbox-file-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.sandbox-file-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.download-file-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: var(--accent-blue);
+  color: white;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--transition-fast);
+}
+
+.download-file-btn:hover {
+  background-color: var(--accent-blue-hover);
+  text-decoration: none;
+}
+
+.download-file-btn svg {
+  width: 14px;
+  height: 14px;
+}

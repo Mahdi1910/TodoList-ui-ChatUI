@@ -1,0 +1,24 @@
+﻿# Git Ignore Rules for ChatUI
+
+# Internal planning/review artifacts
+Implementation Plan/
+review/
+request/
+*.docx
+*report*.md
+review a vibe coding.md
+AI_CONTEXT.md
+AGENTS.md
+PROJECT.md
+skills-lock.json
+
+# Local AI/MCP configuration
+.claude/
+.mcp.json
+
+# Browser automation/test artifacts
+.playwright-mcp/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

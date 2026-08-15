@@ -1,0 +1,140 @@
+<!-- Search Modal -->
+  <div class="modal-overlay hidden" id="search-modal" role="dialog" aria-modal="true" aria-labelledby="search-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="search-modal-title">Search Chats</h3>
+        <button class="modal-close-btn" id="close-search-modal-btn" aria-label="Close modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="input-with-icon">
+          <i data-lucide="search"></i>
+          <label class="visually-hidden" for="search-modal-input">Search chats</label>
+          <input type="text" class="modal-input" id="search-modal-input" placeholder="Search by chat title or message..." />
+        </div>
+        <div class="search-results-list" id="search-results-list">
+          <!-- Dynamically populated with search matches -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add to Project Modal -->
+  <div class="modal-overlay hidden" id="add-to-project-modal" role="dialog" aria-modal="true" aria-labelledby="add-to-project-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="add-to-project-title">Add Chat to Project</h3>
+        <button class="modal-close-btn" id="close-add-to-project-btn" aria-label="Close modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p class="form-label">Select a project to move this chat into:</p>
+        <div class="project-selection-list" id="project-selection-list">
+          <!-- Dynamically filled with available projects -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage Project Chats Modal -->
+  <div class="modal-overlay hidden" id="manage-project-chats-modal" role="dialog" aria-modal="true" aria-labelledby="manage-project-chats-title">
+    <div class="modal-card project-chat-manager-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="manage-project-chats-title">Manage project chats</h3>
+        <button class="modal-close-btn" id="close-manage-project-chats-btn" aria-label="Close modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="form-label">Choose which chats belong to this project. A chat can belong to one project at a time.</p>
+        <div class="project-chat-manager-list" id="manage-project-chats-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Chat Modal -->
+  <div class="modal-overlay hidden" id="rename-chat-modal" role="dialog" aria-modal="true" aria-labelledby="rename-chat-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="rename-chat-title">Rename Chat</h3>
+        <button class="modal-close-btn" id="close-rename-chat-btn" aria-label="Close modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="rename-chat-input">New chat name</label>
+          <div class="input-with-icon">
+            <i data-lucide="edit-3"></i>
+            <input type="text" class="modal-input" id="rename-chat-input" placeholder="Chat name" />
+          </div>
+        </div>
+        <div class="modal-footer modal-footer-end">
+          <button class="primary-btn" id="confirm-rename-chat-btn">Save Name</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Project Modal -->
+  <div class="modal-overlay hidden" id="rename-project-modal" role="dialog" aria-modal="true" aria-labelledby="rename-project-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="rename-project-title">Rename Project</h3>
+        <button class="modal-close-btn" id="close-rename-project-btn" aria-label="Close modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="rename-project-input">New project name</label>
+          <div class="input-with-icon">
+            <i data-lucide="folder-edit"></i>
+            <input type="text" class="modal-input" id="rename-project-input" placeholder="Project name" />
+          </div>
+        </div>
+
+        <div class="modal-footer modal-footer-end">
+          <button class="primary-btn" id="confirm-rename-project-btn">Save Name</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 3. CREATE PROJECT MODAL                    -->
+  <!-- ========================================== -->
+  <div class="modal-overlay hidden" id="create-project-modal" role="dialog" aria-modal="true" aria-labelledby="create-project-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="create-project-title">Create project</h3>
+        <button class="modal-close-btn" id="close-project-modal-btn" aria-label="Close modal">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="project-name-input">Project name</label>
+          <div class="input-with-icon">
+            <i data-lucide="smile"></i>
+            <input type="text" class="modal-input" id="project-name-input" placeholder="e.g. Vacation Trip" />
+          </div>
+        </div>
+
+        <div class="info-callout">
+          <i data-lucide="lightbulb"></i>
+          <p>Projects organize related chats in one place.</p>
+        </div>
+
+        <div class="modal-footer modal-footer-end">
+          <button class="primary-btn" id="confirm-create-project-btn">Create project</button>
+        </div>
+      </div>
+    </div>
+  </div>

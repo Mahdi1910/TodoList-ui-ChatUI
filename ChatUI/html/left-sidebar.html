@@ -1,0 +1,82 @@
+<aside class="sidebar" id="sidebar">
+
+      <!-- Sidebar Top Header -->
+      <div class="sidebar-header">
+        <div class="brand" id="brand-new-chat" role="button" tabindex="0" title="New chat" aria-label="New chat">
+          <svg class="chatgpt-logo" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0811 4.7792-2.7582a.7944.7944 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4954 4.4951zM3.6118 18.3375a4.47 4.47 0 0 1-.5355-3.0071l.142.0859 4.7839 2.7582a.7944.7944 0 0 0 .7854 0l5.833-3.368v2.3324a.0806.0806 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1282-1.6127zM2.3424 8.6056a4.4687 4.4687 0 0 1 2.3408-1.9663v5.673a.7944.7944 0 0 0 .3927.6813l5.833 3.368-2.0199 1.1686a.0754.0754 0 0 1-.0712.0047l-4.8363-2.7915a4.4944 4.4944 0 0 1-1.6391-6.1388zM19.345 9.7736l-5.833-3.368 2.0199-1.1686a.0754.0754 0 0 1 .0712-.0047l4.8363 2.7915a4.4944 4.4944 0 0 1-.7238 8.1051v-5.673a.7944.7944 0 0 0-.3706-.6823zm2.3138-2.7915l-.142-.0859-4.7839-2.7582a.7944.7944 0 0 0-.7854 0l-5.833 3.368V5.174a.0806.0806 0 0 1 .0332-.0615l4.8458-2.7505a4.4992 4.4992 0 0 1 6.6653 4.6198zM8.3061 12.863l-2.02-1.1638a.0806.0806 0 0 1-.038-.052V6.0646a4.4992 4.4992 0 0 1 7.3719-3.4543l-.1419.0811-4.7792 2.7582a.7944.7944 0 0 0-.3927.6813v6.7321z"/>
+          </svg>
+        </div>
+        <div class="sidebar-header-actions">
+          <button class="icon-btn" id="open-search-btn" title="Search chats">
+            <i data-lucide="search"></i>
+          </button>
+          <button class="icon-btn" id="toggle-sidebar-btn" title="Close sidebar">
+            <i data-lucide="panel-left-close"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Navigation -->
+      <div class="sidebar-nav">
+        <button class="new-chat-btn" id="new-chat-btn" title="New chat" aria-label="New chat">
+          <i data-lucide="square-pen"></i>
+          <span>New Chat</span>
+        </button>
+        <button class="workspace-nav-btn" id="workspace-nav-btn" type="button" title="Open Workspace" aria-label="Open Workspace">
+          <i data-lucide="folder-tree"></i>
+          <span>Workspace</span>
+        </button>
+      </div>
+
+      <!-- Scrollable Sidebar Sections -->
+      <div class="sidebar-scrollable">
+
+        <!-- Pinned Chats Section -->
+        <div class="sidebar-section" id="pinned-section">
+          <div class="section-title">Pinned</div>
+          <ul class="chat-list" id="pinned-chat-list">
+            <li class="empty-section-text" id="empty-pinned-msg">No pinned chats</li>
+          </ul>
+        </div>
+
+        <!-- Projects Section -->
+        <div class="sidebar-section" id="projects-section">
+          <div class="section-header">
+            <span class="section-title">Projects</span>
+            <button class="icon-btn-sm" id="create-project-trigger" title="Create Project">
+              <i data-lucide="plus"></i>
+            </button>
+          </div>
+          <ul class="project-list" id="project-list">
+            <li class="empty-section-text" id="empty-project-msg">No projects yet</li>
+          </ul>
+        </div>
+
+        <!-- Recent Chats Section -->
+        <div class="sidebar-section" id="chats-section">
+          <div class="section-header">
+            <span class="section-title">Chats</span>
+            <button class="icon-btn-sm" id="create-chat-trigger" title="New chat" aria-label="New chat">
+              <i data-lucide="plus"></i>
+            </button>
+          </div>
+          <ul class="chat-list" id="recent-chat-list">
+            <li class="empty-section-text" id="empty-chats-msg">Your chat history will appear here</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- Settings Footer -->
+      <div class="sidebar-footer">
+        <div class="user-profile" id="open-settings-trigger" role="button" tabindex="0" aria-label="Open settings">
+          <div class="user-avatar">MA</div>
+          <div class="user-info">
+            <div class="user-name">ChatUI</div>
+            <div class="user-plan">Settings</div>
+          </div>
+        </div>
+      </div>
+
+    </aside>

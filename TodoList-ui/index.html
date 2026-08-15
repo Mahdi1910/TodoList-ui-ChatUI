@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Minimal Task Workspace</title>
+
+  <!-- CSS Module Imports -->
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/layout/app-shell.css">
+  <link rel="stylesheet" href="css/layout/sidebar-layout.css">
+  <link rel="stylesheet" href="css/layout/workspace-layout.css">
+  <link rel="stylesheet" href="css/components/task-cards.css">
+  <link rel="stylesheet" href="css/components/task-subtasks.css">
+  <link rel="stylesheet" href="css/components/task-drag.css">
+  <link rel="stylesheet" href="css/components/task-groups.css">
+  <link rel="stylesheet" href="css/components/task-kanban.css">
+  <link rel="stylesheet" href="css/components/modal-controls.css">
+  <link rel="stylesheet" href="css/components/project-tags.css">
+  <link rel="stylesheet" href="css/components/quick-task.css">
+  <link rel="stylesheet" href="css/components/schedule-date.css">
+  <link rel="stylesheet" href="css/components/schedule-wheels.css">
+  <link rel="stylesheet" href="css/components/schedule-reminders.css">
+  <link rel="stylesheet" href="css/components/schedule-repeat.css">
+  <link rel="stylesheet" href="css/components/schedule-repeat-end.css">
+</head>
+<body>
+
+  <div id="app">
+    <!-- 1. Global Static Narrow Rail (Desktop Leftmost Sidebar) -->
+    <aside class="primary-rail" aria-label="Application navigation">
+      <div class="rail-top">
+        <!-- Tick-Tick To-Do App Main Icon -->
+        <button class="rail-item active" id="rail-app-todo" data-app="todo" title="To-Do List">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+
+        <!-- Dummy Module: AI Assistant (Planned) -->
+        <button class="rail-item" id="rail-app-ai" data-app="ai" title="AI Assistant (Coming Soon)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </button>
+
+        <!-- Dummy Module: Habit Tracker (Planned) -->
+        <button class="rail-item" id="rail-app-habit" data-app="habit" title="Habit Tracker (Coming Soon)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </button>
+
+        <!-- Dummy Module: Diary / Log (Planned) -->
+        <button class="rail-item" id="rail-app-diary" data-app="diary" title="Diary Writer (Coming Soon)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Settings Icon (Bottom) -->
+      <div class="rail-bottom">
+        <button class="rail-item" id="btn-open-settings" title="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Sidebar Backdrop for tap-outside-to-close on Mobile -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <!-- 2. Secondary Floating Drawer Sidebar for To-Do Module -->
+    <aside class="secondary-sidebar" id="secondary-sidebar" aria-label="To-Do filters and projects" aria-hidden="true" inert>
+      <div class="sidebar-header">
+        <span class="sidebar-title">To-Do List</span>
+      </div>
+
+      <div class="sidebar-content">
+        <!-- Main Filters -->
+        <div class="sidebar-section">
+          <button class="sidebar-nav-item active" data-filter="inbox">
+            <span class="item-left">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+              </svg>
+              Inbox
+            </span>
+            <span class="item-count" id="count-inbox">0</span>
+          </button>
+
+          <button class="sidebar-nav-item" data-filter="today">
+            <span class="item-left">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Today
+            </span>
+            <span class="item-count" id="count-today">0</span>
+          </button>
+
+          <button class="sidebar-nav-item" data-filter="completed">
+            <span class="item-left">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Completed
+            </span>
+            <span class="item-count" id="count-completed">0</span>
+          </button>
+        </div>
+
+        <!-- Projects List Section -->
+        <div class="sidebar-section projects-section">
+          <div class="section-label-row">
+            <span class="section-label">Projects</span>
+            <button class="section-add-btn" id="btn-add-project" type="button" title="New project" aria-label="New project">+</button>
+          </div>
+          <div id="project-list"></div>
+        </div>
+
+        <!-- Tags List Section -->
+        <div class="sidebar-section tags-section">
+          <div class="section-label-row">
+            <span class="section-label">Tags</span>
+            <button class="section-add-btn" id="btn-add-tag" type="button" title="New tag" aria-label="New tag">+</button>
+          </div>
+          <div id="tag-list"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 3. Main Content Workspace -->
+    <main class="main-workspace">
+      <!-- Top Action Bar -->
+      <header class="workspace-header">
+        <div class="header-left">
+          <button class="toggle-sidebar-btn" id="btn-toggle-sidebar" title="Toggle Sidebar" aria-label="Toggle To-Do sidebar" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
+            </svg>
+          </button>
+          <h1 class="view-title" id="current-view-title">Inbox</h1>
+        </div>
+        <div class="workspace-header-actions">
+          <button type="button" class="workspace-control-btn" id="btn-sort-direction" title="Ascending — click for Descending" aria-label="Ascending — click for Descending">↑</button>
+          <div class="workspace-menu-wrap">
+            <button type="button" class="workspace-control-btn" id="btn-workspace-menu" aria-haspopup="menu" aria-expanded="false" aria-label="View and sort options">•••</button>
+            <div class="workspace-menu" id="workspace-menu" role="menu">
+              <div class="workspace-menu-label">View</div>
+              <div class="workspace-view-switcher" role="group" aria-label="Task view">
+                <button type="button" data-view-type="list" role="radio" aria-checked="true" aria-label="List view" title="List view">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h14" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+                <button type="button" data-view-type="kanban" role="radio" aria-checked="false" aria-label="Kanban view" title="Kanban view">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="4" y="5" width="5" height="14" rx="1"/><rect x="11" y="5" width="4" height="9" rx="1"/><rect x="17" y="5" width="3" height="11" rx="1"/></svg>
+                </button>
+                <button type="button" data-view-type="timeline" disabled aria-disabled="true" aria-label="Timeline view unavailable" title="Timeline view — unavailable">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 7h14M5 12h9M5 17h12" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>
+                </button>
+              </div>
+              <div class="workspace-menu-divider"></div>
+              <button type="button" class="workspace-submenu-trigger" id="workspace-sort-group-trigger" aria-haspopup="dialog" aria-controls="workspace-sort-group-panel" aria-expanded="false">
+                <span class="workspace-menu-primary">Sort &amp; Group</span>
+                <span class="workspace-menu-chevron" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Task Containers Workspace -->
+      <div class="workspace-content">
+        <div class="list-view" id="list-view">
+        <!-- Container 1: Active Tasks -->
+        <section class="tasks-section" id="active-tasks-container">
+          <div class="section-header-title" hidden>
+            <span>Active Tasks</span>
+            <span id="active-tasks-count">0 tasks</span>
+          </div>
+
+          <div class="task-list" id="active-task-list">
+            <!-- Rendered dynamically by tasks.js -->
+          </div>
+
+          <div class="empty-state" id="active-empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p>No active tasks. Take a break or add a new task!</p>
+          </div>
+        </section>
+
+        <!-- Container 2: Completed Tasks (Available ONLY when completed tasks exist) -->
+        <section class="tasks-section completed-section" id="completed-tasks-container">
+          <button type="button" class="section-header-title completed-section-toggle" aria-controls="completed-task-list" aria-expanded="true" aria-label="Collapse completed tasks">
+            <span>Completed</span>
+            <span class="completed-section-toggle-meta">
+              <span id="completed-tasks-count">0 tasks</span>
+              <span class="completed-section-chevron" aria-hidden="true">▾</span>
+            </span>
+          </button>
+
+          <div class="task-list" id="completed-task-list">
+            <!-- Rendered dynamically by tasks.js -->
+          </div>
+        </section>
+        </div>
+
+        <section class="kanban-view" id="kanban-view" hidden aria-label="Kanban task board">
+          <div class="kanban-board" id="kanban-board"></div>
+          <div class="empty-state kanban-empty-state" id="kanban-empty-state" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5h5v14H4zM11 5h4v9h-4zM17 5h3v11h-3z" />
+            </svg>
+            <p>No tasks in this view.</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- Bottom-Right Floating Action Button (FAB) for Quick Task Creation -->
+      <button class="fab-add-task" id="btn-open-add-task" aria-label="Add Task">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
+    </main>
+
+    <!-- 4. Mobile Bottom Navigation Bar (Phone Viewport Only) -->
+    <nav class="mobile-bottom-nav" aria-label="Application navigation">
+      <button class="nav-item-mobile active" data-app="todo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Tasks
+      </button>
+      <button class="nav-item-mobile" data-app="ai">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        AI
+      </button>
+      <button class="nav-item-mobile" data-app="habit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        Habits
+      </button>
+      <button class="nav-item-mobile" data-app="diary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+        Diary
+      </button>
+      <button class="nav-item-mobile" id="btn-mobile-open-settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        Settings
+      </button>
+    </nav>
+  </div>
+
+  <div id="workspace-sort-group-panel" class="workspace-settings-panel" role="dialog" aria-label="Sort and group settings" aria-hidden="true">
+    <section class="workspace-settings-section" aria-labelledby="workspace-sort-label">
+      <div class="workspace-settings-label" id="workspace-sort-label">Sort</div>
+      <div class="workspace-option-chips" role="radiogroup" aria-label="Sort tasks">
+        <button type="button" class="workspace-option-chip" data-sort-key="custom" role="radio" aria-checked="false">Custom</button>
+        <button type="button" class="workspace-option-chip" data-sort-key="dueDate" role="radio" aria-checked="false">Due Date</button>
+        <button type="button" class="workspace-option-chip" data-sort-key="priority" role="radio" aria-checked="false">Priority</button>
+        <button type="button" class="workspace-option-chip" data-sort-key="name" role="radio" aria-checked="false">Name</button>
+        <button type="button" class="workspace-option-chip" data-sort-key="createdAt" role="radio" aria-checked="false">Created Date</button>
+      </div>
+    </section>
+    <div class="workspace-settings-divider"></div>
+    <section class="workspace-settings-section" aria-labelledby="workspace-group-label">
+      <div class="workspace-settings-label" id="workspace-group-label">Group</div>
+      <div class="workspace-option-chips" role="radiogroup" aria-label="Group tasks">
+        <button type="button" class="workspace-option-chip" data-group-key="none" role="radio" aria-checked="false">None</button>
+        <button type="button" class="workspace-option-chip" data-group-key="priority" role="radio" aria-checked="false">Priority</button>
+        <button type="button" class="workspace-option-chip" data-group-key="date" role="radio" aria-checked="false">Date</button>
+        <button type="button" class="workspace-option-chip" data-group-key="project" role="radio" aria-checked="false">Project</button>
+        <button type="button" class="workspace-option-chip" data-group-key="tag" role="radio" aria-checked="false">Tag</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="task-action-menu" id="task-action-menu" role="menu" aria-label="Task actions" hidden>
+    <button type="button" data-task-action="add-subtask" role="menuitem">Add Subtask</button>
+    <button type="button" data-task-action="link-parent" role="menuitem" aria-haspopup="menu" aria-expanded="false">Link to Parent</button>
+    <button type="button" data-task-action="unlink" role="menuitem">Unlink</button>
+    <button type="button" data-task-action="delete" role="menuitem">Delete</button>
+  </div>
+
+  <!-- Modal 1: Minimalist Quick Input Sheet (Matching iOS/TickTick screenshot) -->
+  <div class="modal-overlay quick-input-overlay" id="add-task-modal" role="dialog" aria-modal="true" aria-labelledby="task-sheet-title" aria-hidden="true">
+    <div class="quick-input-card" id="quick-input-card">
+      <h2 id="task-sheet-title" class="sr-only">Create a task</h2>
+      <form id="add-task-form">
+        <!-- Title Input -->
+        <input type="text" id="task-title-input" class="quick-input-title" placeholder="What needs to be done?" required autocomplete="off" autocapitalize="sentences" spellcheck="true" inputmode="text" name="task-title" data-lpignore="true" data-1p-ignore="true" aria-label="Task title">
+
+        <!-- Description Input -->
+        <input type="text" id="task-desc-input" class="quick-input-desc" placeholder="Description" autocomplete="off" autocapitalize="sentences" spellcheck="true" inputmode="text" name="task-description" data-lpignore="true" data-1p-ignore="true" aria-label="Task description">
+
+        <div class="parent-subtasks-section" id="parent-subtasks-section" hidden>
+          <div class="parent-subtasks-header">
+            <span>Subtasks</span>
+            <span id="parent-subtasks-count">0</span>
+          </div>
+          <div class="parent-subtasks-list" id="parent-subtasks-list"></div>
+        </div>
+
+        <!-- Toolbar Row (Action Icons Left + Submit Arrow Right) -->
+        <div class="quick-toolbar">
+          <div class="quick-icons-left">
+            <!-- Icon 1: Calendar / Date -->
+            <button type="button" class="toolbar-icon-btn" id="btn-pop-date" title="Set Date">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </button>
+
+            <!-- Icon 2: Priority Flags (Dropdown Context Menu) -->
+            <div class="context-menu-wrapper">
+              <button type="button" class="toolbar-icon-btn" id="btn-pop-priority" title="Select Priority">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+              </button>
+              <div class="context-menu" id="menu-priority">
+                <div class="context-menu-item selected" data-priority="">None</div>
+                <div class="context-menu-item" data-priority="low"><span class="menu-dot priority-low-dot"></span> Low Priority</div>
+                <div class="context-menu-item" data-priority="medium"><span class="menu-dot priority-medium-dot"></span> Medium Priority</div>
+                <div class="context-menu-item" data-priority="high"><span class="menu-dot priority-high-dot"></span> High Priority</div>
+              </div>
+            </div>
+
+            <!-- Icon 3: Tag Icon (Multi-select Context Menu) -->
+            <div class="context-menu-wrapper">
+              <button type="button" class="toolbar-icon-btn" id="btn-pop-tags" title="Select Tags">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+              </button>
+              <div class="context-menu" id="menu-tags"></div>
+            </div>
+
+            <!-- Icon 4: Project Select (Single Select Context Menu) -->
+            <div class="context-menu-wrapper">
+              <button type="button" class="toolbar-icon-btn" id="btn-pop-project" title="Select Project">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002-2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+              </button>
+              <div class="context-menu" id="menu-project"></div>
+            </div>
+            <button type="button" class="toolbar-icon-btn add-subtask-toolbar-btn" id="btn-add-subtask-from-editor" title="Add Subtask" aria-label="Add Subtask" hidden>+</button>
+          </div>
+
+          <!-- Circular Blue Submit Button with Up Arrow -->
+          <button type="submit" id="btn-submit-quick-task" class="quick-submit-btn" aria-label="Submit Task">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay quick-input-overlay subtask-modal-overlay" id="subtask-modal" role="dialog" aria-modal="true" aria-labelledby="subtask-editor-heading" aria-hidden="true">
+    <div class="quick-input-card subtask-editor-card" id="subtask-editor-card">
+      <form id="subtask-form">
+        <div class="subtask-editor-header">
+          <div class="subtask-editor-heading-wrap">
+            <span class="subtask-editor-heading" id="subtask-editor-heading">New Subtask</span>
+            <span class="subtask-parent-label" id="subtask-parent-label"></span>
+          </div>
+          <button type="button" class="modal-close-btn" id="btn-close-subtask" aria-label="Close subtask editor">&times;</button>
+        </div>
+
+        <input type="text" id="subtask-title-input" class="quick-input-title" placeholder="Subtask title" required autocomplete="off" autocapitalize="sentences" spellcheck="true" inputmode="text" data-lpignore="true" data-1p-ignore="true" aria-label="Subtask title">
+        <input type="text" id="subtask-desc-input" class="quick-input-desc" placeholder="Description" autocomplete="off" autocapitalize="sentences" spellcheck="true" inputmode="text" data-lpignore="true" data-1p-ignore="true" aria-label="Subtask description">
+
+        <div class="quick-toolbar">
+          <div class="quick-icons-left">
+            <button type="button" class="toolbar-icon-btn" id="btn-subtask-date" title="Set Date" aria-label="Set subtask schedule">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z"/></svg>
+            </button>
+            <div class="context-menu-wrapper">
+              <button type="button" class="toolbar-icon-btn" id="btn-subtask-priority" title="Select Priority" aria-label="Select subtask priority">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2z"/></svg>
+              </button>
+              <div class="context-menu" id="subtask-menu-priority">
+                <div class="context-menu-item selected" data-subtask-priority="">None</div>
+                <div class="context-menu-item" data-subtask-priority="low"><span class="menu-dot priority-low-dot"></span> Low Priority</div>
+                <div class="context-menu-item" data-subtask-priority="medium"><span class="menu-dot priority-medium-dot"></span> Medium Priority</div>
+                <div class="context-menu-item" data-subtask-priority="high"><span class="menu-dot priority-high-dot"></span> High Priority</div>
+              </div>
+            </div>
+            <div class="context-menu-wrapper">
+              <button type="button" class="toolbar-icon-btn" id="btn-subtask-tags" title="Select Tags" aria-label="Select subtask tags">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+              </button>
+              <div class="context-menu" id="subtask-menu-tags"></div>
+            </div>
+            <div class="subtask-project-lock" id="subtask-project-lock" title="Subtasks inherit the parent project">Inbox 🔒</div>
+          </div>
+          <div class="subtask-editor-actions">
+            <button type="button" class="btn-secondary" id="btn-cancel-subtask">Cancel</button>
+            <button type="submit" class="btn-primary" id="btn-submit-subtask">Add Subtask</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 1B: Schedule Date Picker Dialog (Secondary Modal Layer) -->
+  <div class="modal-overlay schedule-modal-overlay" id="schedule-modal" role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title" aria-hidden="true">
+    <div class="modal-card schedule-modal-card">
+      <div class="modal-header schedule-modal-header">
+        <h2 class="modal-title sr-only" id="schedule-modal-title">Schedule Task</h2>
+        <!-- 3 Segmented Control Tabs -->
+        <div class="schedule-tabs" role="tablist" aria-label="Schedule mode">
+          <button type="button" class="schedule-tab-btn active" role="tab" aria-selected="true" id="tab-sched-date" aria-controls="panel-sched-date">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <span>Date</span>
+          </button>
+          <button type="button" class="schedule-tab-btn" role="tab" aria-selected="false" id="tab-sched-time" aria-controls="panel-sched-time">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>Time</span>
+          </button>
+          <button type="button" class="schedule-tab-btn" role="tab" aria-selected="false" id="tab-sched-repeat" aria-controls="panel-sched-repeat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span>Repeat</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Content Panel: Date -->
+      <div class="schedule-tab-panel active" id="panel-sched-date" role="tabpanel" aria-labelledby="tab-sched-date">
+        <!-- Quick-Action Bar ABOVE Calendar (5 ICON-ONLY buttons: ↻ → » › ×) -->
+        <div class="schedule-quick-actions" aria-label="Quick date shortcuts">
+          <!-- Action 1: Today (↻ Rotate) -->
+          <button type="button" class="sched-quick-btn" id="btn-sched-today" title="Today" aria-label="Select today">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+          </button>
+          <!-- Action 2: Tomorrow (→ Right Arrow) -->
+          <button type="button" class="sched-quick-btn" id="btn-sched-tomorrow" title="Tomorrow" aria-label="Select tomorrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+            </svg>
+          </button>
+          <!-- Action 3: Next Week (» Double Chevron Right) -->
+          <button type="button" class="sched-quick-btn" id="btn-sched-next-week" title="Next Week (+7 days)" aria-label="Select next week">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+            </svg>
+          </button>
+          <!-- Action 4: Next Month (› Single Chevron Right) -->
+          <button type="button" class="sched-quick-btn" id="btn-sched-next-month" title="Next Month" aria-label="Select same day next month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </button>
+          <!-- Action 5: Clear (× Cross) -->
+          <button type="button" class="sched-quick-btn" id="btn-sched-clear" title="Clear Date" aria-label="Clear selected date">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Calendar Header: Month & Year + Prev/Next Controls (NO duplicate text Today button) -->
+        <div class="calendar-header">
+          <button type="button" class="calendar-nav-btn" id="btn-cal-prev" title="Previous Month" aria-label="Previous Month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <span class="calendar-title" id="calendar-month-year" aria-live="polite">August 2026</span>
+          <button type="button" class="calendar-nav-btn" id="btn-cal-next" title="Next Month" aria-label="Next Month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+
+        <!-- Weekday Headers -->
+        <div class="calendar-weekdays" aria-hidden="true">
+          <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+        </div>
+
+        <!-- Calendar Days Grid -->
+        <div class="calendar-grid" id="calendar-days-grid" role="grid" aria-label="Calendar days">
+          <!-- Dynamically populated by ScheduleComponent -->
+        </div>
+      </div>
+
+      <!-- Tab Content Panel: Time -->
+      <div class="schedule-tab-panel" id="panel-sched-time" role="tabpanel" aria-labelledby="tab-sched-time">
+        <div class="time-panel-header">
+          <span class="time-panel-title">Select Time</span>
+        </div>
+
+        <!-- Time Picker Wheels Container -->
+        <div class="time-picker-container" role="group" aria-label="Time selection">
+          <div class="wheel-mask top" aria-hidden="true"></div>
+          <div class="wheel-mask bottom" aria-hidden="true"></div>
+          <div class="selection-highlight" aria-hidden="true"></div>
+
+          <!-- Hour Wheel -->
+          <div class="time-wheel" id="wheel-hour" role="listbox" aria-label="Hour selection" tabindex="0">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+
+          <span class="wheel-separator" aria-hidden="true">:</span>
+
+          <!-- Minute Wheel -->
+          <div class="time-wheel" id="wheel-minute" role="listbox" aria-label="Minute selection" tabindex="0">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+
+          <!-- Period Wheel (AM/PM) -->
+          <div class="time-wheel" id="wheel-period" role="listbox" aria-label="AM or PM selection" tabindex="0">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+        </div>
+
+        <!-- Reset Time Action Button -->
+        <div class="time-actions-row">
+          <button type="button" class="btn-sched-reset-time" id="btn-sched-reset-time" title="Reset to current time">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span>Reset Time</span>
+          </button>
+        </div>
+
+        <!-- Reminder Section -->
+        <div class="reminder-section">
+          <button type="button" class="reminder-trigger-btn" id="btn-sched-reminder-trigger" aria-haspopup="menu" aria-expanded="false">
+            <span class="reminder-trigger-left">
+              <span class="reminder-icon">🔔</span>
+              <span>Reminder</span>
+            </span>
+            <span class="reminder-trigger-val" id="reminder-value-display">On time</span>
+          </button>
+
+          <!-- Upward Reminder Context Menu -->
+          <div class="reminder-menu" id="menu-sched-reminder" role="menu" aria-label="Reminder options">
+            <div class="reminder-menu-item selected" data-reminder="none" role="menuitemcheckbox" aria-checked="true">
+              <span>None</span>
+              <span class="rem-check-icon">✓</span>
+            </div>
+            <div class="reminder-menu-item" data-reminder="on_time" role="menuitemcheckbox" aria-checked="false">
+              <span>On time</span>
+              <span class="rem-check-icon">✓</span>
+            </div>
+            <div class="reminder-menu-item" data-reminder="5_min" role="menuitemcheckbox" aria-checked="false">
+              <span>5 minutes before</span>
+              <span class="rem-check-icon">✓</span>
+            </div>
+            <div class="reminder-menu-item" data-reminder="10_min" role="menuitemcheckbox" aria-checked="false">
+              <span>10 minutes before</span>
+              <span class="rem-check-icon">✓</span>
+            </div>
+            <div class="reminder-menu-item" data-reminder="15_min" role="menuitemcheckbox" aria-checked="false">
+              <span>15 minutes before</span>
+              <span class="rem-check-icon">✓</span>
+            </div>
+            <!-- Custom reminders container -->
+            <div id="custom-reminders-list"></div>
+            <div class="reminder-menu-item custom-action" id="btn-open-custom-reminder" role="menuitem">
+              <span>Custom...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content Panel: Repeat -->
+      <div class="schedule-tab-panel" id="panel-sched-repeat" role="tabpanel" aria-labelledby="tab-sched-repeat">
+        <div class="repeat-panel-header">
+          <span class="repeat-panel-title">Repeat</span>
+        </div>
+
+        <!-- Presets Radio List -->
+        <div class="repeat-options-list" role="radiogroup" aria-label="Repeat preset shortcuts">
+          <button type="button" class="repeat-option-item selected" data-repeat-preset="none" role="radio" aria-checked="true">
+            <span>None</span>
+            <span class="repeat-check-icon">✓</span>
+          </button>
+          <button type="button" class="repeat-option-item" data-repeat-preset="daily" role="radio" aria-checked="false">
+            <span>Daily</span>
+            <span class="repeat-check-icon">✓</span>
+          </button>
+          <button type="button" class="repeat-option-item" data-repeat-preset="weekly" role="radio" aria-checked="false">
+            <span>Weekly</span>
+            <span class="repeat-check-icon">✓</span>
+          </button>
+          <button type="button" class="repeat-option-item" data-repeat-preset="monthly" role="radio" aria-checked="false">
+            <span>Monthly</span>
+            <span class="repeat-check-icon">✓</span>
+          </button>
+          <button type="button" class="repeat-option-item" data-repeat-preset="yearly" role="radio" aria-checked="false">
+            <span>Yearly</span>
+            <span class="repeat-check-icon">✓</span>
+          </button>
+          <button type="button" class="repeat-option-item custom-action" id="btn-open-custom-repeat" role="radio" aria-checked="false">
+            <span>Custom...</span>
+            <span class="repeat-check-icon">✓</span>
+          </button>
+        </div>
+
+        <!-- Summary Preview Bar -->
+        <div class="repeat-summary-bar">
+          <span id="repeat-summary-text">Does not repeat</span>
+        </div>
+      </div>
+
+      <!-- Schedule Modal Footer -->
+      <div class="schedule-footer">
+        <button type="button" class="btn-secondary" id="btn-sched-cancel">Cancel</button>
+        <button type="button" class="btn-primary" id="btn-sched-apply">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 1C: Custom Reminder Dialog (Layer 3 - z-index: 1300) -->
+  <div class="modal-overlay custom-reminder-overlay" id="custom-reminder-modal" role="dialog" aria-modal="true" aria-labelledby="custom-reminder-title" aria-hidden="true">
+    <div class="modal-card custom-reminder-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="custom-reminder-title">Custom Reminder</h3>
+        <button class="modal-close-btn" id="btn-close-custom-reminder" type="button" aria-label="Close custom reminder dialog">&times;</button>
+      </div>
+      <form id="custom-reminder-form">
+        <!-- 3 Vertical Scroll Wheels Header Labels -->
+        <div class="custom-rem-wheel-labels" aria-hidden="true">
+          <span>Minutes</span><span>Hours</span><span>Days</span>
+        </div>
+
+        <!-- 3 Vertical Scroll Wheels Picker Container -->
+        <div class="time-picker-container custom-rem-wheels-container" role="group" aria-label="Custom reminder duration selection">
+          <div class="wheel-mask top" aria-hidden="true"></div>
+          <div class="wheel-mask bottom" aria-hidden="true"></div>
+          <div class="selection-highlight" aria-hidden="true"></div>
+
+          <!-- Minutes Wheel (0-60) -->
+          <div class="time-wheel" id="wheel-custom-min" role="listbox" aria-label="Minutes before task selection" tabindex="0">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+
+          <!-- Hours Wheel (0-23) -->
+          <div class="time-wheel" id="wheel-custom-hr" role="listbox" aria-label="Hours before task selection" tabindex="0">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+
+          <!-- Days Wheel (0-60) -->
+          <div class="time-wheel" id="wheel-custom-day" role="listbox" aria-label="Days before task selection" tabindex="0">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+        </div>
+
+        <span class="custom-reminder-sublabel">Before the task</span>
+        <div class="modal-footer custom-reminder-footer">
+          <button type="button" class="btn-secondary" id="btn-custom-rem-cancel">Cancel</button>
+          <button type="submit" class="btn-primary" id="btn-custom-rem-apply">Apply</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 1D: Custom Repeat Dialog (Layer 2.5 - z-index: 1250) -->
+  <div class="modal-overlay custom-repeat-overlay" id="custom-repeat-modal" role="dialog" aria-modal="true" aria-labelledby="custom-repeat-title" aria-hidden="true">
+    <div class="modal-card custom-repeat-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="custom-repeat-title">Custom Repeat</h3>
+        <button class="modal-close-btn" id="btn-close-custom-repeat" type="button" aria-label="Close custom repeat dialog">&times;</button>
+      </div>
+      <form id="custom-repeat-form">
+        <!-- 3-Wheel Selector: Every + Number (1-99) + Unit (day/week/month/year) -->
+        <div class="custom-repeat-wheel-labels" aria-hidden="true">
+          <span>Frequency</span><span>Every</span><span>Unit</span>
+        </div>
+
+        <div class="time-picker-container custom-repeat-wheels-container" role="group" aria-label="Custom repeat frequency selection">
+          <div class="wheel-mask top" aria-hidden="true"></div>
+          <div class="wheel-mask bottom" aria-hidden="true"></div>
+          <div class="selection-highlight" aria-hidden="true"></div>
+
+          <!-- Wheel 1: Static "Every" -->
+          <div class="time-wheel" id="wheel-repeat-label" role="listbox" aria-label="Static Every label">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+
+          <!-- Wheel 2: Interval Number (1-99) -->
+          <div class="time-wheel" id="wheel-repeat-interval" role="listbox" aria-label="Repeat interval number" tabindex="0">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+
+          <!-- Wheel 3: Unit (day/week/month/year) -->
+          <div class="time-wheel" id="wheel-repeat-unit" role="listbox" aria-label="Repeat unit selection" tabindex="0">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+        </div>
+
+        <!-- Dynamic Sub-View 1: Week (7 Circular Weekday Buttons) -->
+        <div class="custom-repeat-subview" id="subview-repeat-week" style="display:none;">
+          <span class="subview-label">Repeat on</span>
+          <div class="weekday-circles-row" role="group" aria-label="Select days of the week">
+            <button type="button" class="weekday-circle-btn" data-day="1" aria-pressed="false" title="Monday">Mo</button>
+            <button type="button" class="weekday-circle-btn" data-day="2" aria-pressed="false" title="Tuesday">Tu</button>
+            <button type="button" class="weekday-circle-btn" data-day="3" aria-pressed="false" title="Wednesday">We</button>
+            <button type="button" class="weekday-circle-btn" data-day="4" aria-pressed="false" title="Thursday">Th</button>
+            <button type="button" class="weekday-circle-btn" data-day="5" aria-pressed="false" title="Friday">Fr</button>
+            <button type="button" class="weekday-circle-btn" data-day="6" aria-pressed="false" title="Saturday">Sa</button>
+            <button type="button" class="weekday-circle-btn" data-day="0" aria-pressed="false" title="Sunday">Su</button>
+          </div>
+        </div>
+
+        <!-- Dynamic Sub-View 2: Month (Single Current/Scheduled Month Calendar Grid) -->
+        <div class="custom-repeat-subview" id="subview-repeat-month" style="display:none;">
+          <div class="subview-header">
+            <span class="subview-label" id="repeat-month-grid-title">August 2026</span>
+          </div>
+          <div class="calendar-weekdays" aria-hidden="true">
+            <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+          </div>
+          <div class="calendar-grid" id="repeat-month-days-grid" role="grid" aria-label="Select month dates">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+        </div>
+
+        <!-- Dynamic Sub-View 3: Year (Jan-Dec Bounded Calendar Grid) -->
+        <div class="custom-repeat-subview" id="subview-repeat-year" style="display:none;">
+          <div class="calendar-header repeat-year-nav">
+            <button type="button" class="calendar-nav-btn" id="btn-repeat-year-prev" title="Previous Month" aria-label="Previous Month">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <span class="calendar-title" id="repeat-year-grid-title" aria-live="polite">August 2026</span>
+            <button type="button" class="calendar-nav-btn" id="btn-repeat-year-next" title="Next Month" aria-label="Next Month">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+          <div class="calendar-weekdays" aria-hidden="true">
+            <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+          </div>
+          <div class="calendar-grid" id="repeat-year-days-grid" role="grid" aria-label="Select dates across current year">
+            <!-- Dynamically populated by ScheduleComponent -->
+          </div>
+        </div>
+
+        <div class="modal-footer custom-repeat-footer">
+          <button type="button" class="btn-secondary" id="btn-custom-rep-cancel">Cancel</button>
+          <button type="submit" class="btn-primary" id="btn-custom-rep-apply">Done</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 2: Project Create / Edit Dialog -->
+  <div class="modal-overlay" id="project-modal" role="dialog" aria-modal="true" aria-labelledby="project-modal-title" aria-hidden="true">
+    <div class="modal-card project-modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="project-modal-title">New Project</h2>
+        <button class="modal-close-btn" id="btn-close-project-modal" type="button" aria-label="Close project dialog">&times;</button>
+      </div>
+      <form id="project-form">
+        <label class="project-name-label" for="project-name-input">Name</label>
+        <div class="project-name-input-wrap">
+          <button class="project-icon-trigger" id="project-icon-trigger" type="button" aria-label="Choose project icon" aria-haspopup="listbox" aria-expanded="false">●</button>
+          <input id="project-name-input" class="project-name-input" type="text" placeholder="Project name" autocomplete="off" required>
+          <div class="project-icon-picker" id="project-icon-picker" role="listbox" aria-label="Project icons">
+            <button type="button" role="option" data-icon="●">●</button>
+            <button type="button" role="option" data-icon="◆">◆</button>
+            <button type="button" role="option" data-icon="★">★</button>
+            <button type="button" role="option" data-icon="✓">✓</button>
+            <button type="button" role="option" data-icon="▣">▣</button>
+            <button type="button" role="option" data-icon="✦">✦</button>
+            <button type="button" role="option" data-icon="☰">☰</button>
+            <button type="button" role="option" data-icon="◉">◉</button>
+          </div>
+        </div>
+
+        <div class="project-view-field">
+          <span class="project-name-label">View type</span>
+          <div class="project-view-options" role="radiogroup" aria-label="Project view type">
+            <button type="button" class="project-view-option selected" data-taxonomy-view="list" role="radio" aria-checked="true" title="List">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>List</span>
+            </button>
+            <button type="button" class="project-view-option" data-taxonomy-view="kanban" role="radio" aria-checked="false" title="Kanban">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg><span>Kanban</span>
+            </button>
+            <button type="button" class="project-view-option" data-taxonomy-view="timeline" role="radio" aria-checked="false" title="Timeline" disabled aria-disabled="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 18V6M4 12h16M20 6v12M8 9v6M12 7v10M16 9v6"/></svg><span>Timeline</span>
+            </button>
+          </div>
+        </div>
+        <div class="project-view-field">
+          <label class="project-name-label" for="project-parent-select">Parent project</label>
+          <select id="project-parent-select" class="project-parent-select">
+            <option value="">No parent (top-level project)</option>
+          </select>
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn-primary" id="btn-save-project">Create Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 3: Tag Create / Edit Dialog -->
+  <div class="modal-overlay" id="tag-modal" role="dialog" aria-modal="true" aria-labelledby="tag-modal-title" aria-hidden="true">
+    <div class="modal-card project-modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="tag-modal-title">New Tag</h2>
+        <button class="modal-close-btn" id="btn-close-tag-modal" type="button" aria-label="Close tag dialog">&times;</button>
+      </div>
+      <form id="tag-form">
+        <label class="project-name-label" for="tag-name-input">Name</label>
+        <div class="project-name-input-wrap">
+          <button class="project-icon-trigger" id="tag-icon-trigger" type="button" aria-label="Choose tag icon" aria-haspopup="listbox" aria-expanded="false">●</button>
+          <input id="tag-name-input" class="project-name-input" type="text" placeholder="Tag name" autocomplete="off" required>
+          <div class="project-icon-picker" id="tag-icon-picker" role="listbox" aria-label="Tag icons">
+            <button type="button" role="option" data-icon="●">●</button>
+            <button type="button" role="option" data-icon="◆">◆</button>
+            <button type="button" role="option" data-icon="★">★</button>
+            <button type="button" role="option" data-icon="✓">✓</button>
+            <button type="button" role="option" data-icon="▣">▣</button>
+            <button type="button" role="option" data-icon="✦">✦</button>
+            <button type="button" role="option" data-icon="☰">☰</button>
+            <button type="button" role="option" data-icon="◉">◉</button>
+          </div>
+        </div>
+
+        <div class="project-view-field">
+          <span class="project-name-label">View type</span>
+          <div class="project-view-options" role="radiogroup" aria-label="Tag view type">
+            <button type="button" class="project-view-option selected" data-taxonomy-view="list" role="radio" aria-checked="true" title="List">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>List</span>
+            </button>
+            <button type="button" class="project-view-option" data-taxonomy-view="kanban" role="radio" aria-checked="false" title="Kanban">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg><span>Kanban</span>
+            </button>
+            <button type="button" class="project-view-option" data-taxonomy-view="timeline" role="radio" aria-checked="false" title="Timeline" disabled aria-disabled="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 18V6M4 12h16M20 6v12M8 9v6M12 7v10M16 9v6"/></svg><span>Timeline</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="project-view-field">
+          <label class="project-name-label" for="tag-parent-select">Parent tag</label>
+          <select id="tag-parent-select" class="project-parent-select">
+            <option value="">No parent (top-level tag)</option>
+          </select>
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn-primary" id="btn-save-tag">Create Tag</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 4: Settings Dialog -->
+  <div class="modal-overlay" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="settings-title">Preferences</h2>
+        <button class="modal-close-btn" id="btn-close-settings-modal" aria-label="Close settings">&times;</button>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-title">Appearance Theme</span>
+          <span class="setting-desc">Switch between macOS Dark and Light theme</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="theme-toggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <section id="settings-data-section" class="settings-section settings-data-section" aria-labelledby="settings-data-title">
+        <div class="settings-section-copy">
+          <span class="settings-section-title" id="settings-data-title">Data</span>
+          <span class="settings-data-note">Backup all saved tasks, projects, tags, reminders, repeat data and preferences.</span>
+        </div>
+        <div class="settings-data-actions">
+          <button type="button" class="btn-secondary" id="btn-create-backup">Create Backup</button>
+          <button type="button" class="btn-secondary" id="btn-restore-backup">Restore Backup</button>
+          <input class="sr-only" type="file" id="restore-backup-input" accept="application/json,.json" tabindex="-1">
+        </div>
+        <p class="backup-restore-status" id="backup-restore-status" role="status" aria-live="polite"></p>
+        <div class="restore-summary" id="restore-backup-summary" hidden tabindex="-1">
+          <strong>Backup ready to restore</strong>
+          <span id="restore-backup-details"></span>
+          <span class="restore-warning">This replaces all current local TodoList data.</span>
+          <div class="restore-confirm-actions">
+            <button type="button" class="btn-secondary" id="btn-cancel-restore">Cancel</button>
+            <button type="button" class="btn-danger" id="btn-confirm-restore">Restore and Replace</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" id="btn-save-settings">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Native ES-module application entry -->
+  <script type="module" src="js/bootstrap.js"></script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+/* Modern iOS Card Style Task Items */
+.task-card {
+  background-color: var(--bg-glass-card);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  width: 100%;
+}
+
+.task-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0; /* Ensures task title wraps gracefully instead of squeezing into letters */
+}
+
+/* Custom macOS / iOS Checkbox */
+.task-checkbox-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.task-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--text-muted);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  background: transparent;
+}
+
+.task-checkbox:checked {
+  background-color: var(--success-color);
+  border-color: var(--success-color);
+}
+
+.task-checkbox:checked + .check-icon {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.check-icon {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  color: #ffffff;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.task-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0; /* Crucial for long text on mobile screen */
+}
+
+.task-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  word-break: break-word; /* Wraps words properly without line-letter squeezing */
+  line-height: 1.3;
+}
+
+.task-card.completed .task-title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.meta-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+}
+
+.meta-badge.priority-high {
+  background-color: rgba(255, 69, 58, 0.18);
+  color: var(--danger-color);
+}
+
+.meta-badge.priority-medium {
+  background-color: rgba(255, 214, 10, 0.18);
+  color: var(--warning-color);
+}
+
+.meta-badge.priority-low {
+  background-color: rgba(48, 209, 88, 0.18);
+  color: var(--success-color);
+}
+
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.action-btn.delete-btn:active,
+.action-btn.delete-btn:hover {
+  background-color: rgba(255, 69, 58, 0.15);
+  color: var(--danger-color);
+}
+
+.action-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.task-description {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.task-checkbox:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 3px;
+}
+
+/* Due Date Badge on Task Cards */
+.meta-badge.due-date {
+  background-color: var(--accent-light);
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+/* Due Date Badge SVG Icon */
+.meta-badge.due-date::before {
+  content: "📅 ";
+  font-size: 10px;
+}
+
+/* Meta Badge Repeat Styling */
+.meta-badge.repeat {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+

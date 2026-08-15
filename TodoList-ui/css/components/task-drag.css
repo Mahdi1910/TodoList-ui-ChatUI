@@ -1,0 +1,73 @@
+.task-drag-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1090;
+  pointer-events: none;
+}
+
+.task-family[data-drag-root="true"] > .task-card,
+.subtask-drag-item[data-drag-subtask="true"] > .task-card {
+  -webkit-touch-callout: none;
+}
+
+.task-family.is-dragging,
+.subtask-drag-item.is-dragging {
+  position: absolute;
+  margin: 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: none !important;
+}
+
+.task-family.is-dragging > .task-card,
+.subtask-drag-item.is-dragging > .task-card {
+  box-shadow: var(--shadow-lg);
+}
+
+.task-family.is-dragging .subtask-card {
+  box-shadow: var(--shadow-md);
+}
+
+.task-drop-placeholder {
+  flex: 0 0 auto;
+  min-height: 40px;
+  box-sizing: border-box;
+  border: 2px solid var(--accent-color);
+  border-radius: var(--radius-md);
+  background: var(--accent-light);
+  box-shadow: inset 0 0 0 1px var(--accent-light);
+  transition: width var(--transition-fast);
+}
+
+.task-drop-placeholder.is-root-preview,
+.task-drop-placeholder.is-subtask-preview {
+  width: 100%;
+}
+
+.task-drop-lane {
+  position: relative;
+}
+
+body.task-drag-active {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grabbing;
+}
+
+body.task-drag-active .task-drop-lane {
+  min-height: 28px;
+  border-radius: var(--radius-md);
+}
+
+body.task-drag-active .task-family:not(.is-dragging),
+body.task-drag-active .subtask-drag-item:not(.is-dragging) {
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-drop-placeholder,
+  body.task-drag-active .task-family:not(.is-dragging),
+  body.task-drag-active .subtask-drag-item:not(.is-dragging) {
+    transition: none !important;
+  }
+}

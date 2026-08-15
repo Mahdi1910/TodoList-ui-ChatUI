@@ -1,0 +1,6 @@
+@echo off
+echo Starting local HTTP server for ChatUI...
+echo Opening http://localhost:8000 in your default browser...
+start http://localhost:8000
+python -m http.server 8000
+pause

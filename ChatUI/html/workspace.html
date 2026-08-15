@@ -1,0 +1,70 @@
+<main class="workspace-view hidden" id="workspace-view" aria-label="Workspace">
+  <header class="workspace-header">
+    <div class="workspace-header-left">
+      <button class="icon-btn workspace-open-sidebar-btn" id="workspace-open-sidebar-btn" type="button" title="Open sidebar" aria-label="Open sidebar">
+        <i data-lucide="panel-left"></i>
+      </button>
+      <button class="icon-btn workspace-toggle-explorer-btn" id="workspace-toggle-explorer-btn" type="button" title="Toggle Workspace explorer" aria-label="Toggle Workspace explorer" aria-expanded="false" aria-controls="workspace-explorer">
+        <i data-lucide="folder-tree"></i>
+      </button>
+      <div class="workspace-title-group">
+        <i data-lucide="folder-tree"></i>
+        <span class="workspace-title">Workspace</span>
+      </div>
+    </div>
+
+    <div class="workspace-header-actions">
+      <label class="workspace-search-box" for="workspace-search-input">
+        <i data-lucide="search"></i>
+        <input id="workspace-search-input" type="search" placeholder="Search workspace..." autocomplete="off" />
+      </label>
+      <button class="workspace-action-btn" id="workspace-new-folder-btn" type="button">
+        <i data-lucide="folder-plus"></i>
+        <span>New Folder</span>
+      </button>
+      <button class="workspace-action-btn primary" id="workspace-new-page-btn" type="button">
+        <i data-lucide="file-plus-2"></i>
+        <span>New Page</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="workspace-body">
+    <aside class="workspace-explorer" id="workspace-explorer" aria-label="Workspace explorer">
+      <div class="workspace-explorer-heading">
+        <span>Explorer</span>
+        <button class="icon-btn-sm" id="workspace-refresh-btn" type="button" title="Refresh Workspace" aria-label="Refresh Workspace">
+          <i data-lucide="refresh-cw"></i>
+        </button>
+      </div>
+      <div class="workspace-tree" id="workspace-tree" role="tree" aria-label="Workspace files and folders">
+        <div class="workspace-tree-placeholder">Open Workspace to load folders</div>
+      </div>
+    </aside>
+
+    <section class="workspace-content" id="workspace-content">
+      <div class="workspace-content-toolbar">
+        <div class="workspace-breadcrumb" id="workspace-breadcrumb">/</div>
+        <div class="workspace-document-actions" id="workspace-document-actions"></div>
+      </div>
+
+      <div class="workspace-search-results hidden" id="workspace-search-results" aria-live="polite"></div>
+
+      <div class="workspace-selection-view" id="workspace-selection-view">
+        <div class="workspace-empty-state" id="workspace-empty-state">
+          <i data-lucide="files"></i>
+          <h2>Your Workspace</h2>
+          <p>Create folders and Markdown pages here, or enable the Workspace AI tool so Gemini can manage them for you.</p>
+        </div>
+
+        <div class="workspace-folder-view hidden" id="workspace-folder-view">
+          <div class="workspace-folder-grid" id="workspace-folder-grid"></div>
+        </div>
+
+        <div class="workspace-document-canvas hidden" id="workspace-document-canvas" aria-live="polite"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="workspace-pagination-stage" id="workspace-pagination-stage" aria-hidden="true"></div>
+</main>

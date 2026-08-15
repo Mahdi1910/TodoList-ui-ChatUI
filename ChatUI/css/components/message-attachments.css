@@ -1,0 +1,130 @@
+.file-pill-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.file-pill-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-pill-remove-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.file-pill-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-pill-remove:hover {
+  color: #EF4444;
+}
+
+.message-attachments-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chat-attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 8px 12px;
+  max-width: 320px;
+}
+
+.chat-attachment-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background-color: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.chat-attachment-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+}
+
+.chat-attachment-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-attachment-type {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.chat-audio-player {
+  width: 100%;
+  max-width: 300px;
+  height: 36px;
+  outline: none;
+  border-radius: 18px;
+}
+
+.chat-attachment-media {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.chat-attachment-media-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.chat-attachment-media-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.chat-attachment-image {
+  max-width: 280px;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+  margin-bottom: 4px;
+}
+
+.chat-attachment-image-name {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.message-error-box {
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #F87171;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-top: 6px;
+}

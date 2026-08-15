@@ -1,0 +1,71 @@
+/*
+ * TEMPORARY PERFORMANCE DIAGNOSTICS — remove after profiling is complete.
+ */
+
+.performance-diagnostics-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.performance-diagnostics-note {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.performance-diagnostics-status-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.performance-diagnostics-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.performance-diagnostics-status {
+  min-height: 20px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.performance-diagnostics-status.is-enabled {
+  color: var(--text-secondary);
+}
+
+.performance-diagnostics-status.is-active {
+  color: var(--accent-blue);
+}
+
+.performance-diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.performance-diagnostics-action {
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+.performance-diagnostics-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.performance-diagnostics-clear {
+  color: var(--text-secondary);
+}

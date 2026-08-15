@@ -1,0 +1,159 @@
+/* Repeat Tab Panel & Presets List */
+.repeat-panel-header {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.repeat-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.repeat-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.repeat-option-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.repeat-option-item:hover,
+.repeat-option-item:focus-visible {
+  background-color: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+
+.repeat-option-item.selected {
+  color: var(--accent-color);
+  font-weight: 600;
+  border-color: var(--accent-color);
+  background-color: var(--accent-light);
+}
+
+.repeat-check-icon {
+  opacity: 0;
+  color: var(--accent-color);
+  font-weight: 700;
+}
+
+.repeat-option-item.selected .repeat-check-icon {
+  opacity: 1;
+}
+
+.repeat-option-item.custom-action {
+  margin-top: 4px;
+}
+
+/* Repeat Live Summary Bar */
+.repeat-summary-bar {
+  text-align: center;
+  padding: 8px 12px;
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-color);
+  margin-bottom: 12px;
+}
+
+/* Custom Repeat Dialog Modal (Layer 2.5 - z-index: 1250) */
+.custom-repeat-overlay {
+  z-index: 1250;
+}
+
+.custom-repeat-card {
+  max-width: 360px;
+  padding: 18px;
+}
+
+.custom-repeat-wheel-labels {
+  display: flex;
+  justify-content: space-around;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 10px;
+  padding: 0 8px;
+}
+
+.custom-repeat-wheel-labels span {
+  flex: 1;
+  text-align: center;
+}
+
+.custom-repeat-wheels-container {
+  margin: 8px 0 16px 0;
+}
+
+/* Dynamic Sub-Views */
+.custom-repeat-subview {
+  margin-bottom: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.subview-header,
+.subview-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+/* Weekday Circles Row */
+.weekday-circles-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.weekday-circle-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.weekday-circle-btn:hover,
+.weekday-circle-btn:focus-visible {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.weekday-circle-btn[aria-pressed="true"] {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(10, 132, 255, 0.35);
+}
+

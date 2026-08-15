@@ -1,0 +1,97 @@
+/* ==========================================================================
+   COMPONENTS.CSS — Modals, Dropdowns, Dictation Bar & Voice Orb
+   ========================================================================== */
+
+/* 1. Model Selector Dropdown */
+.model-dropdown-container {
+  position: relative;
+}
+
+.model-selector-btn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-selector-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.model-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  width: max-content;
+  min-width: 220px;
+  max-width: min(92vw, 380px);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 50;
+}
+
+.model-option {
+  padding: 7px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.model-option:hover {
+  background-color: var(--bg-hover);
+}
+
+.model-option.active {
+  background-color: var(--bg-tertiary);
+}
+
+.model-icon {
+  width: 23px;
+  height: 23px;
+  border-radius: 6px;
+  background-color: var(--bg-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+}
+
+.model-details {
+  flex: 1;
+}
+
+.model-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.check-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--accent-blue);
+  opacity: 0;
+}
+
+.model-option.active .check-icon {
+  opacity: 1;
+}
+
+/* 2. Context Menu Popup */

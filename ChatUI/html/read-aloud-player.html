@@ -1,0 +1,18 @@
+<!-- Global Read Aloud player. Playback controls never cancel Live generation. -->
+<div class="read-aloud-player hidden" id="read-aloud-player" role="region" aria-label="Read aloud player">
+  <button class="read-aloud-control-btn" id="read-aloud-play-btn" type="button" title="Pause audio" aria-label="Pause audio">
+    <i data-lucide="pause"></i>
+  </button>
+  <span class="read-aloud-time" id="read-aloud-current-time" aria-label="Current audio time">00:00</span>
+  <div class="read-aloud-track-wrap">
+    <div class="read-aloud-track-rail" aria-hidden="true">
+      <div class="read-aloud-generation-fill" id="read-aloud-generation-fill"></div>
+      <div class="read-aloud-playback-fill" id="read-aloud-playback-fill"></div>
+    </div>
+    <input class="read-aloud-seek" id="read-aloud-seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Audio position" />
+  </div>
+  <span class="read-aloud-time" id="read-aloud-total-time" aria-label="Available audio time">00:00</span>
+  <button class="read-aloud-control-btn" id="read-aloud-close-btn" type="button" title="Close player" aria-label="Close player">
+    <i data-lucide="x"></i>
+  </button>
+</div>

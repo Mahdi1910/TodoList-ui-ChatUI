@@ -1,0 +1,126 @@
+/* Markdown Formatted Content Styles (ChatGPT Style) */
+.assistant-bubble p {
+  margin-bottom: 12px;
+  line-height: 1.65;
+}
+
+.assistant-bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.assistant-bubble h1, .assistant-bubble h2, .assistant-bubble h3, .assistant-bubble h4 {
+  margin: 18px 0 10px 0;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.assistant-bubble h1 { font-size: 20px; }
+.assistant-bubble h2 { font-size: 18px; }
+.assistant-bubble h3 { font-size: 16px; }
+
+.assistant-bubble ul, .assistant-bubble ol {
+  margin: 8px 0 14px;
+  padding-inline-start: 24px;
+  line-height: 1.6;
+}
+
+.assistant-bubble li {
+  margin-bottom: 4px;
+}
+
+.assistant-bubble blockquote {
+  border-inline-start: 3px solid var(--accent-blue);
+  border-left: 0;
+  padding-inline-start: 14px;
+  padding-left: 0;
+  margin: 12px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.assistant-bubble table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 14px;
+}
+
+.assistant-bubble th, .assistant-bubble td {
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  text-align: start;
+}
+
+.assistant-bubble th {
+  background-color: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+.assistant-bubble code {
+  background-color: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 13px;
+}
+
+/* Code Container Wrapper with Header */
+.code-block-wrapper {
+  direction: ltr;
+  text-align: left;
+  margin: 14px 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  background-color: #0d1117;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #161b22;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.copy-code-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.copy-code-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.copy-code-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  padding: 14px;
+  overflow-x: auto;
+  background-color: #0d1117;
+}
+
+.code-block-wrapper pre code {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  border-radius: 0;
+}

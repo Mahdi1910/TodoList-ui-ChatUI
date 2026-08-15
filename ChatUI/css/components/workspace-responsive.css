@@ -1,0 +1,46 @@
+/* Workspace small-screen drawer refinements. */
+.workspace-toggle-explorer-btn { display: none; }
+
+@media (max-width: 767px) {
+  .workspace-toggle-explorer-btn { display: inline-flex; }
+  .workspace-title-group > svg { display: none; }
+
+  .workspace-body { position: relative; }
+  .workspace-content {
+    width: 100%;
+    flex: 1 1 100%;
+    position: relative;
+  }
+
+  .workspace-explorer {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(82vw, 300px);
+    height: 100%;
+    z-index: 20;
+    transform: translateX(-105%);
+    transition: transform var(--transition-normal);
+    box-shadow: 12px 0 30px rgba(0, 0, 0, 0.32);
+  }
+
+  .workspace-view.workspace-explorer-open .workspace-explorer {
+    transform: translateX(0);
+  }
+
+  .workspace-view.workspace-explorer-open .workspace-content::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    background: rgba(0, 0, 0, 0.36);
+  }
+
+  .workspace-document-canvas {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .workspace-page {
+    max-width: calc(100vw - 18px);
+  }
+}

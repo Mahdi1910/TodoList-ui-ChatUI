@@ -1,0 +1,257 @@
+/* ==========================================================================
+   ANIMATIONS.CSS — Motion System, Transitions & Micro-Animations
+   ========================================================================== */
+
+/* 1. Message Row Entrance Animation (User & Assistant) */
+.message-row {
+  animation: messageEntrance 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes messageEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 2. Chat Switch Viewport Fade Transition */
+.conversation-thread-fade {
+  animation: threadFadeIn 140ms ease-out forwards;
+}
+
+@keyframes threadFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 3. Smooth Character & Token Streaming Fade-In */
+.streaming-text-wrap {
+  display: inline;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.char-stream {
+  display: inline;
+  animation: charFadeIn 120ms ease-out forwards;
+}
+
+@keyframes charFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.streaming-cursor,
+.typing-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 16px;
+  background-color: var(--text-primary);
+  margin-left: 4px;
+  vertical-align: middle;
+  animation: blink 0.75s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* 4. Pulsing Blue Orb Thinking Indicator & Slots */
+.thinking-slot {
+  transition: opacity 180ms ease, transform 180ms ease;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.thinking-slot.fading-out {
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+}
+
+.thinking-slot.hidden {
+  display: none !important;
+}
+
+.content-slot {
+  transition: opacity 200ms ease;
+}
+
+.thinking-indicator {
+  display: none;
+}
+
+.thinking-panel {
+  width: 100%;
+  margin: 0 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.025));
+  overflow: hidden;
+  animation: thinkingPanelEntrance 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.thinking-toggle {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: transparent;
+  border: 0;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.thinking-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.035);
+}
+
+.thinking-toggle-left {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.thinking-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.thinking-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thinking-chevron {
+  width: 17px;
+  height: 17px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 180ms ease;
+}
+
+.thinking-toggle[aria-expanded="true"] .thinking-chevron {
+  transform: rotate(180deg);
+}
+
+.thinking-details {
+  border-top: 1px solid var(--border-color);
+  padding: 14px 16px 16px;
+  max-height: 360px;
+  overflow-y: auto;
+  animation: thinkingDetailsOpen 180ms ease-out;
+}
+
+.thinking-details.hidden {
+  display: none !important;
+}
+
+.thinking-content {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: normal;
+}
+
+.thinking-content p {
+  margin: 0 0 10px;
+}
+
+.thinking-content p:last-child {
+  margin-bottom: 0;
+}
+
+.thinking-sphere {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #60A5FA 0%, #2563EB 60%, #1D4ED8 100%);
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.7);
+  animation: none;
+}
+
+.thinking-panel.generating .thinking-sphere {
+  animation: spherePulse 1.6s infinite ease-in-out;
+}
+
+@keyframes thinkingPanelEntrance {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes thinkingDetailsOpen {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes spherePulse {
+  0%, 100% {
+    transform: scale(0.8);
+    box-shadow: 0 0 6px rgba(37, 99, 235, 0.4);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.35);
+    box-shadow: 0 0 18px rgba(59, 130, 246, 0.9);
+    opacity: 1;
+  }
+}
+
+@keyframes thinkingPulse {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.1);
+    opacity: 1;
+    background-color: var(--text-primary);
+  }
+}
+
+/* 5. Sidebar Generating Spinner/Pulsing Badge */
+.sidebar-chat-generating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-generating-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: var(--accent-blue);
+  animation: thinkingPulse 1.2s infinite ease-in-out both;
+}
+
+.sidebar-generating-dot:nth-child(1) { animation-delay: 0s; }
+.sidebar-generating-dot:nth-child(2) { animation-delay: 0.2s; }
+.sidebar-generating-dot:nth-child(3) { animation-delay: 0.4s; }

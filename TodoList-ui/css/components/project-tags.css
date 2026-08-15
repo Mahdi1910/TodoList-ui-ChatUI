@@ -1,0 +1,150 @@
+@import url('sidebar-taxonomy-drag.css');
+
+.project-name-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.project-name-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.project-name-input-wrap:focus-within {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.project-icon-trigger {
+  flex: 0 0 42px;
+  height: 44px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 20px;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.project-icon-trigger:hover { background: var(--bg-hover); }
+
+.project-name-input {
+  min-width: 0;
+  flex: 1;
+  height: 44px;
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.project-icon-picker {
+  position: absolute;
+  left: 4px;
+  top: 48px;
+  z-index: 1100;
+  display: none;
+  grid-template-columns: repeat(4, 42px);
+  gap: 4px;
+  padding: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.project-icon-picker.open { display: grid; }
+
+.project-icon-picker button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 19px;
+  cursor: pointer;
+}
+
+.project-icon-picker button:hover,
+.project-icon-picker button.selected { background: var(--bg-hover); }
+
+.project-view-field { margin-top: 22px; }
+
+.project-view-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.project-view-option {
+  min-height: 76px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.project-view-option svg { width: 22px; height: 22px; stroke-width: 1.8; }
+.project-view-option span { font-size: 12px; font-weight: 600; }
+.project-view-option:hover,
+.project-view-option.selected {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+  background: var(--accent-light);
+}
+
+.tag-nav-item { position: relative; }
+.tag-nav-item .item-left { min-width: 0; }
+.tag-icon { width: 18px; text-align: center; flex-shrink: 0; color: var(--text-secondary); }
+.tag-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-nav-right { display: flex; align-items: center; gap: 4px; }
+.tag-more-btn {
+  width: 24px; height: 24px; border: 0; background: transparent;
+  color: var(--text-muted); border-radius: var(--radius-sm); cursor: pointer;
+  font-size: 17px; line-height: 1; opacity: 0;
+}
+.tag-nav-item:hover .tag-more-btn, .tag-more-btn:focus-visible { opacity: 1; }
+.tag-more-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.tag-more-menu {
+  position: absolute; right: 8px; top: calc(100% - 2px); z-index: 60;
+  min-width: 120px; padding: 4px; display: none;
+  background: var(--bg-secondary); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+}
+.tag-more-menu.open { display: flex; flex-direction: column; }
+.tag-more-menu button {
+  border: 0; background: transparent; color: var(--text-primary);
+  text-align: left; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer;
+}
+.tag-more-menu button:hover { background: var(--bg-hover); }
+.tag-more-menu button[data-tag-delete]:hover { color: var(--danger-color); }
+.project-parent-select {
+  width: 100%; height: 44px; padding: 0 12px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit;
+}
+
+.project-view-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  color: var(--text-muted);
+  border-color: var(--border-color);
+  background: var(--bg-primary);
+}

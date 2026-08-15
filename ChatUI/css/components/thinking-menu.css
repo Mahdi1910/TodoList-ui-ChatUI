@@ -1,0 +1,66 @@
+/* Thinking level selector */
+.thinking-dropdown-container { position: relative; }
+.thinking-selector-btn {
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.thinking-selector-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.thinking-selector-btn svg { width: 14px; height: 14px; }
+.thinking-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  width: max-content;
+  min-width: 130px;
+  max-width: min(92vw, 300px);
+  padding: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,.5);
+  z-index: 51;
+}
+.thinking-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+}
+.thinking-option:hover, .thinking-option.selected { background: var(--bg-hover); }
+.thinking-color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* Thinking selector states */
+.thinking-selector-btn { min-width: 90px; justify-content: space-between; }
+.thinking-selector-btn.thinking-minimal { color: #9CA3AF; }
+.thinking-selector-btn.thinking-low { color: #60A5FA; }
+.thinking-selector-btn.thinking-medium { color: #F59E0B; }
+.thinking-selector-btn.thinking-high { color: #F87171; }
+.thinking-option { position: relative; }
+.thinking-option .thinking-check-icon { width: 15px; height: 15px; margin-left: auto; }
+.thinking-option.thinking-minimal .thinking-color-dot { background: #9CA3AF !important; }
+.thinking-option.thinking-low .thinking-color-dot { background: #60A5FA !important; }
+.thinking-option.thinking-medium .thinking-color-dot { background: #F59E0B !important; }
+.thinking-option.thinking-high .thinking-color-dot { background: #F87171 !important; }
+.thinking-option.thinking-minimal.selected { color: #9CA3AF; }
+.thinking-option.thinking-low.selected { color: #60A5FA; }
+.thinking-option.thinking-medium.selected { color: #F59E0B; }
+.thinking-option.thinking-high.selected { color: #F87171; }
+.thinking-selector-btn.thinking-minimal svg { color: #9CA3AF; }
+.thinking-selector-btn.thinking-low svg { color: #60A5FA; }
+.thinking-selector-btn.thinking-medium svg { color: #F59E0B; }
+.thinking-selector-btn.thinking-high svg { color: #F87171; }
+.thinking-selector-btn.thinking-minimal { background: rgba(156,163,175,.08); }
+.thinking-selector-btn.thinking-low { background: rgba(96,165,250,.08); }
+.thinking-selector-btn.thinking-medium { background: rgba(245,158,11,.08); }
+.thinking-selector-btn.thinking-high { background: rgba(248,113,113,.08); }

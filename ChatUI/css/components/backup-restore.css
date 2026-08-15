@@ -1,0 +1,12 @@
+/* Backup & Restore Settings */
+.backup-restore-panel { display: flex; flex-direction: column; gap: 18px; }
+.backup-restore-section { padding: 16px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-tertiary); }
+.backup-restore-section-title { margin: 0 0 6px; color: var(--text-primary); font-size: 14px; font-weight: 600; }
+.backup-restore-description { margin: 0 0 14px; color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
+.backup-restore-action { min-height: 36px; padding: 8px 12px; }
+.backup-restore-action:disabled { opacity: 0.55; cursor: wait; }
+.backup-restore-warning { display: flex; align-items: flex-start; gap: 9px; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.backup-restore-warning svg { width: 17px; height: 17px; flex: 0 0 17px; margin-top: 1px; }
+.backup-restore-status { min-height: 20px; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+.backup-restore-status.is-success { color: var(--text-secondary); }
+.backup-restore-status.is-error { color: #EF4444; }

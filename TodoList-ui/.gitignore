@@ -1,0 +1,22 @@
+# Local/internal development files
+.claude/
+.mcp.json
+.playwright-mcp/
+.ad10-chrome-test/
+implementation plan/
+review/
+request/
+REQUIREMENTS.md
+AI_CONTEXT.md
+AGENTS.md
+PROJECT.md
+skills-lock.json
+*.docx
+*report*.md
+.DS_Store
+Thumbs.db
+.env
+.env.*
+*.pem
+*.p12
+*.pfx

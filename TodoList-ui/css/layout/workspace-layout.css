@@ -1,0 +1,264 @@
+@import url('../components/workspace-menu.css');
+
+/* 3. Main Workspace Area */
+.main-workspace {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+  overflow: hidden;
+  min-width: 0;
+  position: relative;
+}
+
+.workspace-header {
+  height: 64px;
+  padding: 0 var(--spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.toggle-sidebar-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.toggle-sidebar-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.toggle-sidebar-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.view-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Bottom-Right Floating Action Button (FAB) positioned above Mobile Bottom Nav */
+.fab-add-task {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--accent-color);
+  color: #ffffff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(10, 132, 255, 0.45);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
+  z-index: 20;
+}
+
+@media (max-width: 768px) {
+  .fab-add-task {
+    bottom: calc(76px + env(safe-area-inset-bottom, 12px)); /* Lift FAB cleanly above mobile bottom navbar */
+    right: 20px;
+  }
+}
+
+.fab-add-task:hover,
+.fab-add-task:active {
+  background-color: var(--accent-hover);
+  transform: scale(1.08);
+  box-shadow: 0 8px 25px rgba(10, 132, 255, 0.6);
+}
+
+.fab-add-task svg {
+  width: 28px;
+  height: 28px;
+}
+
+.workspace-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md) var(--spacing-md) 90px var(--spacing-md);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+@media (max-width: 768px) {
+  .workspace-content {
+    padding-bottom: calc(140px + env(safe-area-inset-bottom, 12px)); /* Ensure tasks don't get hidden behind bottom nav */
+  }
+}
+
+/* Tasks Containers */
+.tasks-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.section-header-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.completed-section-toggle {
+  width: 100%;
+  margin: 0;
+  padding: 0 0 var(--spacing-xs);
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.completed-section-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.completed-section-toggle-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.completed-section-chevron {
+  display: inline-flex;
+  width: 12px;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.completed-section .task-list[hidden] {
+  display: none;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl) 0;
+  color: var(--text-muted);
+  gap: var(--spacing-sm);
+  text-align: center;
+}
+
+.empty-state svg {
+  width: 44px;
+  height: 44px;
+  opacity: 0.4;
+}
+
+/* Completed Tasks Section - Hidden by default unless completed tasks exist */
+.completed-section {
+  display: none;
+}
+
+.completed-section.has-tasks {
+  display: flex;
+}
+
+/* Keyboard focus should remain visible without changing the visual language. */
+button:focus-visible,
+input:focus-visible,
+[role="option"]:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* Only interaction chrome is non-selectable; task content remains copyable. */
+button,
+.rail-item,
+.nav-item-mobile,
+.context-menu-item {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+.workspace-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.workspace-control-btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workspace-control-btn:hover,
+.workspace-control-btn:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}

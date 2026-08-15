@@ -1,0 +1,145 @@
+/* Message Actions Toolbar */
+.message-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  position: relative;
+}
+
+.toolbar-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-muted);
+}
+
+.toolbar-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.toolbar-btn i {
+  width: 15px;
+  height: 15px;
+}
+
+.message-edit-container {
+  width: 100%;
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.assistant .message-edit-container {
+  max-width: 100%;
+}
+
+.message-edit-input {
+  width: 100%;
+  min-height: 72px;
+  max-height: 320px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  font: inherit;
+  line-height: 1.6;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.message-edit-input:focus {
+  border-color: var(--border-color);
+}
+
+.message-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.message-edit-actions .toolbar-btn {
+  width: auto;
+  min-width: 64px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+}
+
+.message-edit-actions .message-edit-save {
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+.message-edit-actions .message-edit-save:hover {
+  background-color: var(--text-secondary);
+  color: var(--bg-primary);
+}
+
+.message-edit-actions .toolbar-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+/* Floating control for returning to the newest message */
+.scroll-to-bottom-btn {
+  position: absolute;
+  left: 50%;
+  right: auto;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  z-index: 100;
+  pointer-events: auto;
+  touch-action: manipulation;
+  isolation: isolate;
+  transition: opacity 160ms ease, transform 160ms ease, background-color var(--transition-fast);
+}
+
+.scroll-to-bottom-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.scroll-to-bottom-btn.hidden {
+  display: none !important;
+}
+
+.scroll-to-bottom-btn i {
+  width: 17px;
+  height: 17px;
+  pointer-events: none;
+}
+
+/* Read Aloud toolbar state */
+.read-msg-btn.is-reading {
+  color: var(--accent-blue);
+  background: var(--bg-hover);
+}
+
+.read-msg-btn.is-loading svg {
+  animation: read-toolbar-pulse 900ms ease-in-out infinite alternate;
+}
+
+@keyframes read-toolbar-pulse {
+  from { opacity: 0.45; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .read-msg-btn.is-loading svg { animation: none; }
+}

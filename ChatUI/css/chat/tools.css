@@ -1,0 +1,189 @@
+/* ========================================== */
+/* AI TOOLS UI (MENU, TOGGLES, INDICATORS)   */
+/* ========================================== */
+
+.composer-bar {
+  position: relative;
+}
+
+.tools-btn {
+  margin-right: 4px;
+}
+
+/* Active Tools Indicators Container */
+.active-tools-indicators {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+  flex-wrap: nowrap;
+}
+
+/* Indicator Pill (Icon-Only) */
+.tool-indicator-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.tool-indicator-pill:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--text-muted);
+  color: var(--accent-blue);
+}
+
+.tool-indicator-pill .pill-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-indicator-pill .pill-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Tools Popover Context Menu */
+.tools-popup-menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 12px;
+  width: 280px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 200;
+  overflow: hidden;
+  animation: fadeIn 150ms ease-out;
+}
+
+.tools-popup-menu.hidden {
+  display: none !important;
+}
+
+.tools-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.tools-menu-header .close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.tools-menu-header .close-btn:hover {
+  color: var(--text-primary);
+}
+
+.tools-menu-body {
+  padding: 6px 0;
+}
+
+.tool-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  transition: background-color var(--transition-fast);
+}
+
+.tool-option:hover {
+  background-color: var(--bg-hover);
+}
+
+.tool-option-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tool-option-info .tool-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-primary);
+}
+
+.tool-label-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.tool-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.tool-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Toggle Switch Slider */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border-color);
+  transition: 200ms;
+  border-radius: 18px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: 200ms;
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: var(--accent-blue);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(16px);
+}

@@ -1,0 +1,30 @@
+<!-- 5. FULL-SCREEN LIVE VOICE OVERLAY          -->
+<!-- ========================================== -->
+<div class="voice-mode-overlay hidden" id="voice-mode-overlay" role="dialog" aria-modal="true" aria-label="Voice Mode">
+
+  <div class="voice-mode-center">
+    <button class="glowing-voice-orb" id="voice-orb-btn" type="button" aria-label="Voice status" disabled>
+      <span class="orb-core"></span>
+      <span class="orb-wave wave1"></span>
+      <span class="orb-wave wave2"></span>
+    </button>
+    <p class="visually-hidden" id="voice-mode-status" role="status" aria-live="polite">Voice Mode</p>
+  </div>
+
+  <div class="voice-mode-bottom">
+    <div class="voice-mode-controls" role="group" aria-label="Voice controls">
+      <button class="voice-auto-detect-btn" id="voice-auto-detect-btn" type="button" title="Auto Detect: On" aria-label="Auto Detect on" aria-pressed="true">
+        <i data-lucide="audio-lines" id="voice-auto-detect-icon"></i>
+      </button>
+
+      <button class="voice-mic-btn" id="voice-mic-btn" type="button" title="Mute Mic" aria-pressed="false">
+        <i data-lucide="mic" id="voice-mic-icon"></i>
+      </button>
+    </div>
+
+    <button class="voice-exit-btn" id="close-voice-mode-btn" type="button" title="Exit Voice Mode" aria-label="Exit Voice Mode">
+      <i data-lucide="x"></i>
+    </button>
+  </div>
+
+</div>

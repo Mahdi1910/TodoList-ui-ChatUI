@@ -1,0 +1,177 @@
+<main class="main-content">
+
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="header-left">
+          <button class="icon-btn open-sidebar-btn" id="open-sidebar-btn" title="Open sidebar">
+            <i data-lucide="panel-left"></i>
+          </button>
+
+          <!-- Gemini Model Switcher Dropdown Trigger -->
+          <div class="model-dropdown-container">
+            <button class="model-selector-btn" id="model-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="model-dropdown-menu">
+              <span class="model-name" id="selected-model-name">3.7 Flash</span>
+              <i data-lucide="chevron-down"></i>
+            </button>
+
+            <!-- Gemini Model Selection Menu; populated dynamically from MODELS. -->
+            <div class="model-dropdown-menu hidden" id="model-dropdown-menu" role="listbox" aria-labelledby="model-dropdown-trigger"></div>
+          </div>
+
+          <!-- Thinking level selector -->
+          <div class="thinking-dropdown-container">
+            <button class="thinking-selector-btn" id="thinking-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="thinking-dropdown-menu">
+              <span id="selected-thinking-level">High</span>
+              <i data-lucide="chevron-down"></i>
+            </button>
+            <div class="thinking-dropdown-menu hidden" id="thinking-dropdown-menu" role="listbox" aria-labelledby="thinking-dropdown-trigger"></div>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- 3-Dot Chat Actions trigger; menu content uses the shared global action menu. -->
+          <div class="chat-options-dropdown-container">
+            <button class="icon-btn" id="chat-options-header-btn" title="Chat options" aria-label="Chat options" aria-haspopup="menu" aria-expanded="false" aria-controls="action-menu">
+              <i data-lucide="more-horizontal"></i>
+            </button>
+          </div>
+
+          <!-- Dedicated Right Sidebar Toggle Button -->
+          <button class="icon-btn" id="toggle-right-sidebar-btn" title="Toggle right panel" aria-label="Toggle tools panel" aria-expanded="false" aria-controls="right-sidebar">
+            <i data-lucide="panel-right"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Chat Area -->
+      <div class="chat-viewport" id="chat-viewport">
+
+        <!-- Empty State Screen (Default Clean Landing) -->
+        <div class="empty-state" id="empty-state">
+          <h1 class="landing-title">What can I help with?</h1>
+        </div>
+
+        <!-- Dynamic Conversation Thread Container (Empty on open) -->
+        <div class="conversation-thread hidden" id="conversation-thread">
+          <!-- Dynamically populated via JavaScript when starting/opening a chat -->
+        </div>
+
+      </div>
+
+      <!-- Chat Bottom Composer Area -->
+      <div class="composer-container">
+
+        <!-- Floating return-to-bottom control; shown whenever the chat is above the latest message -->
+        <button class="scroll-to-bottom-btn hidden" id="scroll-to-bottom-btn" title="Scroll to latest message" aria-label="Scroll to latest message">
+          <i data-lucide="arrow-down"></i>
+        </button>
+
+        <!-- Standard Input Pill Bar -->
+        <div class="composer-bar" id="composer-bar">
+          <input type="file" id="file-attachment-input" multiple class="hidden" />
+          <button class="composer-btn attach-btn" id="attach-file-btn" title="Add Gemini-supported files">
+            <i data-lucide="plus"></i>
+          </button>
+
+          <!-- AI Tools Trigger Button -->
+          <button class="composer-btn tools-btn" id="tools-menu-btn" title="AI Tools" aria-haspopup="dialog" aria-expanded="false" aria-controls="tools-popup-menu">
+            <i data-lucide="wrench"></i>
+          </button>
+
+          <!-- Active Tool Indicator Pills Container -->
+          <div class="active-tools-indicators" id="active-tools-indicators" aria-live="polite"></div>
+
+          <!-- Compact Tools Popover Context Menu -->
+          <div class="tools-popup-menu hidden" id="tools-popup-menu" role="dialog" aria-label="AI Tools" hidden>
+            <div class="tools-menu-header">
+              <span>Tools</span>
+              <button class="close-btn" id="close-tools-menu-btn" aria-label="Close tools menu">×</button>
+            </div>
+            <div class="tools-menu-body">
+              <div class="tool-option" data-tool="googleSearch">
+                <div class="tool-option-info">
+                  <i data-lucide="search" class="tool-icon"></i>
+                  <div class="tool-label-group">
+                    <span class="tool-name">Google Search</span>
+                    <span class="tool-desc">Search the web for real-time info</span>
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="toggle-google-search" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="tool-option" data-tool="urlContext">
+                <div class="tool-option-info">
+                  <i data-lucide="link" class="tool-icon"></i>
+                  <div class="tool-label-group">
+                    <span class="tool-name">URL Context</span>
+                    <span class="tool-desc">Fetch & analyze URLs in prompt</span>
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="toggle-url-context" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="tool-option" data-tool="codeExecution">
+                <div class="tool-option-info">
+                  <i data-lucide="code-2" class="tool-icon"></i>
+                  <div class="tool-label-group">
+                    <span class="tool-name">Code Execution</span>
+                    <span class="tool-desc">Run Python code for logic & math</span>
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="toggle-code-execution" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="tool-option" data-tool="workspace">
+                <div class="tool-option-info">
+                  <i data-lucide="folder-tree" class="tool-icon"></i>
+                  <div class="tool-label-group">
+                    <span class="tool-name">Workspace</span>
+                    <span class="tool-desc">Read & manage Workspace files</span>
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="toggle-workspace" />
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <label class="visually-hidden" for="composer-textarea">Message</label>
+          <textarea class="composer-textarea" id="composer-textarea" placeholder="Ask anything" rows="1"></textarea>
+
+          <!-- Voice Record Audio Message Button (separate from Live mode) -->
+          <button class="composer-btn record-audio-btn" id="record-audio-btn" title="Record Voice Message">
+            <i data-lucide="mic"></i>
+          </button>
+
+          <!-- Live Real-Time Voice Button (shown when empty) -->
+          <button class="composer-btn voice-mode-btn" id="open-voice-mode-btn" title="Start Voice Mode">
+            <i data-lucide="audio-lines"></i>
+          </button>
+
+          <!-- Send Button (shown when typing) -->
+          <button class="composer-btn send-btn hidden" id="send-btn" title="Send message">
+            <i data-lucide="arrow-up"></i>
+          </button>
+
+          <!-- Stop Generating Button (shown when AI is answering) -->
+          <button class="composer-btn stop-generating-btn hidden" id="stop-generating-btn" title="Stop generating">
+            <div class="square-icon"></div>
+          </button>
+        </div>
+
+        <!-- Legal Disclaimer -->
+        <div class="chat-disclaimer">
+          AI can make mistakes. Check important info.
+        </div>
+
+      </div>
+
+    </main>
