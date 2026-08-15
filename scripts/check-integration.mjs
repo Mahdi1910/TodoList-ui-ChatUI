@@ -2,7 +2,7 @@ import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promise
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDir, '..');
@@ -47,14 +47,29 @@ async function checkJavaScriptSyntax() {
       const probe = path.join(temp, `${index}.mjs`);
       await writeFile(probe, source);
       const result = spawnSync(process.execPath, ['--check', probe], { encoding: 'utf8' });
-      if (result.status !== 0) {
-        fail(`JavaScript syntax failed for ${path.relative(root, files[index])}:\n${result.stderr || result.stdout}`);
-      }
+      if (result.status !== 0) fail(`JavaScript syntax failed for ${path.relative(root, files[index])}:\n${result.stderr || result.stdout}`);
     }
     console.log(`Syntax-checked ${files.length} runtime JavaScript files.`);
   } finally {
     await rm(temp, { recursive: true, force: true });
   }
+}
+
+async function checkRoutes() {
+  const routerUrl = `${pathToFileURL(path.join(root, 'shell/js/router.js')).href}?check=${Date.now()}`;
+  const router = await import(routerUrl);
+  const rootRoute = router.parseShellRoute('/');
+  assert(rootRoute.app === 'todo' && rootRoute.canonicalPath === '/todo-list-ui', '/ must canonicalize to /todo-list-ui.');
+  const todo = router.parseShellRoute('/todo-list-ui');
+  assert(todo.app === 'todo' && todo.type === 'todo-home', '/todo-list-ui must parse as To-Do.');
+  const chatHome = router.parseShellRoute('/chat-ui');
+  assert(chatHome.app === 'chat' && chatHome.type === 'chat-home', '/chat-ui must parse as Chat home.');
+  const chat = router.parseShellRoute('/chat-ui/chat/chat%20one');
+  assert(chat.app === 'chat' && chat.type === 'chat' && chat.chatId === 'chat one', 'Encoded Chat IDs must round-trip.');
+  assert(router.buildChatPath('a b') === '/chat-ui/chat/a%20b', 'Chat route builder must encode IDs.');
+  assert(router.parseShellRoute('/chat-ui/chat/a/b').app === 'unknown', 'Extra Chat route segments must be rejected.');
+  const legacy = router.parseShellRoute('/chat/old-id');
+  assert(legacy.app === 'chat' && legacy.legacy === true && legacy.canonicalPath === '/chat-ui/chat/old-id', 'Legacy Chat links must canonicalize safely.');
 }
 
 async function checkArchitecture() {
@@ -63,13 +78,11 @@ async function checkArchitecture() {
     read('shell/js/app-shell.js'), read('scripts/build-static.mjs'),
     read('ChatUI/js/module.js'), read('TodoList-ui/js/module.js'), read('ChatUI/js/router/chat-router.js')
   ]);
-
   assert(index.includes('href="/todo-list-ui"'), 'Root index must expose a real /todo-list-ui link.');
   assert(index.includes('href="/chat-ui"'), 'Root index must expose a real /chat-ui link.');
   assert(index.includes('id="shell-module-host"'), 'Root index must contain the shell module host.');
   assert(router.includes("'/todo-list-ui'"), 'Shell router must define /todo-list-ui.');
   assert(router.includes("'/chat-ui'"), 'Shell router must define /chat-ui.');
-  assert(router.includes("/chat/"), 'Shell router must support Chat conversation subroutes.');
   assert(registry.includes("../../TodoList-ui/js/module.js"), 'Shell registry must import only the To-Do module entry.');
   assert(registry.includes("../../ChatUI/js/module.js"), 'Shell registry must import only the ChatUI module entry.');
   assert(!registry.includes('AppDataService') && !registry.includes('state/store') && !registry.includes('voice/'), 'Shell registry must not reach into application internals.');
@@ -97,6 +110,7 @@ async function checkDistOutput() {
 }
 
 await checkJavaScriptSyntax();
+await checkRoutes();
 await checkArchitecture();
 await checkDistOutput();
 
@@ -105,5 +119,4 @@ if (failures.length) {
   failures.forEach((message, index) => console.error(`${index + 1}. ${message}`));
   process.exit(1);
 }
-
 console.log('Integration static checks passed.');
