@@ -3,6 +3,8 @@
 .todo-app *::before,
 .todo-app *::after {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 .todo-app {
