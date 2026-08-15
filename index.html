@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="color-scheme" content="dark light">
+  <title>To-Do</title>
+  <link id="shell-stylesheet" rel="stylesheet" href="/shell/css/shell.css">
+</head>
+<body>
+  <div id="shell-app" class="shell-app">
+    <nav class="shell-primary-rail" aria-label="Applications">
+      <div class="shell-rail-group">
+        <a class="shell-app-link" data-shell-app-link data-shell-route="todo" href="/todo-list-ui" title="To-Do List" aria-label="To-Do List">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </a>
+        <a class="shell-app-link" data-shell-app-link data-shell-route="chat" href="/chat-ui" title="ChatUI" aria-label="ChatUI">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </a>
+        <span class="shell-placeholder-button" title="Habit Tracker — coming soon" aria-label="Habit Tracker — coming soon" aria-disabled="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        </span>
+        <span class="shell-placeholder-button" title="Diary — coming soon" aria-label="Diary — coming soon" aria-disabled="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        </span>
+      </div>
+      <div class="shell-rail-group">
+        <button class="shell-action-button" data-shell-settings type="button" title="Settings" aria-label="Open settings for current application">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </button>
+      </div>
+    </nav>
+
+    <main id="shell-module-host" class="shell-module-host" aria-live="off">
+      <div class="shell-loading" role="status">Loading application…</div>
+    </main>
+  </div>
+
+  <nav class="shell-mobile-nav" aria-label="Applications">
+    <a class="shell-mobile-link" data-shell-app-link data-shell-route="todo" href="/todo-list-ui">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>Tasks</span>
+    </a>
+    <a class="shell-mobile-link" data-shell-app-link data-shell-route="chat" href="/chat-ui">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg><span>AI</span>
+    </a>
+    <span class="shell-mobile-placeholder" aria-disabled="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span>Habits</span></span>
+    <span class="shell-mobile-placeholder" aria-disabled="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v13M4 6v13M20 6v13"/></svg><span>Diary</span></span>
+    <button class="shell-mobile-action" data-shell-settings type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 00-1.88-.34 1.7 1.7 0 00-1.03 1.56V21h-4v-.08A1.7 1.7 0 008.97 19.4a1.7 1.7 0 00-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.56-1.03H3v-4h.08A1.7 1.7 0 004.6 8.97a1.7 1.7 0 00-.34-1.88L4.2 7.03 7.03 4.2l.06.06A1.7 1.7 0 008.97 4.6 1.7 1.7 0 0010 3.04V3h4v.08a1.7 1.7 0 001.03 1.56 1.7 1.7 0 001.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 00-.34 1.88A1.7 1.7 0 0020.96 10H21v4h-.08A1.7 1.7 0 0019.4 15z"/></svg><span>Settings</span></button>
+  </nav>
+
+  <div id="shell-status-root" aria-live="polite"></div>
+  <script type="module" src="/shell/js/app-shell.js"></script>
+</body>
+</html>
