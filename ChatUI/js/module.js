@@ -5,10 +5,7 @@ import {
   unloadModuleStyles
 } from '../../shell/js/dependency-loader.js';
 import { loadChatUILayout } from './layout-loader.js';
-import {
-  configureChatRouter,
-  resetChatRouterConfiguration
-} from './router/chat-router.js';
+import { configureChatRouter, resetChatRouterConfiguration } from './router/chat-router.js';
 import { state, runtime } from './state/store.js';
 import { abortActiveGeneration } from './chat/generation.js';
 import { cancelAudioRecording } from './composer/recorder.js';
@@ -27,17 +24,24 @@ function createRoot() {
   root.id = 'chatui-module-root';
   root.className = 'chatui-app';
   root.dataset.chatuiModuleRoot = '';
-
   const appContainer = document.createElement('div');
   appContainer.id = 'app-container';
   appContainer.className = 'app-container';
-
   const overlayRoot = document.createElement('div');
   overlayRoot.id = 'overlay-root';
   overlayRoot.dataset.chatuiOverlayRoot = '';
-
   root.append(appContainer, overlayRoot);
   return { root, appContainer, overlayRoot };
+}
+
+function configureRouting(context) {
+  const { shell = {}, standalone = false, basePath = '/chat-ui' } = context;
+  configureChatRouter({
+    basePath: standalone ? basePath : '/chat-ui',
+    ownHistory: standalone,
+    navigate: standalone ? null : (path, options) => shell.navigate?.(path, options),
+    setTitle: title => shell.setTitle?.(title)
+  });
 }
 
 function backupOperationBusy() {
@@ -55,26 +59,22 @@ function clearTransientBodyUi() {
 }
 
 function applyShellAppearance(shell) {
-  shell.notifyAppearance?.({
-    theme: state.theme || 'dark',
-    accent: state.accentColor || '#10A37F'
-  });
+  shell.notifyAppearance?.({ theme: state.theme || 'dark', accent: state.accentColor || '#10A37F' });
 }
 
 function createMountedInstance(record, context) {
   const { shell = {}, route } = context;
   record.shell = shell;
+  record.context = context;
   record.leaving = false;
   record.unmounted = false;
 
   const instance = {
     appId: 'chat',
-
     async handleRoute(nextRoute) {
       await record.app.handleRoute(nextRoute);
       applyShellAppearance(record.shell);
     },
-
     async prepareDeactivate() {
       if (record.unmounted) return { allow: true };
       if (backupOperationBusy()) {
@@ -91,51 +91,35 @@ function createMountedInstance(record, context) {
       }
       return { allow: true };
     },
-
     async beforeLeave() {
       if (record.leaving || record.unmounted) return;
       record.leaving = true;
-
-      // No new shell navigation can mount the next module until this sequence
-      // resolves. Destructive user decisions were already handled above.
       if (runtime.isGenerating) abortActiveGeneration();
-      if (runtime.isRecordingAudio && !runtime.isVoiceModeActive) {
-        await cancelAudioRecording({ updateButton: true });
-      }
-
+      if (runtime.isRecordingAudio && !runtime.isVoiceModeActive) await cancelAudioRecording({ updateButton: true });
       closeVoiceMode();
       await stopLiveVoiceMode();
       await stopActiveReadAloud();
       closeWorkspaceView();
       closeActionMenu();
       closeSettingsModal();
-
       document.querySelectorAll('.message-context-menu.show').forEach(menu => menu.classList.remove('show'));
       document.getElementById('search-modal')?.classList.add('hidden');
       document.getElementById('model-dropdown-menu')?.classList.add('hidden');
       document.getElementById('thinking-dropdown-menu')?.classList.add('hidden');
       clearTransientBodyUi();
     },
-
     async unmount() {
       if (record.unmounted) return;
       if (!record.leaving) await instance.beforeLeave();
       record.unmounted = true;
-
       record.lifecycle.suspend();
       record.root.remove();
       unloadModuleStyles('chat');
       resetChatRouterConfiguration();
       currentInstance = null;
     },
-
-    openSettings() {
-      openSettingsModal();
-    },
-
-    getAppearance() {
-      return { theme: state.theme || 'dark', accent: state.accentColor || '#10A37F' };
-    }
+    openSettings() { openSettingsModal(); },
+    getAppearance() { return { theme: state.theme || 'dark', accent: state.accentColor || '#10A37F' }; }
   };
 
   currentInstance = instance;
@@ -144,17 +128,11 @@ function createMountedInstance(record, context) {
 }
 
 async function firstMount(context) {
-  const { host, route, shell = {} } = context;
+  const { host, route } = context;
   const lifecycle = createLifecycleScope('chat');
   const { root, appContainer, overlayRoot } = createRoot();
   host.replaceChildren(root);
-
-  configureChatRouter({
-    basePath: '/chat-ui',
-    ownHistory: false,
-    navigate: (path, options) => shell.navigate?.(path, options),
-    setTitle: title => shell.setTitle?.(title)
-  });
+  configureRouting(context);
 
   try {
     await loadChatUILayout({ appContainer, overlayRoot });
@@ -165,7 +143,7 @@ async function firstMount(context) {
       const diagnostics = await import('./diagnostics/performance-diagnostics-ui.js');
       diagnostics.initPerformanceDiagnosticsUI?.();
     });
-    dormant = { root, appContainer, overlayRoot, lifecycle, app, shell, leaving: false, unmounted: false };
+    dormant = { root, appContainer, overlayRoot, lifecycle, app, leaving: false, unmounted: false };
     return createMountedInstance(dormant, context);
   } catch (error) {
     await lifecycle.dispose();
@@ -178,24 +156,17 @@ async function firstMount(context) {
 }
 
 async function restoreDormant(context) {
-  const { host, route, shell = {} } = context;
-  host.replaceChildren(dormant.root);
+  context.host.replaceChildren(dormant.root);
   dormant.lifecycle.resume();
-  configureChatRouter({
-    basePath: '/chat-ui',
-    ownHistory: false,
-    navigate: (path, options) => shell.navigate?.(path, options),
-    setTitle: title => shell.setTitle?.(title)
-  });
+  configureRouting(context);
   const instance = createMountedInstance(dormant, context);
-  await dormant.app.handleRoute(route);
+  await dormant.app.handleRoute(context.route);
   return instance;
 }
 
 export async function mount(context = {}) {
   if (currentInstance) throw new Error('ChatUI is already mounted.');
   if (!context.host) throw new Error('ChatUI mount requires a host element.');
-
   await Promise.all([ensureChatDependencies(), loadChatStyles()]);
   const instance = dormant ? await restoreDormant(context) : await firstMount(context);
   context.shell?.setTitle?.(state.activeChatId
