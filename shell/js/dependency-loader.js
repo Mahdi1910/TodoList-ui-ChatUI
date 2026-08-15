@@ -3,8 +3,8 @@ const stylePromises = new Map();
 const ownedStyles = new Map();
 
 const CHAT_DEPENDENCIES = Object.freeze({
-  lucide: 'https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js',
-  marked: 'https://cdn.jsdelivr.net/npm/marked@15.0.6/marked.min.js',
+  lucide: 'https://unpkg.com/lucide@1.28.0',
+  marked: 'https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.6/marked.min.js',
   highlight: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js',
   highlightCss: 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css'
 });
