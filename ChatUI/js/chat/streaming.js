@@ -132,6 +132,7 @@ export async function streamAssistantResponse({
   assistantMessage,
   timelineSlot,
   generationId,
+  generationMode = 'normal',
   isCurrentGeneration,
   onTextUpdate,
   onComplete
@@ -146,7 +147,7 @@ export async function streamAssistantResponse({
   const diagnosticRoundId = measure ? beginNetworkRound({ roundNumber: 1, requestBodyChars: 0 }) : null;
   let firstActivityMeasured = false;
 
-  beginCustomToolGenerationContext({ messages, assistantMessage, generationId });
+  beginCustomToolGenerationContext({ messages, generationId, generationMode });
 
   // TEMP_PERF_DIAGNOSTICS
   markPerformanceEvent('stream_call_started');
