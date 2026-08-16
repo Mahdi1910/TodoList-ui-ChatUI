@@ -1,0 +1,2 @@
+mp4box 2.4.1
+Source: https://www.npmjs.com/package/mp4box/v/2.4.1
