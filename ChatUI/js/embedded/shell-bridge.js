@@ -70,8 +70,12 @@ function observeAppearance(getState) {
   window.addEventListener('workspace:theme-changed', report);
 }
 
+function isEmbeddedSafe() {
+  return IS_EMBEDDED && window.parent !== window;
+}
+
 export function initChatEmbeddedBridge({ navigateChat, openSettings, getState }) {
-  if (!IS_EMEDDED_SAFE() || initialized) return false;
+  if (!isEmbeddedSafe() || initialized) return false;
   initialized = true;
 
   installExternalLinkPolicy();
@@ -128,8 +132,4 @@ export function initChatEmbeddedBridge({ navigateChat, openSettings, getState })
     capabilities: ['navigate-chat', 'open-settings', 'appearance', 'persistent-media']
   });
   return true;
-}
-
-function IS_EMEDDED_SAFE() {
-  return IS_EMBEDDED && window.parent !== window;
 }
