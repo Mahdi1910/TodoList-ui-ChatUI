@@ -2,14 +2,32 @@
  * layout-loader.js - Assemble static HTML fragments before application bootstrap.
  */
 
-async function loadFragment(path) {
-  const response = await fetch(path, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Failed to load ${path}: HTTP ${response.status}`);
+const IS_EMBEDDED = new URLSearchParams(window.location.search).get('embedded') === '1';
+const SHELL_CHANNEL = 'mahdi-app-shell';
+const SHELL_VERSION = 1;
+
+function postEmbeddedError(stage, error) {
+  if (!IS_EMBEDDED || window.parent === window) return;
+  const message = error instanceof Error ? error.message : String(error || 'Unknown layout error');
+  window.parent.postMessage({
+    channel: SHELL_CHANNEL,
+    version: SHELL_VERSION,
+    app: 'chat',
+    type: 'app:error',
+    payload: { stage, message }
+  }, window.location.origin);
+}
+
+async function loadFragment(relativePath) {
+  const url = new URL(relativePath, import.meta.url);
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Failed to load ${url.pathname}: HTTP ${response.status}`);
   return response.text();
 }
 
 function showLayoutFailure(error) {
   console.error('ChatUI layout loading failed:', error);
+  postEmbeddedError('LAYOUT', error);
   const overlay = document.createElement('div');
   overlay.className = 'startup-error-overlay';
   overlay.setAttribute('role', 'alert');
@@ -22,15 +40,15 @@ function showLayoutFailure(error) {
 
 try {
   const [leftSidebar, mainChat, workspace, rightSidebar, chatModals, settingsModal, voiceOverlay, readAloudPlayer, globalUi] = await Promise.all([
-    loadFragment('/html/left-sidebar.html'),
-    loadFragment('/html/main-chat.html'),
-    loadFragment('/html/workspace.html'),
-    loadFragment('/html/right-sidebar.html'),
-    loadFragment('/html/chat-modals.html'),
-    loadFragment('/html/settings-modal.html'),
-    loadFragment('/html/voice-overlay.html'),
-    loadFragment('/html/read-aloud-player.html'),
-    loadFragment('/html/global-ui.html')
+    loadFragment('../html/left-sidebar.html'),
+    loadFragment('../html/main-chat.html'),
+    loadFragment('../html/workspace.html'),
+    loadFragment('../html/right-sidebar.html'),
+    loadFragment('../html/chat-modals.html'),
+    loadFragment('../html/settings-modal.html'),
+    loadFragment('../html/voice-overlay.html'),
+    loadFragment('../html/read-aloud-player.html'),
+    loadFragment('../html/global-ui.html')
   ]);
 
   const appContainer = document.getElementById('app-container');
@@ -44,9 +62,13 @@ try {
   overlayRoot.innerHTML = `${chatModals}${settingsModal}${voiceOverlay}${globalUi}`;
   if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
   await import('./app.js');
-  // TEMP_PERF_DIAGNOSTICS
-  const diagnosticsUi = await import('./diagnostics/performance-diagnostics-ui.js');
-  diagnosticsUi.initPerformanceDiagnosticsUI();
+
+  // Keep the existing temporary standalone diagnostics, but do not pay their
+  // extra listener/UI cost in the always-alive embedded Chat iframe.
+  if (!IS_EMBEDDED) {
+    const diagnosticsUi = await import('./diagnostics/performance-diagnostics-ui.js');
+    diagnosticsUi.initPerformanceDiagnosticsUI();
+  }
 } catch (error) {
   showLayoutFailure(error);
 }

@@ -3,6 +3,9 @@
  */
 
 const CHAT_ROUTE_PREFIX = '/chat/';
+const IS_EMBEDDED = new URLSearchParams(window.location.search).get('embedded') === '1';
+const SHELL_CHANNEL = 'mahdi-app-shell';
+const SHELL_VERSION = 1;
 
 export function parseChatRoute(pathname = window.location.pathname) {
   const path = pathname || '/';
@@ -25,7 +28,28 @@ export function buildChatPath(chatId) {
   return `${CHAT_ROUTE_PREFIX}${encodeURIComponent(chatId)}`;
 }
 
+function postEmbeddedRoute(path, method) {
+  if (!IS_EMBEDDED || window.parent === window) return;
+  const route = parseChatRoute(path);
+  const chatId = route.type === 'chat' ? route.chatId : null;
+  window.parent.postMessage({
+    channel: SHELL_CHANNEL,
+    version: SHELL_VERSION,
+    app: 'chat',
+    type: 'chatui:route-change',
+    payload: {
+      chatId,
+      historyMode: method === 'replaceState' ? 'replace' : 'push'
+    }
+  }, window.location.origin);
+}
+
 function writeRoute(method, path, state = {}) {
+  if (IS_EMBEDDED) {
+    postEmbeddedRoute(path, method);
+    return;
+  }
+
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (current === path) return;
   window.history[method]({ ...state }, '', path);
@@ -48,8 +72,12 @@ export function replaceHomeRoute() {
 }
 
 export function initChatRouter(onRouteChange) {
-  if (typeof onRouteChange !== 'function') return () => {};
+  if (IS_EMBEDDED || typeof onRouteChange !== 'function') return () => {};
   const handlePopState = () => onRouteChange(parseChatRoute());
   window.addEventListener('popstate', handlePopState);
   return () => window.removeEventListener('popstate', handlePopState);
+}
+
+export function isEmbeddedChatRouter() {
+  return IS_EMBEDDED;
 }

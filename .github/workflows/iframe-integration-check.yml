@@ -1,0 +1,47 @@
+name: Iframe Integration Check
+
+on:
+  push:
+    branches: ["feature/persistent-iframe-integration"]
+  pull_request:
+
+jobs:
+  static-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify integration invariants
+        run: node scripts/verify-integration.mjs
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check shell/js/protocol.js
+          node --check shell/js/router.js
+          node --check shell/js/frame-manager.js
+          node --check shell/js/frame-bridge.js
+          node --check shell/js/app-shell.js
+          node --check ChatUI/js/layout-loader.js
+          node --check ChatUI/js/router/chat-router.js
+          node --check ChatUI/js/app.js
+          node --check ChatUI/js/embedded/shell-bridge.js
+          node --check TodoList-ui/js/bootstrap.js
+          node --check TodoList-ui/js/app-main.js
+          node --check TodoList-ui/js/embedded/shell-bridge.js
+          node --check worker.js
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify local route behavior without browser automation
+        run: |
+          python server.py --port 8765 > /tmp/combined-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID' EXIT
+          sleep 1
+          curl -fsS http://127.0.0.1:8765/todo-list-ui > /tmp/todo-shell.html
+          curl -fsS http://127.0.0.1:8765/chat-ui > /tmp/chat-shell.html
+          curl -fsS http://127.0.0.1:8765/chat-ui/chat/test-id > /tmp/chat-deep-shell.html
+          test "$(curl -s -o /tmp/missing.js -w '%{http_code}' http://127.0.0.1:8765/ChatUI/js/definitely-missing.js)" = "404"
+          grep -q 'id="app-shell"' /tmp/todo-shell.html
+          grep -q 'id="app-shell"' /tmp/chat-shell.html
+          grep -q 'id="app-shell"' /tmp/chat-deep-shell.html

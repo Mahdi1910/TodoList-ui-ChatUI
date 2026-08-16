@@ -1,0 +1,156 @@
+import { createFrameManager } from './frame-manager.js';
+import { createFrameBridge } from './frame-bridge.js';
+import { createShellRouter, parseShellRoute } from './router.js';
+
+const navTodo = document.getElementById('shell-nav-todo');
+const navChat = document.getElementById('shell-nav-chat');
+const settingsButton = document.getElementById('shell-open-settings');
+const chatStatus = document.getElementById('shell-chat-status');
+const toast = document.getElementById('shell-toast');
+
+let activeApp = 'todo';
+const appearances = new Map();
+const titles = new Map([['todo', 'To-Do'], ['chat', 'ChatUI']]);
+let toastTimer = null;
+
+function showToast(message) {
+  if (!toast) return;
+  if (toastTimer) window.clearTimeout(toastTimer);
+  toast.textContent = message;
+  toast.hidden = false;
+  toastTimer = window.setTimeout(() => { toast.hidden = true; }, 3200);
+}
+
+function applyShellAppearance(app) {
+  const appearance = appearances.get(app) || {};
+  const theme = appearance.theme === 'light' ? 'light' : 'dark';
+  const accent = /^#[0-9a-f]{6}$/i.test(appearance.accentColor || '') ? appearance.accentColor : (theme === 'light' ? '#0071e3' : '#0a84ff');
+  document.documentElement.dataset.shellTheme = theme;
+  document.documentElement.style.setProperty('--shell-accent', accent);
+  if (theme === 'light') {
+    document.documentElement.style.setProperty('--shell-bg', '#f5f5f7');
+    document.documentElement.style.setProperty('--shell-nav-bg', '#ffffff');
+    document.documentElement.style.setProperty('--shell-text', '#1d1d1f');
+    document.documentElement.style.setProperty('--shell-muted', '#73737a');
+    document.documentElement.style.setProperty('--shell-border', 'rgba(0,0,0,.1)');
+    document.documentElement.style.setProperty('--shell-hover', 'rgba(0,0,0,.05)');
+    document.documentElement.style.setProperty('--shell-active', `${accent}1a`);
+  } else {
+    document.documentElement.style.setProperty('--shell-bg', '#121214');
+    document.documentElement.style.setProperty('--shell-nav-bg', '#1c1c1e');
+    document.documentElement.style.setProperty('--shell-text', '#ffffff');
+    document.documentElement.style.setProperty('--shell-muted', 'rgba(255,255,255,.62)');
+    document.documentElement.style.setProperty('--shell-border', 'rgba(255,255,255,.1)');
+    document.documentElement.style.setProperty('--shell-hover', 'rgba(255,255,255,.08)');
+    document.documentElement.style.setProperty('--shell-active', `${accent}26`);
+  }
+}
+
+function updateTitle() {
+  document.title = titles.get(activeApp) || (activeApp === 'chat' ? 'ChatUI' : 'To-Do');
+}
+
+function updateNavigationState() {
+  navTodo?.setAttribute('aria-current', activeApp === 'todo' ? 'page' : 'false');
+  navChat?.setAttribute('aria-current', activeApp === 'chat' ? 'page' : 'false');
+  settingsButton?.setAttribute('aria-label', `Open ${activeApp === 'chat' ? 'ChatUI' : 'To-Do'} settings`);
+  if (settingsButton) settingsButton.disabled = frameManager.getState(activeApp) !== 'READY';
+}
+
+const frameManager = createFrameManager({
+  onStateChange(app, state) {
+    if (app === 'chat') chatStatus?.classList.toggle('visible', state === 'FAILED');
+    if (app === activeApp) updateNavigationState();
+  }
+});
+
+let router;
+const bridge = createFrameBridge(frameManager, {
+  onReady(app, payload) {
+    if (payload.appearance) appearances.set(app, payload.appearance);
+    if (payload.title) titles.set(app, payload.title);
+
+    bridge.requestAppearance(app);
+
+    if (app === 'chat') {
+      const current = router.getCurrentRoute();
+      if (current.app !== 'chat') {
+        const lastPath = router.rememberChatFromReady(payload.currentChatId || null);
+        const lastRoute = parseShellRoute(lastPath);
+        bridge.navigateChat(lastRoute.chatId, 'ready-sync');
+      }
+    }
+
+    if (app === activeApp) {
+      applyShellAppearance(app);
+      updateTitle();
+      updateNavigationState();
+    }
+  },
+  onError(app, payload) {
+    if (app === activeApp) showToast(`${app === 'chat' ? 'ChatUI' : 'To-Do'} failed to start: ${payload.message || 'unknown error'}`);
+  },
+  onCommandError(app, payload) {
+    showToast(`${app === 'chat' ? 'ChatUI' : 'To-Do'}: ${payload.message || 'command failed'}`);
+  },
+  onCommandTimeout(app, command) {
+    showToast(`${app === 'chat' ? 'ChatUI' : 'To-Do'} did not respond to ${command}.`);
+  },
+  onChatRouteChange(payload) {
+    const chatId = typeof payload.chatId === 'string' ? payload.chatId : null;
+    const historyMode = payload.historyMode === 'replace' ? 'replace' : 'push';
+    router.handleChatChildRoute(chatId, historyMode);
+  },
+  onAppearance(app, payload) {
+    appearances.set(app, payload);
+    if (app === activeApp) applyShellAppearance(app);
+  },
+  onTitle(app, payload) {
+    if (typeof payload.title !== 'string' || !payload.title.trim()) return;
+    titles.set(app, payload.title.slice(0, 160));
+    if (app === activeApp) updateTitle();
+  },
+  onSettingsOpened() {
+    if (toast) toast.hidden = true;
+  }
+});
+
+function activateRoute(route, meta = {}) {
+  const previousApp = activeApp;
+  activeApp = route.app;
+
+  if (meta.source === 'rail') {
+    (activeApp === 'chat' ? navChat : navTodo)?.focus({ preventScroll: true });
+  }
+
+  frameManager.activate(activeApp);
+  if (previousApp !== activeApp) {
+    bridge.setActive(previousApp, false);
+    bridge.setActive(activeApp, true);
+  } else {
+    bridge.setActive(activeApp, true);
+  }
+
+  updateNavigationState();
+  applyShellAppearance(activeApp);
+  updateTitle();
+
+  if (route.app === 'chat' && meta.source !== 'child') {
+    bridge.navigateChat(route.chatId || null, meta.source || 'shell');
+  }
+}
+
+router = createShellRouter(activateRoute);
+
+navTodo?.addEventListener('click', () => router.goTodo());
+navChat?.addEventListener('click', () => router.goChat());
+settingsButton?.addEventListener('click', () => {
+  if (frameManager.getState(activeApp) !== 'READY') {
+    showToast(`${activeApp === 'chat' ? 'ChatUI' : 'To-Do'} is still loading.`);
+    return;
+  }
+  bridge.openSettings(activeApp);
+});
+
+router.start();
+frameManager.startAll();

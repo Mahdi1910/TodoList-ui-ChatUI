@@ -15,6 +15,7 @@ import { TasksComponent } from './components/tasks.js';
 import { ScheduleComponent } from './components/schedule.js';
 import { SubtaskEditorComponent } from './components/subtask-editor.js';
 import { SettingsComponent } from './components/settings.js';
+import { initializeTodoEmbeddedBridge } from './embedded/shell-bridge.js';
 
 function assertMethod(owner, name, label) {
   if (typeof owner?.[name] !== 'function') throw new Error(`${label}.${name} is unavailable.`);
@@ -57,6 +58,7 @@ export async function startApplication({ runStage, setStorageErrorReporter }) {
     ScheduleComponent.initRepeatEndUi();
     SubtaskEditorComponent.init();
     SettingsComponent.init();
+    initializeTodoEmbeddedBridge({ settingsComponent: SettingsComponent, appState: AppState });
   });
   console.log('✅ Apple Minimalist To-Do List Application Initialized with IndexedDB persistence.');
 }

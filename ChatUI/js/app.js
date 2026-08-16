@@ -8,7 +8,7 @@ import { initSidebarUI, renderSidebar } from './sidebar/sidebar.js';
 import { initComposerListeners, updateComposerButtons } from './composer/composer.js';
 import { initAttachmentListeners } from './composer/attachments.js';
 import { initRecorderListeners } from './composer/recorder.js';
-import { initSettingsUI } from './settings/settings.js';
+import { initSettingsUI, openSettingsModal } from './settings/settings.js';
 import { initVoiceUI } from './voice/voice-ui.js';
 import { initReadAloud } from './voice/read-aloud.js';
 import { initActionMenu } from './ui/action-menu.js';
@@ -16,12 +16,31 @@ import { initModalGlobalListeners } from './ui/modals.js';
 import { initModelDropdownUI, initRightSidebarUI } from './ui/menus.js';
 import { initSmartScrollControls, loadChat, startNewChat } from './chat/chat.js';
 import { state } from './state/store.js';
-import { initChatRouter, parseChatRoute } from './router/chat-router.js';
+import { initChatRouter, parseChatRoute, isEmbeddedChatRouter } from './router/chat-router.js';
 import { initWorkspaceUI } from './workspace/workspace-ui.js';
 import './workspace/workspace-navigation-bridge.js';
 
+const IS_EMBEDDED = isEmbeddedChatRouter();
+const SHELL_CHANNEL = 'mahdi-app-shell';
+const SHELL_VERSION = 1;
+
+function postEmbeddedStartupError(stage, error) {
+  if (!IS_EMBEDDED || window.parent === window) return;
+  window.parent.postMessage({
+    channel: SHELL_CHANNEL,
+    version: SHELL_VERSION,
+    app: 'chat',
+    type: 'app:error',
+    payload: {
+      stage,
+      message: error instanceof Error ? error.message : String(error || 'Unknown startup error')
+    }
+  }, window.location.origin);
+}
+
 function showBootstrapFailure(stage, error) {
   console.error(`ChatUI startup failed during ${stage}:`, error);
+  postEmbeddedStartupError(stage, error);
 
   const existing = document.getElementById('startup-error');
   if (existing) existing.remove();
@@ -111,6 +130,18 @@ async function handleRoute(route, { startup = false } = {}) {
   startNewChat(renderSidebar, null, { historyMode: 'replace' });
 }
 
+async function initializeEmbeddedBridge() {
+  const { initChatEmbeddedBridge } = await import('./embedded/shell-bridge.js');
+  initChatEmbeddedBridge({
+    navigateChat: async chatId => {
+      if (chatId) await handleRoute({ type: 'chat', chatId }, { startup: false });
+      else await handleRoute({ type: 'home', chatId: null }, { startup: false });
+    },
+    openSettings: openSettingsModal,
+    getState: () => state
+  });
+}
+
 async function bootstrapApp() {
   startupDeadlineAt = Date.now() + STARTUP_DEADLINE_MS;
   await runBootstrapStep('Markdown initialization', () => initMarkdown());
@@ -118,12 +149,16 @@ async function bootstrapApp() {
   await runBootstrapStep('Action menu initialization', () => initActionMenu());
   await runBootstrapStep('Sidebar initialization', () => initSidebarUI());
   await runBootstrapStep('Workspace initialization', () => initWorkspaceUI());
-  await runBootstrapStep('Chat router initialization', () => {
-    initChatRouter(route => {
-      void handleRoute(route, { startup: false });
+
+  if (!IS_EMBEDDED) {
+    await runBootstrapStep('Chat router initialization', () => {
+      initChatRouter(route => {
+        void handleRoute(route, { startup: false });
+      });
     });
-  });
-  await runBootstrapStep('Route restoration', () => handleRoute(parseChatRoute(), { startup: true }));
+    await runBootstrapStep('Route restoration', () => handleRoute(parseChatRoute(), { startup: true }));
+  }
+
   await runBootstrapStep('Composer initialization', () => initComposerListeners(renderSidebar));
 
   const attachFileBtn = document.getElementById('attach-file-btn');
@@ -140,6 +175,10 @@ async function bootstrapApp() {
   await runBootstrapStep('Modal initialization', () => initModalGlobalListeners());
   await runBootstrapStep('Smart-scroll initialization', () => initSmartScrollControls());
   await runBootstrapStep('Composer button synchronization', () => updateComposerButtons());
+
+  if (IS_EMBEDDED) {
+    await runBootstrapStep('Embedded shell bridge initialization', () => initializeEmbeddedBridge());
+  }
 }
 
 if (document.readyState === 'loading') {

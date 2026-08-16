@@ -1,3 +1,5 @@
+import { isTodoEmbeddedMode, postTodoShellMessage } from './embedded/shell-bridge.js';
+
 const BOOTSTRAP_MESSAGES = {
   MODULE_LOAD: 'A required application module could not be loaded.',
   INTEGRATION: 'Application modules loaded, but one integration is incomplete.',
@@ -28,6 +30,12 @@ function showBootstrapBanner(message) {
 function reportBootstrapError(stage, error) {
   const message = BOOTSTRAP_MESSAGES[stage] || 'The application could not finish starting.';
   console.error(`[${stage}] ${message}`, error);
+  if (isTodoEmbeddedMode()) {
+    postTodoShellMessage('app:error', {
+      stage,
+      message: `${message}${error?.message ? ` ${error.message}` : ''}`
+    });
+  }
   if (STORAGE_STAGES.has(stage) && typeof storageErrorReporter === 'function') {
     storageErrorReporter(message, error);
     return;
