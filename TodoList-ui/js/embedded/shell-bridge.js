@@ -71,18 +71,23 @@ function readAppearance(appState) {
   };
 }
 
-function oversizedResult(requestId) {
+function oversizedResult(requestId, originalResult = null) {
+  const mutationOccurred = Boolean(originalResult?.meta?.mutationOccurred);
+  const affectedCount = Math.max(0, Number(originalResult?.overview?.affectedCount ?? originalResult?.meta?.affectedCount) || 0);
   return {
     requestId,
     result: {
       ok: false,
-      overview: { message: 'Todo result exceeded the RPC response limit.', affectedCount: 0 },
+      overview: { message: 'Todo result exceeded the RPC response limit.', affectedCount },
       error: {
         code: 'RESULT_TOO_LARGE',
         message: 'Todo result exceeded the 64 KiB RPC response limit. Narrow or paginate the request.',
-        details: {}
+        details: {
+          originalCode: originalResult?.error?.code || null,
+          mutationOccurred
+        }
       },
-      meta: { mutationOccurred: false }
+      meta: { mutationOccurred, affectedCount }
     }
   };
 }
@@ -113,7 +118,7 @@ export function initializeTodoEmbeddedBridge({ settingsComponent, appState, todo
           const result = await todoToolExecutor.executeRequest(payload);
           const responsePayload = { requestId, result };
           if (!postTodoShellMessage('todo:tool-response', responsePayload)) {
-            postTodoShellMessage('todo:tool-response', oversizedResult(requestId));
+            postTodoShellMessage('todo:tool-response', oversizedResult(requestId, result));
           }
           break;
         }
