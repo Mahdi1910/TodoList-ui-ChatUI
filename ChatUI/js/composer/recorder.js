@@ -9,12 +9,17 @@ import {
   tryAddAttachmentFile
 } from './attachments.js';
 import { updateComposerButtons } from './composer.js';
+import { remuxMp4AacToAdts } from './aac-remuxer.js';
 
 const MIN_USEFUL_RECORDING_BYTES = 64 * 1024;
 const AUTO_STOP_HEADROOM_BYTES = 128 * 1024;
+const AAC_REMUX_OVERHEAD_RATIO = 0.10;
 const DEFAULT_TIMESLICE_MS = 1000;
+const AAC_LC_MP4_MIME = 'audio/mp4;codecs=mp4a.40.2';
+const GENERIC_MP4_MIME = 'audio/mp4';
 
 let activeRecordingOptions = null;
+let activeStopPromise = null;
 
 function resetRecordButton(recordAudioBtn = document.getElementById('record-audio-btn')) {
   if (!recordAudioBtn) return;
@@ -55,12 +60,40 @@ function showRecordingError(message, options = {}) {
   if (options.showAlerts !== false) alert(message);
 }
 
+function normalizedMimeType(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isMp4AudioMimeType(value = '') {
+  return normalizedMimeType(value).split(';', 1)[0] === GENERIC_MP4_MIME;
+}
+
+export function getPreferredRecordingMimeType() {
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return '';
+  if (MediaRecorder.isTypeSupported(AAC_LC_MP4_MIME)) return AAC_LC_MP4_MIME;
+  if (MediaRecorder.isTypeSupported(GENERIC_MP4_MIME)) return GENERIC_MP4_MIME;
+  return '';
+}
+
+function createAudioMediaRecorder(stream) {
+  const preferredMimeType = getPreferredRecordingMimeType();
+  return preferredMimeType
+    ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+    : new MediaRecorder(stream);
+}
+
 function recordingFileName(mimeType) {
-  const type = String(mimeType || '').toLowerCase();
-  const extension = type.includes('mp4') || type.includes('aac') ? 'm4a'
-    : type.includes('ogg') ? 'ogg'
-      : 'webm';
+  const type = normalizedMimeType(mimeType);
+  const extension = type.split(';', 1)[0] === 'audio/aac' ? 'aac'
+    : type.includes('mp4') ? 'm4a'
+      : type.includes('ogg') ? 'ogg'
+        : 'webm';
   return `recorded_audio_${Date.now()}.${extension}`;
+}
+
+function recordingHeadroomBytes(recorder, byteLimit) {
+  if (!isMp4AudioMimeType(recorder?.mimeType)) return AUTO_STOP_HEADROOM_BYTES;
+  return Math.max(AUTO_STOP_HEADROOM_BYTES, Math.ceil((Number(byteLimit) || 0) * AAC_REMUX_OVERHEAD_RATIO));
 }
 
 export async function startAudioRecording(options = {}) {
@@ -80,7 +113,7 @@ export async function startAudioRecording(options = {}) {
 
   try {
     requestedStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new MediaRecorder(requestedStream);
+    const recorder = createAudioMediaRecorder(requestedStream);
     activeRecordingOptions = { ...options };
     setRuntime({
       mediaStreamTrack: requestedStream,
@@ -104,7 +137,7 @@ export async function startAudioRecording(options = {}) {
 
       const stopThreshold = Math.max(
         MIN_USEFUL_RECORDING_BYTES,
-        runtime.audioRecordingByteLimit - AUTO_STOP_HEADROOM_BYTES
+        runtime.audioRecordingByteLimit - recordingHeadroomBytes(recorder, runtime.audioRecordingByteLimit)
       );
       if (
         nextBytes >= stopThreshold &&
@@ -139,6 +172,8 @@ export async function startAudioRecording(options = {}) {
 }
 
 export function stopAudioRecording(options = {}) {
+  if (activeStopPromise) return activeStopPromise;
+
   const recordAudioBtn = options.recordAudioBtn || document.getElementById('record-audio-btn');
   const recorder = runtime.mediaRecorder;
   const startOptions = activeRecordingOptions || {};
@@ -146,12 +181,6 @@ export function stopAudioRecording(options = {}) {
   const shouldRefresh = options.refresh !== false;
   const updateButton = options.updateButton ?? startOptions.updateButton ?? true;
   const showLimitAlert = options.showLimitAlert ?? startOptions.showLimitAlert ?? true;
-
-  if (runtime.isStoppingAudioRecording && recorder) {
-    return new Promise(resolve => {
-      recorder.addEventListener('stop', () => resolve(null), { once: true });
-    });
-  }
 
   if (!runtime.isRecordingAudio || !recorder || recorder.state === 'inactive') {
     stopMediaStream();
@@ -163,25 +192,55 @@ export function stopAudioRecording(options = {}) {
 
   setRuntime({ isStoppingAudioRecording: true });
 
-  return new Promise(resolve => {
-    recorder.onstop = () => {
+  const stopPromise = new Promise(resolve => {
+    recorder.onstop = async () => {
       const mimeType = recorder.mimeType || 'audio/webm';
-      const audioBlob = new Blob(runtime.audioChunks, { type: mimeType });
-      const audioFile = new File([audioBlob], recordingFileName(mimeType), { type: mimeType });
+      const recordedChunks = [...runtime.audioChunks];
       const stoppedForLimit = runtime.audioRecordingLimitReached;
-      const added = shouldAttach && audioFile.size > 0
-        ? tryAddAttachmentFile(audioFile, { refresh: shouldRefresh, showAlert: startOptions.showAlerts !== false })
-        : false;
+      let resultFile = null;
 
+      // MediaRecorder is finished producing bytes. Release the microphone now,
+      // before any potentially asynchronous parsing/remux work starts.
       stopMediaStream();
-      resetRecordingState();
-      if (updateButton) resetRecordButton(recordAudioBtn);
-      updateComposerButtons();
 
-      if (stoppedForLimit && added && showLimitAlert) {
-        alert('Recording stopped automatically because it reached the available attachment size limit.');
+      try {
+        const recordedBlob = new Blob(recordedChunks, { type: mimeType });
+        let finalBlob = recordedBlob;
+        let finalMimeType = mimeType;
+
+        if (isMp4AudioMimeType(mimeType)) {
+          finalBlob = await remuxMp4AacToAdts(recordedBlob);
+          finalMimeType = 'audio/aac';
+        }
+
+        const audioFile = new File(
+          [finalBlob],
+          recordingFileName(finalMimeType),
+          { type: finalMimeType }
+        );
+
+        if (shouldAttach && audioFile.size > 0) {
+          const added = tryAddAttachmentFile(audioFile, {
+            refresh: shouldRefresh,
+            showAlert: startOptions.showAlerts !== false
+          });
+          resultFile = added ? audioFile : null;
+          if (stoppedForLimit && added && showLimitAlert) {
+            alert('Recording stopped automatically because it reached the available attachment size limit.');
+          }
+        } else if (!shouldAttach && audioFile.size > 0) {
+          resultFile = audioFile;
+        }
+      } catch (error) {
+        console.error('Failed to prepare recorded audio attachment:', error);
+        showRecordingError('Recorded audio could not be prepared in a Gemini-compatible AAC format. Please try again.', startOptions);
+        resultFile = null;
+      } finally {
+        resetRecordingState();
+        if (updateButton) resetRecordButton(recordAudioBtn);
+        updateComposerButtons();
+        resolve(resultFile);
       }
-      resolve(shouldAttach ? (added ? audioFile : null) : (audioFile.size > 0 ? audioFile : null));
     };
 
     try {
@@ -195,9 +254,17 @@ export function stopAudioRecording(options = {}) {
       resolve(null);
     }
   });
+
+  activeStopPromise = stopPromise;
+  void stopPromise.finally(() => {
+    if (activeStopPromise === stopPromise) activeStopPromise = null;
+  });
+  return stopPromise;
 }
 
 export function cancelAudioRecording(options = {}) {
+  if (activeStopPromise) return activeStopPromise.then(() => undefined);
+
   const recorder = runtime.mediaRecorder;
   const recordAudioBtn = options.recordAudioBtn || document.getElementById('record-audio-btn');
   // If Voice Mode takes over while the normal composer recorder is active, always
