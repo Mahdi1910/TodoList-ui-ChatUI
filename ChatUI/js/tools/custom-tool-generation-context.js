@@ -1,8 +1,8 @@
 /**
  * custom-tool-generation-context.js - Exact originating-turn context for the
- * one active ChatUI generation. Regenerate keeps the same userTurnId.
+ * one active ChatUI generation. Regenerate keeps the same userTurnId but is
+ * identified explicitly so it can never count as duplicate confirmation.
  */
-import { state } from '../state/store.js';
 
 let current = Object.freeze({
   userTurnId: '',
@@ -17,16 +17,11 @@ function lastUserMessageId(messages = []) {
   return '';
 }
 
-function assistantAlreadyExists(assistantMessage) {
-  const id = String(assistantMessage?.id || '');
-  if (!id) return false;
-  return state.chats.some(chat => (chat.messages || []).some(message => message?.id === id));
-}
-
-export function beginCustomToolGenerationContext({ messages = [], assistantMessage = null, generationId = '' } = {}) {
+export function beginCustomToolGenerationContext({ messages = [], generationId = '', generationMode = 'normal' } = {}) {
+  const resolvedMode = generationMode === 'regenerate' ? 'regenerate' : 'normal';
   current = Object.freeze({
     userTurnId: lastUserMessageId(messages),
-    generationMode: assistantAlreadyExists(assistantMessage) ? 'regenerate' : 'normal',
+    generationMode: resolvedMode,
     generationAttemptId: String(generationId || '')
   });
   return current;
