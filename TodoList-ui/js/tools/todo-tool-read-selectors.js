@@ -216,11 +216,12 @@ export function selectTasks(args = {}) {
 
   const exactIds = Array.isArray(args.ids) && args.ids.length <= 10;
   let resolvedDetail = detail === 'auto' ? (exactIds ? 'full' : 'summary') : detail;
+  const totalMatched = ordered.length;
   if (resolvedDetail === 'full' && requestedLimit > 10) resolvedDetail = 'summary';
   if (resolvedDetail === 'full' && Array.isArray(args.ids) && args.ids.length > 10) resolvedDetail = 'summary';
+  if (resolvedDetail === 'full' && !exactIds && totalMatched > 10) resolvedDetail = 'summary';
   const max = resolvedDetail === 'full' ? 10 : 20;
   requestedLimit = Math.min(requestedLimit, max);
-  const totalMatched = ordered.length;
   const page = ordered.slice(offset, offset + requestedLimit);
   const serializer = resolvedDetail === 'full' ? serializeTaskFull : serializeTaskSummary;
   return {
@@ -266,7 +267,7 @@ export function listTaxonomy(type, args = {}) {
   }
   const totalMatched = flattened.length;
   const page = flattened.slice(offset, offset + limit);
-  const includeCounts = args.includeCounts === true;
+  const includeCounts = args.includeCounts !== false;
   const items = page.map(({ item, depth }) => ({
     id: item.id,
     name: item.name,
@@ -293,9 +294,11 @@ export function currentViewTaskIds(limit = 100) {
 
 export function makeTreeLines(items, { idKey = 'id', parentKey = 'parentId', labelKey = 'name', max = 30 } = {}) {
   const rows = items.slice(0, max);
+  const rowIds = new Set(rows.map(item => item[idKey]).filter(Boolean));
   const byParent = new Map();
   rows.forEach(item => {
-    const parent = item[parentKey] || null;
+    const rawParent = item[parentKey] || null;
+    const parent = rawParent && rowIds.has(rawParent) ? rawParent : null;
     if (!byParent.has(parent)) byParent.set(parent, []);
     byParent.get(parent).push(item);
   });
