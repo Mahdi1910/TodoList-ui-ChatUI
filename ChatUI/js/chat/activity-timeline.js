@@ -5,6 +5,8 @@
  * reconstructed from these records.
  */
 
+import { getCustomToolProvider } from '../tools/custom-tool-provider.js';
+
 const TOOL_PREVIEW_MAX_CHARS = 16 * 1024;
 const TOOL_PREVIEW_MAX_DEPTH = 6;
 const TOOL_PREVIEW_MAX_ARRAY_ITEMS = 40;
@@ -92,9 +94,9 @@ function basename(path = '') {
 }
 
 export function getToolProvider(name = '', toolType = '') {
-  const normalizedName = String(name || '');
+  const customProvider = getCustomToolProvider(name);
+  if (customProvider !== 'unknown') return customProvider;
   const normalizedType = String(toolType || '').toUpperCase();
-  if (normalizedName.startsWith('workspace_')) return 'workspace';
   if (normalizedType.includes('GOOGLE_SEARCH')) return 'google-search';
   if (normalizedType.includes('URL_CONTEXT')) return 'url-context';
   if (normalizedType.includes('CODE_EXECUTION')) return 'code-execution';
@@ -118,6 +120,26 @@ export function formatToolSummary({ provider, name, args = {}, toolType = '' } =
       default: return String(name || 'Workspace operation').replace(/^workspace_/, '').replaceAll('_', ' ');
     }
   }
+  if (provider === 'todo' || String(name || '').startsWith('todo_')) {
+    const count = key => Array.isArray(args?.[key]) ? args[key].length : 0;
+    switch (name) {
+      case 'todo_find_tasks': return 'Read To-Do tasks';
+      case 'todo_create_tasks': return `Created ${count('tasks')} task${count('tasks') === 1 ? '' : 's'}`;
+      case 'todo_update_tasks': return `Updated ${count('tasks')} task${count('tasks') === 1 ? '' : 's'}`;
+      case 'todo_delete_tasks': return `Deleted ${count('taskIds')} task${count('taskIds') === 1 ? '' : 's'}`;
+      case 'todo_list_projects': return 'Listed projects';
+      case 'todo_create_projects': return `Created ${count('projects')} project${count('projects') === 1 ? '' : 's'}`;
+      case 'todo_update_projects': return `Updated ${count('projects')} project${count('projects') === 1 ? '' : 's'}`;
+      case 'todo_delete_projects': return `Deleted ${count('projectIds')} project${count('projectIds') === 1 ? '' : 's'}`;
+      case 'todo_list_tags': return 'Listed tags';
+      case 'todo_create_tags': return `Created ${count('tags')} tag${count('tags') === 1 ? '' : 's'}`;
+      case 'todo_update_tags': return `Updated ${count('tags')} tag${count('tags') === 1 ? '' : 's'}`;
+      case 'todo_delete_tags': return `Deleted ${count('tagIds')} tag${count('tagIds') === 1 ? '' : 's'}`;
+      case 'todo_get_workspace': return 'Read To-Do view';
+      case 'todo_update_workspace': return 'Changed To-Do view';
+      default: return String(name || 'To-Do operation').replace(/^todo_/, '').replaceAll('_', ' ');
+    }
+  }
   if (provider === 'google-search') {
     const queries = Array.isArray(args.queries) ? args.queries : [];
     return queries.length ? `Searched “${String(queries[0]).slice(0, 90)}”` : 'Searched the web';
@@ -133,6 +155,7 @@ export function formatToolSummary({ provider, name, args = {}, toolType = '' } =
 function providerLabel(provider) {
   switch (provider) {
     case 'workspace': return 'Workspace';
+    case 'todo': return 'To-Do';
     case 'google-search': return 'Google Search';
     case 'url-context': return 'URL Context';
     case 'code-execution': return 'Code Execution';
@@ -172,7 +195,9 @@ function findTool(session, callId) {
 
 function createToolActivity(session, event) {
   closeLastTextual(session);
-  const provider = event.provider || getToolProvider(event.name, event.toolType);
+  const provider = event.provider && event.provider !== 'unknown'
+    ? event.provider
+    : getToolProvider(event.name, event.toolType);
   const argsPreview = buildBoundedToolPreview(event.args || {});
   const sequence = ++session.sequence;
   const activity = {

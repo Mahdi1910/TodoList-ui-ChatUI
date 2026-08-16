@@ -1,8 +1,6 @@
 name: Iframe Integration Check
 
 on:
-  push:
-    branches: ["feature/persistent-iframe-integration"]
   pull_request:
 
 jobs:
@@ -15,7 +13,9 @@ jobs:
           node-version: 22
       - name: Verify integration invariants
         run: node scripts/verify-integration.mjs
-      - name: Check changed JavaScript syntax
+      - name: Verify Todo tool behavior
+        run: node scripts/verify-todo-tools.mjs
+      - name: Check integration JavaScript syntax
         run: |
           node --check shell/js/protocol.js
           node --check shell/js/router.js
@@ -26,9 +26,23 @@ jobs:
           node --check ChatUI/js/router/chat-router.js
           node --check ChatUI/js/app.js
           node --check ChatUI/js/embedded/shell-bridge.js
+          node --check ChatUI/js/chat/streaming.js
+          node --check ChatUI/js/todo/todo-tool-definitions.js
+          node --check ChatUI/js/todo/todo-tool-executor.js
+          node --check ChatUI/js/todo/todo-bridge-client.js
+          node --check ChatUI/js/todo/todo-mutation-replay-guard.js
+          node --check ChatUI/js/tools/custom-tool-provider.js
+          node --check ChatUI/js/tools/custom-tool-generation-context.js
+          node --check ChatUI/js/tools/function-tool-registry.js
           node --check TodoList-ui/js/bootstrap.js
           node --check TodoList-ui/js/app-main.js
           node --check TodoList-ui/js/embedded/shell-bridge.js
+          node --check TodoList-ui/js/tools/todo-tool-registry.js
+          node --check TodoList-ui/js/tools/todo-tool-normalizers.js
+          node --check TodoList-ui/js/tools/todo-tool-read-selectors.js
+          node --check TodoList-ui/js/tools/todo-tool-ui-guard.js
+          node --check TodoList-ui/js/tools/todo-tool-ui-sync.js
+          node --check TodoList-ui/js/tools/todo-tool-executor.js
           node --check worker.js
       - name: Build safe runtime bundle
         run: node scripts/build-static.mjs

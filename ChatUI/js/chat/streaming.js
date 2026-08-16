@@ -11,6 +11,10 @@ import {
 } from './activity-timeline.js';
 import { renderActivityTimeline } from './activity-renderer.js';
 import { scrollToBottom } from './ui.js';
+import {
+  beginCustomToolGenerationContext,
+  clearCustomToolGenerationContext
+} from '../tools/custom-tool-generation-context.js';
 // TEMP_PERF_DIAGNOSTICS
 import {
   beginNetworkRound,
@@ -128,6 +132,7 @@ export async function streamAssistantResponse({
   assistantMessage,
   timelineSlot,
   generationId,
+  generationMode = 'normal',
   isCurrentGeneration,
   onTextUpdate,
   onComplete
@@ -141,6 +146,8 @@ export async function streamAssistantResponse({
   // the first usable Gemini activity parsed by ChatUI, not a raw socket byte.
   const diagnosticRoundId = measure ? beginNetworkRound({ roundNumber: 1, requestBodyChars: 0 }) : null;
   let firstActivityMeasured = false;
+
+  beginCustomToolGenerationContext({ messages, generationId, generationMode });
 
   // TEMP_PERF_DIAGNOSTICS
   markPerformanceEvent('stream_call_started');
@@ -275,6 +282,7 @@ export async function streamAssistantResponse({
     attachPartialGeneration(error, session);
     throw error;
   } finally {
+    clearCustomToolGenerationContext(generationId);
     renderFrames.cancel();
   }
 }

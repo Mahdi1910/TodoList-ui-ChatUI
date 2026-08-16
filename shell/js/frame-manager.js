@@ -37,8 +37,16 @@ export function createFrameManager({ onStateChange } = {}) {
       readyPayload: null,
       queue: [],
       timeoutId: null,
-      hasLoadedEvent: false
+      hasLoadedEvent: false,
+      stateWaiters: new Set(),
+      readyPromise: null
     });
+  }
+
+  function notifyStateWaiters(record) {
+    for (const waiter of [...record.stateWaiters]) {
+      try { waiter(record.state, record.readyPayload); } catch (_) {}
+    }
   }
 
   function updatePanel(record, state, detail = '') {
@@ -47,6 +55,7 @@ export function createFrameManager({ onStateChange } = {}) {
     const detailEl = record.panel.querySelector('.frame-error-detail');
     if (detailEl) detailEl.textContent = detail ? ` ${detail}` : '';
     onStateChange?.(record.app, state, detail);
+    notifyStateWaiters(record);
   }
 
   function clearTimeoutFor(record) {
@@ -94,16 +103,16 @@ export function createFrameManager({ onStateChange } = {}) {
 
   function start(app, { retry = false } = {}) {
     const record = records.get(app);
-    if (!record) return;
-    if (!retry && record.state !== 'NOT_CREATED') return;
+    if (!record) return false;
+    if (!retry && record.state !== 'NOT_CREATED') return false;
 
     clearTimeoutFor(record);
     record.readyPayload = null;
-    record.queue = retry ? record.queue : record.queue;
     record.hasLoadedEvent = false;
     updatePanel(record, 'LOADING');
     armTimeout(record);
     record.frame.src = retry ? addRetryToken(record.src) : record.src;
+    return true;
   }
 
   function startAll() {
@@ -127,14 +136,14 @@ export function createFrameManager({ onStateChange } = {}) {
     const record = records.get(app);
     if (!record) return;
     clearTimeoutFor(record);
+    record.readyPayload = null;
     updatePanel(record, 'FAILED', detail);
   }
 
   function retry(app) {
     const record = records.get(app);
     if (!record || record.state !== 'FAILED') return false;
-    start(app, { retry: true });
-    return true;
+    return start(app, { retry: true });
   }
 
   function send(app, message) {
@@ -146,6 +155,74 @@ export function createFrameManager({ onStateChange } = {}) {
     }
     record.frame.contentWindow?.postMessage(message, window.location.origin);
     return true;
+  }
+
+  function sendNow(app, message) {
+    const record = records.get(app);
+    if (!record || record.state !== 'READY') return false;
+    record.frame.contentWindow?.postMessage(message, window.location.origin);
+    return true;
+  }
+
+  function waitForReadyOrFailed(record, timeoutMs) {
+    if (record.state === 'READY' || record.state === 'FAILED') {
+      return Promise.resolve({ state: record.state, payload: record.readyPayload });
+    }
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = value => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        record.stateWaiters.delete(onState);
+        resolve(value);
+      };
+      const onState = state => {
+        if (state === 'READY' || state === 'FAILED') finish({ state, payload: record.readyPayload });
+      };
+      const timeoutId = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        record.stateWaiters.delete(onState);
+        reject(new Error(`${record.app} did not become ready before the readiness timeout.`));
+      }, timeoutMs);
+      record.stateWaiters.add(onState);
+    });
+  }
+
+  function ensureReady(app, { timeoutMs = 30000, retryFailed = true } = {}) {
+    const record = records.get(app);
+    if (!record) return Promise.reject(new Error(`Unknown application frame: ${app}`));
+    if (record.state === 'READY') return Promise.resolve(record.readyPayload || {});
+    if (record.readyPromise) return record.readyPromise;
+
+    const promise = (async () => {
+      let retried = false;
+      const deadline = Date.now() + timeoutMs;
+      while (true) {
+        if (record.state === 'READY') return record.readyPayload || {};
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 0) throw new Error(`${app} did not become ready before the readiness timeout.`);
+        if (record.state === 'NOT_CREATED') start(app);
+        else if (record.state === 'FAILED') {
+          if (!retryFailed || retried) throw new Error(`${app} is unavailable.`);
+          retried = true;
+          start(app, { retry: true });
+        }
+
+        const outcome = await waitForReadyOrFailed(record, remainingMs);
+        if (outcome.state === 'READY') return outcome.payload || {};
+        if (!retryFailed || retried) throw new Error(`${app} failed to start.`);
+        retried = true;
+        start(app, { retry: true });
+      }
+    })();
+
+    record.readyPromise = promise;
+    promise.finally(() => {
+      if (record.readyPromise === promise) record.readyPromise = null;
+    }).catch(() => {});
+    return promise;
   }
 
   function activate(app) {
@@ -183,6 +260,8 @@ export function createFrameManager({ onStateChange } = {}) {
     markFailed,
     retry,
     send,
+    sendNow,
+    ensureReady,
     activate,
     appFromWindow,
     getState,

@@ -1,15 +1,47 @@
 import { createShellMessage, isProtocolMessage, safeRequestId } from './protocol.js';
 
+const NORMAL_MESSAGE_LIMIT = 32 * 1024;
+const TODO_RPC_LIMIT = 64 * 1024;
+const TODO_RPC_TYPES = new Set([
+  'chatui:todo-tool-request',
+  'chatui:todo-tool-cancel',
+  'todo:tool-response',
+  'shell:todo-tool-request',
+  'shell:todo-tool-cancel',
+  'shell:todo-tool-response',
+  'shell:todo-tool-dispatched'
+]);
+
+function messageLimit(type) {
+  return TODO_RPC_TYPES.has(type) ? TODO_RPC_LIMIT : NORMAL_MESSAGE_LIMIT;
+}
+
 function validPayloadSize(data) {
-  try { return JSON.stringify(data).length <= 32 * 1024; }
+  try { return JSON.stringify(data).length <= messageLimit(data?.type); }
   catch (_) { return false; }
+}
+
+function toolFailure(code, message, details = {}, meta = {}) {
+  const mutationOccurred = Boolean(meta.mutationOccurred);
+  const affectedCount = Math.max(0, Number(meta.affectedCount) || 0);
+  return {
+    ok: false,
+    overview: { message, affectedCount },
+    error: { code, message, details },
+    meta: { ...meta, mutationOccurred, affectedCount }
+  };
 }
 
 export function createFrameBridge(frameManager, callbacks = {}) {
   const pendingSettings = new Map();
+  const cancelledTodoRequests = new Set();
 
   function send(app, type, payload = {}) {
     return frameManager.send(app, createShellMessage(type, payload));
+  }
+
+  function sendNow(app, type, payload = {}) {
+    return frameManager.sendNow(app, createShellMessage(type, payload));
   }
 
   function navigateChat(chatId, source = 'shell') {
@@ -38,6 +70,62 @@ export function createFrameBridge(frameManager, callbacks = {}) {
     return requestId;
   }
 
+  function sendTodoResultToChat(requestId, result) {
+    const payload = { requestId: String(requestId || ''), result };
+    const message = createShellMessage('shell:todo-tool-response', payload);
+    if (!validPayloadSize(message)) {
+      const mutationOccurred = Boolean(result?.meta?.mutationOccurred);
+      const affectedCount = Math.max(0, Number(result?.overview?.affectedCount ?? result?.meta?.affectedCount) || 0);
+      payload.result = toolFailure(
+        'RESULT_TOO_LARGE',
+        'Todo result exceeded the 64 KiB Shell RPC limit. Narrow or paginate the request.',
+        { originalCode: result?.error?.code || null, mutationOccurred },
+        { mutationOccurred, affectedCount }
+      );
+    }
+    // A response is safe to defer while Chat itself is reloading. The mutation request is never deferred.
+    frameManager.send('chat', createShellMessage('shell:todo-tool-response', payload));
+  }
+
+  async function handleTodoRequest(payload) {
+    const requestId = String(payload?.requestId || '');
+    if (!requestId) return;
+    try {
+      const ready = await frameManager.ensureReady('todo', { timeoutMs: 30000, retryFailed: true });
+      if (cancelledTodoRequests.has(requestId)) {
+        cancelledTodoRequests.delete(requestId);
+        sendTodoResultToChat(requestId, toolFailure('REQUEST_ABORTED', 'Todo request was stopped before dispatch.'));
+        return;
+      }
+      const capabilities = Array.isArray(ready?.capabilities) ? ready.capabilities : [];
+      if (!capabilities.includes('todo-tools-v1')) {
+        sendTodoResultToChat(requestId, toolFailure('TODO_UNAVAILABLE', 'Todo loaded without the required todo-tools-v1 capability.'));
+        return;
+      }
+      const sent = sendNow('todo', 'shell:todo-tool-request', payload);
+      if (!sent) {
+        sendTodoResultToChat(requestId, toolFailure('TODO_UNAVAILABLE', 'Todo became unavailable before the request could be dispatched.'));
+        return;
+      }
+      // Let Chat start the read/mutation execution timeout only after the Todo
+      // request has actually crossed the readiness boundary and been posted.
+      send('chat', 'shell:todo-tool-dispatched', { requestId });
+    } catch (error) {
+      cancelledTodoRequests.delete(requestId);
+      sendTodoResultToChat(requestId, toolFailure('TODO_UNAVAILABLE', error instanceof Error ? error.message : 'Todo could not be started.'));
+    }
+  }
+
+  function handleTodoCancel(payload) {
+    const requestId = String(payload?.requestId || '');
+    if (!requestId) return;
+    cancelledTodoRequests.add(requestId);
+    if (frameManager.getState('todo') === 'READY') {
+      sendNow('todo', 'shell:todo-tool-cancel', { requestId });
+    }
+    window.setTimeout(() => cancelledTodoRequests.delete(requestId), 2 * 60 * 1000);
+  }
+
   window.addEventListener('message', event => {
     if (event.origin !== window.location.origin) return;
     const app = frameManager.appFromWindow(event.source);
@@ -51,6 +139,9 @@ export function createFrameBridge(frameManager, callbacks = {}) {
       case 'app:ready':
         frameManager.markReady(app, payload);
         callbacks.onReady?.(app, payload);
+        if (app === 'chat') {
+          sendNow('chat', 'shell:todo-rpc-capabilities', { supported: true, version: 'todo-rpc-v1' });
+        }
         break;
       case 'app:error':
         frameManager.markFailed(app, String(payload.message || payload.stage || 'Application startup failed.'));
@@ -67,6 +158,18 @@ export function createFrameBridge(frameManager, callbacks = {}) {
         break;
       case 'chatui:route-change':
         if (app === 'chat') callbacks.onChatRouteChange?.(payload);
+        break;
+      case 'chatui:todo-tool-request':
+        if (app === 'chat') void handleTodoRequest(payload);
+        break;
+      case 'chatui:todo-tool-cancel':
+        if (app === 'chat') handleTodoCancel(payload);
+        break;
+      case 'todo:tool-response':
+        if (app === 'todo') {
+          cancelledTodoRequests.delete(String(payload.requestId || ''));
+          sendTodoResultToChat(payload.requestId, payload.result);
+        }
         break;
       case 'app:settings-opened': {
         const timeoutId = pendingSettings.get(payload.requestId);

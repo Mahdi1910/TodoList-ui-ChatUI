@@ -30,7 +30,8 @@ export const state = {
     googleSearch: false,
     urlContext: false,
     codeExecution: false,
-    workspace: false
+    workspace: false,
+    todo: false
   },
   api: {
     textApiKey: '',

@@ -195,6 +195,7 @@ async function regenerateTarget(chatRef, targetRef, updateSidebarCallback = null
       assistantMessage,
       timelineSlot: assistantRow.querySelector('.assistant-activity-timeline'),
       generationId: genId,
+      generationMode: 'regenerate',
       isCurrentGeneration,
       onComplete: (fullText, thinkingText, thoughtSignature, modelResponseParts, toolMetadata, activityTimeline) => {
         assistantMessage.content = fullText || '';

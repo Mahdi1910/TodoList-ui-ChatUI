@@ -1,21 +1,36 @@
 const SHELL_CHANNEL = 'mahdi-app-shell';
 const SHELL_VERSION = 1;
 const IS_EMBEDDED = new URLSearchParams(window.location.search).get('embedded') === '1';
+const NORMAL_MESSAGE_LIMIT = 32 * 1024;
+const TODO_RPC_LIMIT = 64 * 1024;
+const TODO_RPC_TYPES = new Set(['shell:todo-tool-request', 'shell:todo-tool-cancel', 'todo:tool-response']);
 let initialized = false;
 
 export function isTodoEmbeddedMode() {
   return IS_EMBEDDED && window.parent !== window;
 }
 
+function messageLimit(type) {
+  return TODO_RPC_TYPES.has(type) ? TODO_RPC_LIMIT : NORMAL_MESSAGE_LIMIT;
+}
+
+function fitsMessage(message, type = '') {
+  try { return JSON.stringify(message).length <= messageLimit(type || message?.type); }
+  catch (_) { return false; }
+}
+
 export function postTodoShellMessage(type, payload = {}) {
-  if (!isTodoEmbeddedMode()) return;
-  window.parent.postMessage({
+  if (!isTodoEmbeddedMode()) return false;
+  const message = {
     channel: SHELL_CHANNEL,
     version: SHELL_VERSION,
     app: 'todo',
     type,
     payload
-  }, window.location.origin);
+  };
+  if (!fitsMessage(message, type)) return false;
+  window.parent.postMessage(message, window.location.origin);
+  return true;
 }
 
 function prepareEmbeddedLayout() {
@@ -44,8 +59,7 @@ function validShellMessage(event) {
   if (!message || typeof message !== 'object') return false;
   if (message.channel !== SHELL_CHANNEL || message.version !== SHELL_VERSION || message.app !== 'shell') return false;
   if (typeof message.type !== 'string' || message.type.length > 80) return false;
-  try { return JSON.stringify(message).length <= 32 * 1024; }
-  catch (_) { return false; }
+  return fitsMessage(message, message.type);
 }
 
 function readAppearance(appState) {
@@ -57,7 +71,28 @@ function readAppearance(appState) {
   };
 }
 
-export function initializeTodoEmbeddedBridge({ settingsComponent, appState }) {
+function oversizedResult(requestId, originalResult = null) {
+  const mutationOccurred = Boolean(originalResult?.meta?.mutationOccurred);
+  const affectedCount = Math.max(0, Number(originalResult?.overview?.affectedCount ?? originalResult?.meta?.affectedCount) || 0);
+  return {
+    requestId,
+    result: {
+      ok: false,
+      overview: { message: 'Todo result exceeded the RPC response limit.', affectedCount },
+      error: {
+        code: 'RESULT_TOO_LARGE',
+        message: 'Todo result exceeded the 64 KiB RPC response limit. Narrow or paginate the request.',
+        details: {
+          originalCode: originalResult?.error?.code || null,
+          mutationOccurred
+        }
+      },
+      meta: { mutationOccurred, affectedCount }
+    }
+  };
+}
+
+export function initializeTodoEmbeddedBridge({ settingsComponent, appState, todoToolExecutor }) {
   if (!isTodoEmbeddedMode() || initialized) return false;
   initialized = true;
 
@@ -70,13 +105,26 @@ export function initializeTodoEmbeddedBridge({ settingsComponent, appState }) {
   new MutationObserver(reportAppearance)
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-  window.addEventListener('message', event => {
+  window.addEventListener('message', async event => {
     if (!validShellMessage(event)) return;
     const message = event.data;
     const payload = message.payload && typeof message.payload === 'object' ? message.payload : {};
 
     try {
       switch (message.type) {
+        case 'shell:todo-tool-request': {
+          if (!todoToolExecutor?.executeRequest) throw new Error('Todo tool executor is unavailable.');
+          const requestId = String(payload.requestId || '');
+          const result = await todoToolExecutor.executeRequest(payload);
+          const responsePayload = { requestId, result };
+          if (!postTodoShellMessage('todo:tool-response', responsePayload)) {
+            postTodoShellMessage('todo:tool-response', oversizedResult(requestId, result));
+          }
+          break;
+        }
+        case 'shell:todo-tool-cancel':
+          todoToolExecutor?.cancelRequest?.(String(payload.requestId || ''));
+          break;
         case 'shell:open-settings':
           settingsComponent.openModal(null);
           postTodoShellMessage('app:settings-opened', { requestId: payload.requestId || null });
@@ -94,6 +142,22 @@ export function initializeTodoEmbeddedBridge({ settingsComponent, appState }) {
           break;
       }
     } catch (error) {
+      if (message.type === 'shell:todo-tool-request') {
+        postTodoShellMessage('todo:tool-response', {
+          requestId: String(payload.requestId || ''),
+          result: {
+            ok: false,
+            overview: { message: 'Todo tool request failed.', affectedCount: 0 },
+            error: {
+              code: 'INTERNAL_TODO_ERROR',
+              message: error instanceof Error ? error.message : String(error || 'Todo tool request failed.'),
+              details: {}
+            },
+            meta: { mutationOccurred: false }
+          }
+        });
+        return;
+      }
       postTodoShellMessage('app:command-error', {
         requestId: payload.requestId || null,
         command: message.type,
@@ -105,7 +169,7 @@ export function initializeTodoEmbeddedBridge({ settingsComponent, appState }) {
   postTodoShellMessage('app:ready', {
     title: 'To-Do',
     appearance: readAppearance(appState),
-    capabilities: ['open-settings', 'appearance']
+    capabilities: ['open-settings', 'appearance', 'todo-tools-v1']
   });
   return true;
 }

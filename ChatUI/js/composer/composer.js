@@ -5,6 +5,20 @@
 import { state, setState, runtime } from '../state/store.js';
 import { persistSettings } from '../storage/storage.js';
 import { sendMessage } from '../chat/chat.js';
+import { isTodoBridgeSupported } from '../todo/todo-bridge-client.js';
+
+const TOOL_DESCRIPTORS = Object.freeze([
+  { key: 'googleSearch', icon: 'search', label: 'Google Search', toggle: 'toggle-google-search', sidebarToggle: 'sidebar-toggle-google-search' },
+  { key: 'urlContext', icon: 'link', label: 'URL Context', toggle: 'toggle-url-context', sidebarToggle: 'sidebar-toggle-url-context' },
+  { key: 'codeExecution', icon: 'code-2', label: 'Code Execution', toggle: 'toggle-code-execution', sidebarToggle: 'sidebar-toggle-code-execution' },
+  { key: 'workspace', icon: 'folder-tree', label: 'Workspace', toggle: 'toggle-workspace', sidebarToggle: 'sidebar-toggle-workspace' },
+  { key: 'todo', icon: 'list-todo', label: 'To-Do', toggle: 'toggle-todo', sidebarToggle: 'sidebar-toggle-todo' }
+]);
+let todoSupportListenerInstalled = false;
+
+function toolAvailable(key) {
+  return key !== 'todo' || isTodoBridgeSupported();
+}
 
 export function updateComposerButtons() {
   const composerTextarea = document.getElementById('composer-textarea');
@@ -36,61 +50,52 @@ export function updateComposerButtons() {
   }
 }
 
-export function renderToolsUI() {
-  const tools = state.tools || { googleSearch: false, urlContext: false, codeExecution: false, workspace: false };
-  const toggleGoogleSearch = document.getElementById('toggle-google-search');
-  const toggleUrlContext = document.getElementById('toggle-url-context');
-  const toggleCodeExecution = document.getElementById('toggle-code-execution');
-  const toggleWorkspace = document.getElementById('toggle-workspace');
+function syncToolToggle(id, key, tools) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  const available = toolAvailable(key);
+  input.checked = !!tools[key];
+  input.disabled = !available;
+  const card = input.closest('.tool-option, .sidebar-tool-card');
+  card?.classList.toggle('tool-unavailable', !available);
+  card?.setAttribute('aria-disabled', available ? 'false' : 'true');
+  if (!available && key === 'todo') {
+    input.title = 'To-Do tools are available only inside the combined Chat + Todo application.';
+  } else {
+    input.removeAttribute('title');
+  }
+}
 
-  const sidebarToggleGoogleSearch = document.getElementById('sidebar-toggle-google-search');
-  const sidebarToggleUrlContext = document.getElementById('sidebar-toggle-url-context');
-  const sidebarToggleCodeExecution = document.getElementById('sidebar-toggle-code-execution');
-  const sidebarToggleWorkspace = document.getElementById('sidebar-toggle-workspace');
+export function renderToolsUI() {
+  const tools = state.tools || {};
+  TOOL_DESCRIPTORS.forEach(tool => {
+    syncToolToggle(tool.toggle, tool.key, tools);
+    syncToolToggle(tool.sidebarToggle, tool.key, tools);
+  });
 
   const activeIndicators = document.getElementById('active-tools-indicators');
-
-  if (toggleGoogleSearch) toggleGoogleSearch.checked = !!tools.googleSearch;
-  if (toggleUrlContext) toggleUrlContext.checked = !!tools.urlContext;
-  if (toggleCodeExecution) toggleCodeExecution.checked = !!tools.codeExecution;
-  if (toggleWorkspace) toggleWorkspace.checked = !!tools.workspace;
-
-  if (sidebarToggleGoogleSearch) sidebarToggleGoogleSearch.checked = !!tools.googleSearch;
-  if (sidebarToggleUrlContext) sidebarToggleUrlContext.checked = !!tools.urlContext;
-  if (sidebarToggleCodeExecution) sidebarToggleCodeExecution.checked = !!tools.codeExecution;
-  if (sidebarToggleWorkspace) sidebarToggleWorkspace.checked = !!tools.workspace;
-
   if (!activeIndicators) return;
-
   activeIndicators.innerHTML = '';
 
-  const activePills = [];
-  if (tools.googleSearch) activePills.push({ key: 'googleSearch', icon: 'search', label: 'Google Search' });
-  if (tools.urlContext) activePills.push({ key: 'urlContext', icon: 'link', label: 'URL Context' });
-  if (tools.codeExecution) activePills.push({ key: 'codeExecution', icon: 'code-2', label: 'Code Execution' });
-  if (tools.workspace) activePills.push({ key: 'workspace', icon: 'folder-tree', label: 'Workspace' });
+  TOOL_DESCRIPTORS
+    .filter(tool => tools[tool.key] && toolAvailable(tool.key))
+    .forEach(pill => {
+      const btn = document.createElement('button');
+      btn.className = 'tool-indicator-pill';
+      btn.dataset.toolKey = pill.key;
+      btn.title = `${pill.label} (Click to turn off)`;
+      btn.setAttribute('aria-label', `Turn off ${pill.label}`);
+      btn.innerHTML = `<span class="pill-icon"><i data-lucide="${pill.icon}"></i></span>`;
 
-  activePills.forEach(pill => {
-    const btn = document.createElement('button');
-    btn.className = 'tool-indicator-pill';
-    btn.dataset.toolKey = pill.key;
-    btn.title = `${pill.label} (Click to turn off)`;
-    btn.setAttribute('aria-label', `Turn off ${pill.label}`);
-    btn.innerHTML = `<span class="pill-icon"><i data-lucide="${pill.icon}"></i></span>`;
-
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      setState({ tools: { ...state.tools, [pill.key]: false } });
-      renderToolsUI();
-      try {
-        await persistSettings();
-      } catch (err) {
-        console.error('Failed to save tools state:', err);
-      }
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        setState({ tools: { ...state.tools, [pill.key]: false } });
+        renderToolsUI();
+        try { await persistSettings(); }
+        catch (err) { console.error('Failed to save tools state:', err); }
+      });
+      activeIndicators.appendChild(btn);
     });
-
-    activeIndicators.appendChild(btn);
-  });
 
   if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
 }
@@ -99,20 +104,16 @@ export function initToolsMenuListeners() {
   const toolsBtn = document.getElementById('tools-menu-btn');
   const toolsMenu = document.getElementById('tools-popup-menu');
   const closeBtn = document.getElementById('close-tools-menu-btn');
-  const toggleGoogleSearch = document.getElementById('toggle-google-search');
-  const toggleUrlContext = document.getElementById('toggle-url-context');
-  const toggleCodeExecution = document.getElementById('toggle-code-execution');
-  const toggleWorkspace = document.getElementById('toggle-workspace');
-
-  const sidebarToggleGoogleSearch = document.getElementById('sidebar-toggle-google-search');
-  const sidebarToggleUrlContext = document.getElementById('sidebar-toggle-url-context');
-  const sidebarToggleCodeExecution = document.getElementById('sidebar-toggle-code-execution');
-  const sidebarToggleWorkspace = document.getElementById('sidebar-toggle-workspace');
 
   renderToolsUI();
 
+  if (!todoSupportListenerInstalled) {
+    todoSupportListenerInstalled = true;
+    window.addEventListener('todo-bridge-support-changed', () => renderToolsUI());
+  }
+
   if (toolsBtn && toolsMenu) {
-    toolsBtn.addEventListener('click', (e) => {
+    toolsBtn.addEventListener('click', e => {
       e.stopPropagation();
       const isHidden = toolsMenu.classList.contains('hidden');
       if (isHidden) {
@@ -136,26 +137,22 @@ export function initToolsMenuListeners() {
   }
 
   const handleToggle = async (key, checked) => {
+    if (checked && !toolAvailable(key)) {
+      renderToolsUI();
+      return;
+    }
     setState({ tools: { ...state.tools, [key]: checked } });
     renderToolsUI();
-    try {
-      await persistSettings();
-    } catch (err) {
-      console.error('Failed to save tools state:', err);
-    }
+    try { await persistSettings(); }
+    catch (err) { console.error('Failed to save tools state:', err); }
   };
 
-  if (toggleGoogleSearch) toggleGoogleSearch.addEventListener('change', (e) => handleToggle('googleSearch', e.target.checked));
-  if (toggleUrlContext) toggleUrlContext.addEventListener('change', (e) => handleToggle('urlContext', e.target.checked));
-  if (toggleCodeExecution) toggleCodeExecution.addEventListener('change', (e) => handleToggle('codeExecution', e.target.checked));
-  if (toggleWorkspace) toggleWorkspace.addEventListener('change', (e) => handleToggle('workspace', e.target.checked));
+  TOOL_DESCRIPTORS.forEach(tool => {
+    document.getElementById(tool.toggle)?.addEventListener('change', e => handleToggle(tool.key, e.target.checked));
+    document.getElementById(tool.sidebarToggle)?.addEventListener('change', e => handleToggle(tool.key, e.target.checked));
+  });
 
-  if (sidebarToggleGoogleSearch) sidebarToggleGoogleSearch.addEventListener('change', (e) => handleToggle('googleSearch', e.target.checked));
-  if (sidebarToggleUrlContext) sidebarToggleUrlContext.addEventListener('change', (e) => handleToggle('urlContext', e.target.checked));
-  if (sidebarToggleCodeExecution) sidebarToggleCodeExecution.addEventListener('change', (e) => handleToggle('codeExecution', e.target.checked));
-  if (sidebarToggleWorkspace) sidebarToggleWorkspace.addEventListener('change', (e) => handleToggle('workspace', e.target.checked));
-
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', e => {
     if (toolsMenu && !toolsMenu.contains(e.target) && e.target !== toolsBtn) {
       toolsMenu.classList.add('hidden');
       toolsMenu.setAttribute('hidden', '');
@@ -163,7 +160,7 @@ export function initToolsMenuListeners() {
     }
   });
 
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && toolsMenu && !toolsMenu.classList.contains('hidden')) {
       toolsMenu.classList.add('hidden');
       toolsMenu.setAttribute('hidden', '');
@@ -185,7 +182,7 @@ export function initComposerListeners(updateSidebarCallback = null) {
       updateComposerButtons();
     });
 
-    composerTextarea.addEventListener('keydown', (e) => {
+    composerTextarea.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendMessage(updateSidebarCallback);
@@ -194,8 +191,6 @@ export function initComposerListeners(updateSidebarCallback = null) {
   }
 
   if (sendBtn) {
-    sendBtn.addEventListener('click', () => {
-      sendMessage(updateSidebarCallback);
-    });
+    sendBtn.addEventListener('click', () => sendMessage(updateSidebarCallback));
   }
 }

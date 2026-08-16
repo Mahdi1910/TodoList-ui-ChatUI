@@ -43,7 +43,7 @@ function repairDuplicateAssistants(messages) {
     const assistants = [];
     for (let cursor = index + 1; cursor < ordered.length; cursor += 1) {
       if (ordered[cursor].role === 'user') break;
-      if (ordered[cursor].role === 'assistant') assistants.push(ordered[cursor]);
+      if (ordered[cursor]?.role === 'assistant') assistants.push(ordered[cursor]);
     }
     if (assistants.length === 1) keepAssistantIds.add(assistants[0].id);
     if (assistants.length > 1) {
@@ -246,7 +246,8 @@ export async function loadState(options = {}) {
         googleSearch: !!savedTools.googleSearch,
         urlContext: !!savedTools.urlContext,
         codeExecution: !!savedTools.codeExecution,
-        workspace: !!savedTools.workspace
+        workspace: !!savedTools.workspace,
+        todo: !!savedTools.todo
       },
       api: {
         textApiKey: settings.api?.textApiKey || '',
