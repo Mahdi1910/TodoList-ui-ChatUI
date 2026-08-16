@@ -15,6 +15,7 @@ import { TasksComponent } from './components/tasks.js';
 import { ScheduleComponent } from './components/schedule.js';
 import { SubtaskEditorComponent } from './components/subtask-editor.js';
 import { SettingsComponent } from './components/settings.js';
+import { TodoToolExecutor } from './tools/todo-tool-executor.js';
 import { initializeTodoEmbeddedBridge } from './embedded/shell-bridge.js';
 
 function assertMethod(owner, name, label) {
@@ -37,6 +38,7 @@ function assertIntegrations() {
   assertMethod(ScheduleComponent, 'showRepeatValidationError', 'ScheduleComponent');
   assertMethod(AppDataService, 'whenIdle', 'AppDataService');
   assertMethod(AppDataService, 'repairRepeatState', 'AppDataService');
+  assertMethod(TodoToolExecutor, 'executeRequest', 'TodoToolExecutor');
 }
 
 export async function startApplication({ runStage, setStorageErrorReporter }) {
@@ -58,7 +60,11 @@ export async function startApplication({ runStage, setStorageErrorReporter }) {
     ScheduleComponent.initRepeatEndUi();
     SubtaskEditorComponent.init();
     SettingsComponent.init();
-    initializeTodoEmbeddedBridge({ settingsComponent: SettingsComponent, appState: AppState });
+    initializeTodoEmbeddedBridge({
+      settingsComponent: SettingsComponent,
+      appState: AppState,
+      todoToolExecutor: TodoToolExecutor
+    });
   });
   console.log('✅ Apple Minimalist To-Do List Application Initialized with IndexedDB persistence.');
 }

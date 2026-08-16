@@ -1,3 +1,4 @@
+import { initializeTodoBridgeClient } from '../todo/todo-bridge-client.js';
 const SHELL_CHANNEL = 'mahdi-app-shell';
 const SHELL_VERSION = 1;
 const IS_EMBEDDED = new URLSearchParams(window.location.search).get('embedded') === '1';
@@ -78,6 +79,7 @@ export function initChatEmbeddedBridge({ navigateChat, openSettings, getState })
   if (!isEmbeddedSafe() || initialized) return false;
   initialized = true;
 
+  initializeTodoBridgeClient();
   installExternalLinkPolicy();
   observeTitle();
   observeAppearance(getState);

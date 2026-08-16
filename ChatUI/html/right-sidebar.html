@@ -1,91 +1,35 @@
 <aside class="right-sidebar collapsed" id="right-sidebar" aria-label="Control panel" aria-hidden="true" inert>
       <div class="right-sidebar-header">
         <span class="right-sidebar-title">Controls</span>
-        <button class="icon-btn-sm" id="close-right-sidebar-btn" title="Close panel" aria-label="Close panel">
-          <i data-lucide="x"></i>
-        </button>
+        <button class="icon-btn-sm" id="close-right-sidebar-btn" title="Close panel" aria-label="Close panel"><i data-lucide="x"></i></button>
       </div>
 
       <div class="right-sidebar-scrollable">
-        <!-- AI Tools Section -->
         <div class="right-sidebar-section">
           <div class="right-sidebar-section-title">AI TOOLS</div>
 
-          <div class="sidebar-tool-card">
+          <div class="sidebar-tool-card"><div class="sidebar-tool-info"><i data-lucide="search" class="tool-icon"></i><div class="tool-text"><span class="tool-name">Google Search</span><span class="tool-desc">Real-time web answers</span></div></div><label class="toggle-switch"><input type="checkbox" id="sidebar-toggle-google-search" /><span class="toggle-slider"></span></label></div>
+          <div class="sidebar-tool-card"><div class="sidebar-tool-info"><i data-lucide="link" class="tool-icon"></i><div class="tool-text"><span class="tool-name">URL Context</span><span class="tool-desc">Analyze prompt URLs</span></div></div><label class="toggle-switch"><input type="checkbox" id="sidebar-toggle-url-context" /><span class="toggle-slider"></span></label></div>
+          <div class="sidebar-tool-card"><div class="sidebar-tool-info"><i data-lucide="code-2" class="tool-icon"></i><div class="tool-text"><span class="tool-name">Code Execution</span><span class="tool-desc">Run Python code</span></div></div><label class="toggle-switch"><input type="checkbox" id="sidebar-toggle-code-execution" /><span class="toggle-slider"></span></label></div>
+          <div class="sidebar-tool-card"><div class="sidebar-tool-info"><i data-lucide="folder-tree" class="tool-icon"></i><div class="tool-text"><span class="tool-name">Workspace</span><span class="tool-desc">Read & manage Workspace files</span></div></div><label class="toggle-switch"><input type="checkbox" id="sidebar-toggle-workspace" /><span class="toggle-slider"></span></label></div>
+          <div class="sidebar-tool-card" data-tool="todo">
             <div class="sidebar-tool-info">
-              <i data-lucide="search" class="tool-icon"></i>
+              <i data-lucide="list-todo" class="tool-icon"></i>
               <div class="tool-text">
-                <span class="tool-name">Google Search</span>
-                <span class="tool-desc">Real-time web answers</span>
+                <span class="tool-name">To-Do</span>
+                <span class="tool-desc">Manage tasks, projects & tags</span>
+                <span class="tool-desc">AI may send Todo information it uses to your configured model endpoint.</span>
               </div>
             </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="sidebar-toggle-google-search" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-
-          <div class="sidebar-tool-card">
-            <div class="sidebar-tool-info">
-              <i data-lucide="link" class="tool-icon"></i>
-              <div class="tool-text">
-                <span class="tool-name">URL Context</span>
-                <span class="tool-desc">Analyze prompt URLs</span>
-              </div>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="sidebar-toggle-url-context" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-
-          <div class="sidebar-tool-card">
-            <div class="sidebar-tool-info">
-              <i data-lucide="code-2" class="tool-icon"></i>
-              <div class="tool-text">
-                <span class="tool-name">Code Execution</span>
-                <span class="tool-desc">Run Python code</span>
-              </div>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="sidebar-toggle-code-execution" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-
-          <div class="sidebar-tool-card">
-            <div class="sidebar-tool-info">
-              <i data-lucide="folder-tree" class="tool-icon"></i>
-              <div class="tool-text">
-                <span class="tool-name">Workspace</span>
-                <span class="tool-desc">Read & manage Workspace files</span>
-              </div>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="sidebar-toggle-workspace" />
-              <span class="toggle-slider"></span>
-            </label>
+            <label class="toggle-switch"><input type="checkbox" id="sidebar-toggle-todo" /><span class="toggle-slider"></span></label>
           </div>
         </div>
 
-        <!-- Quick Chat Actions Section -->
         <div class="right-sidebar-section">
           <div class="right-sidebar-section-title">CHAT ACTIONS</div>
-
-          <button class="sidebar-action-btn" id="right-sidebar-clear-chat-btn">
-            <i data-lucide="eraser"></i>
-            <span>Clear Messages</span>
-          </button>
-
-          <button class="sidebar-action-btn" id="right-sidebar-export-chat-btn">
-            <i data-lucide="download"></i>
-            <span>Export Chat</span>
-          </button>
-
-          <button class="sidebar-action-btn danger" id="right-sidebar-delete-chat-btn">
-            <i data-lucide="trash-2"></i>
-            <span>Delete Chat</span>
-          </button>
+          <button class="sidebar-action-btn" id="right-sidebar-clear-chat-btn"><i data-lucide="eraser"></i><span>Clear Messages</span></button>
+          <button class="sidebar-action-btn" id="right-sidebar-export-chat-btn"><i data-lucide="download"></i><span>Export Chat</span></button>
+          <button class="sidebar-action-btn danger" id="right-sidebar-delete-chat-btn"><i data-lucide="trash-2"></i><span>Delete Chat</span></button>
         </div>
       </div>
     </aside>
