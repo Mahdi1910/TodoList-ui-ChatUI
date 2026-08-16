@@ -62,9 +62,13 @@ try {
   overlayRoot.innerHTML = `${chatModals}${settingsModal}${voiceOverlay}${globalUi}`;
   if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
   await import('./app.js');
-  // TEMP_PERF_DIAGNOSTICS
-  const diagnosticsUi = await import('./diagnostics/performance-diagnostics-ui.js');
-  diagnosticsUi.initPerformanceDiagnosticsUI();
+
+  // Keep the existing temporary standalone diagnostics, but do not pay their
+  // extra listener/UI cost in the always-alive embedded Chat iframe.
+  if (!IS_EMBEDDED) {
+    const diagnosticsUi = await import('./diagnostics/performance-diagnostics-ui.js');
+    diagnosticsUi.initPerformanceDiagnosticsUI();
+  }
 } catch (error) {
   showLayoutFailure(error);
 }
