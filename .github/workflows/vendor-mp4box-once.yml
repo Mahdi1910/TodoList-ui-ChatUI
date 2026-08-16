@@ -1,0 +1,48 @@
+name: Vendor MP4Box Once
+
+on:
+  push:
+    branches:
+      - feature/gemini-aac-voice-recording
+    paths:
+      - vendor-mp4box.request
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: feature/gemini-aac-voice-recording
+
+      - name: Vendor mp4box 2.4.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          pushd "$workdir" >/dev/null
+          npm pack mp4box@2.4.1 --silent >/tmp/mp4box-package-name.txt
+          package_name="$(cat /tmp/mp4box-package-name.txt | tail -n 1)"
+          tar -xzf "$package_name"
+          popd >/dev/null
+
+          rm -rf ChatUI/js/vendor/mp4box
+          mkdir -p ChatUI/js/vendor/mp4box
+          cp "$workdir/package/dist/"*.mjs ChatUI/js/vendor/mp4box/
+          cp "$workdir/package/LICENSE" ChatUI/js/vendor/mp4box/LICENSE
+          printf 'mp4box 2.4.1\nSource: https://www.npmjs.com/package/mp4box/v/2.4.1\n' > ChatUI/js/vendor/mp4box/VERSION.txt
+          rm -f vendor-mp4box.request
+
+      - name: Commit vendored dependency
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ChatUI/js/vendor/mp4box vendor-mp4box.request
+          git commit -m "Vendor MP4Box 2.4.1 for AAC remuxing"
+          git push origin HEAD:feature/gemini-aac-voice-recording
