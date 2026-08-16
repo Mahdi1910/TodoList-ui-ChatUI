@@ -13,6 +13,8 @@ jobs:
           node-version: 22
       - name: Verify integration invariants
         run: node scripts/verify-integration.mjs
+      - name: Verify Todo tool behavior
+        run: node scripts/verify-todo-tools.mjs
       - name: Check integration JavaScript syntax
         run: |
           node --check shell/js/protocol.js
