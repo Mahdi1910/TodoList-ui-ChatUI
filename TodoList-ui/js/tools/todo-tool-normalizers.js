@@ -316,7 +316,7 @@ export function normalizeTaxonomyCreateInput(input, label) {
   return {
     data: {
       name: normalizeTitle(source.name, `${label}.name`),
-      icon: source.icon == null ? ' ' : normalizeText(source.icon, `${label}.icon`, 16, { allowEmpty: false }),
+      icon: source.icon == null ? '●' : normalizeText(source.icon, `${label}.icon`, 16, { allowEmpty: false }),
       parentId: source.parentId == null ? null : normalizeId(source.parentId, `${label}.parentId`),
       viewType: source.viewType || 'list'
     },
