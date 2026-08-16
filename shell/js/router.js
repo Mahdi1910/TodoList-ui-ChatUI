@@ -50,8 +50,15 @@ export function createShellRouter(onRoute) {
   let currentRoute = parseShellRoute(window.location.pathname);
   let lastChatPath = readStoredChatPath();
 
+  function rememberRouteIfChat(route) {
+    if (route?.app !== 'chat') return;
+    lastChatPath = route.path;
+    persistLastChatPath(lastChatPath);
+  }
+
   function emit(route, source) {
     currentRoute = route;
+    rememberRouteIfChat(route);
     onRoute?.(route, { source });
   }
 
