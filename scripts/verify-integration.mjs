@@ -37,7 +37,7 @@ assert(chatEmbedded.includes('/ChatUI/js/layout-loader.js'), 'Embedded Chat entr
 assert(chatLayoutLoader.includes('import.meta.url'), 'Chat fragments must resolve from the module URL.');
 assert(chatRouter.includes('embedded=1') || chatRouter.includes("get('embedded')"), 'Chat router must detect embedded mode.');
 assert(wrangler.includes('"not_found_handling": "none"'), 'Combined deployment must not SPA-fallback missing child assets.');
-assert(worker.includes('chat-ui/chat'), 'Worker must explicitly route public Chat deep links to the shell.');
+assert(worker.includes('chat-ui\\/chat') || worker.includes('chat-ui/chat'), 'Worker must explicitly route public Chat deep links to the shell.');
 
 const allTodoJs = (await walk(path.join(root, 'TodoList-ui', 'js'))).filter(file => file.endsWith('.js'));
 const allChatJs = (await walk(path.join(root, 'ChatUI', 'js'))).filter(file => file.endsWith('.js'));
