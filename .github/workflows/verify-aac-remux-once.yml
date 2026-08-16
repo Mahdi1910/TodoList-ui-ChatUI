@@ -25,6 +25,12 @@ jobs:
           node --input-type=module --check < ChatUI/js/composer/aac-remuxer.js
           node --input-type=module --check < ChatUI/js/composer/recorder.js
 
+      - name: Install FFmpeg
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+
       - name: Generate AAC-LC MP4 fixture
         shell: bash
         run: |
