@@ -21,12 +21,14 @@ function validPayloadSize(data) {
   catch (_) { return false; }
 }
 
-function toolFailure(code, message, details = {}) {
+function toolFailure(code, message, details = {}, meta = {}) {
+  const mutationOccurred = Boolean(meta.mutationOccurred);
+  const affectedCount = Math.max(0, Number(meta.affectedCount) || 0);
   return {
     ok: false,
-    overview: { message, affectedCount: 0 },
+    overview: { message, affectedCount },
     error: { code, message, details },
-    meta: { mutationOccurred: false }
+    meta: { ...meta, mutationOccurred, affectedCount }
   };
 }
 
@@ -72,7 +74,14 @@ export function createFrameBridge(frameManager, callbacks = {}) {
     const payload = { requestId: String(requestId || ''), result };
     const message = createShellMessage('shell:todo-tool-response', payload);
     if (!validPayloadSize(message)) {
-      payload.result = toolFailure('RESULT_TOO_LARGE', 'Todo result exceeded the 64 KiB Shell RPC limit. Narrow or paginate the request.');
+      const mutationOccurred = Boolean(result?.meta?.mutationOccurred);
+      const affectedCount = Math.max(0, Number(result?.overview?.affectedCount ?? result?.meta?.affectedCount) || 0);
+      payload.result = toolFailure(
+        'RESULT_TOO_LARGE',
+        'Todo result exceeded the 64 KiB Shell RPC limit. Narrow or paginate the request.',
+        { originalCode: result?.error?.code || null, mutationOccurred },
+        { mutationOccurred, affectedCount }
+      );
     }
     // A response is safe to defer while Chat itself is reloading. The mutation request is never deferred.
     frameManager.send('chat', createShellMessage('shell:todo-tool-response', payload));
