@@ -1,5 +1,6 @@
 .todo-app,
-#app {
+#app,
+[data-module-owner="todo"] {
   --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -19,7 +20,8 @@
 }
 
 .todo-app[data-theme="dark"],
-#app[data-theme="dark"] {
+#app[data-theme="dark"],
+[data-module-owner="todo"][data-theme="dark"] {
   --bg-primary: #121214;
   --bg-secondary: #1c1c1e;
   --bg-tertiary: #2c2c2e;
@@ -46,7 +48,8 @@
 }
 
 .todo-app[data-theme="light"],
-#app[data-theme="light"] {
+#app[data-theme="light"],
+[data-module-owner="todo"][data-theme="light"] {
   --bg-primary: #f5f5f7;
   --bg-secondary: #ffffff;
   --bg-tertiary: #e5e5ea;
