@@ -1,6 +1,10 @@
 /**
  * activity-timeline.js - Pure chronological activity model for streamed assistant turns.
+ *
+ * The timeline is presentation state only. Gemini protocol history must never be
+ * reconstructed from these records.
  */
+
 import { getCustomToolProvider } from '../tools/custom-tool-provider.js';
 
 const TOOL_PREVIEW_MAX_CHARS = 16 * 1024;
@@ -9,10 +13,14 @@ const TOOL_PREVIEW_MAX_ARRAY_ITEMS = 40;
 const TOOL_PREVIEW_MAX_OBJECT_KEYS = 60;
 const TOOL_PREVIEW_MAX_STRING_CHARS = 4000;
 
-function nowMs() { return Date.now(); }
+function nowMs() {
+  return Date.now();
+}
 
 function cloneScalar(value) {
-  if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
   return String(value);
 }
 
@@ -32,7 +40,8 @@ function safePreviewValue(value, depth, state) {
     return '[Max depth reached]';
   }
   if (Array.isArray(value)) {
-    const output = value.slice(0, TOOL_PREVIEW_MAX_ARRAY_ITEMS).map(item => safePreviewValue(item, depth + 1, state));
+    const output = value.slice(0, TOOL_PREVIEW_MAX_ARRAY_ITEMS)
+      .map(item => safePreviewValue(item, depth + 1, state));
     if (value.length > TOOL_PREVIEW_MAX_ARRAY_ITEMS) {
       state.truncated = true;
       output.push(`… [${value.length - TOOL_PREVIEW_MAX_ARRAY_ITEMS} more items]`);
@@ -42,7 +51,9 @@ function safePreviewValue(value, depth, state) {
   if (typeof value === 'object') {
     const output = {};
     const entries = Object.entries(value);
-    for (const [key, item] of entries.slice(0, TOOL_PREVIEW_MAX_OBJECT_KEYS)) output[key] = safePreviewValue(item, depth + 1, state);
+    for (const [key, item] of entries.slice(0, TOOL_PREVIEW_MAX_OBJECT_KEYS)) {
+      output[key] = safePreviewValue(item, depth + 1, state);
+    }
     if (entries.length > TOOL_PREVIEW_MAX_OBJECT_KEYS) {
       state.truncated = true;
       output.__truncatedKeys = entries.length - TOOL_PREVIEW_MAX_OBJECT_KEYS;
@@ -56,16 +67,25 @@ function safePreviewValue(value, depth, state) {
 function compactPreview(preview, state) {
   let serialized = '';
   try { serialized = JSON.stringify(preview); }
-  catch (_) { state.truncated = true; return '[Unserializable result]'; }
+  catch (_) {
+    state.truncated = true;
+    return '[Unserializable result]';
+  }
   if (serialized.length <= TOOL_PREVIEW_MAX_CHARS) return preview;
+
   state.truncated = true;
-  return { preview: `${serialized.slice(0, TOOL_PREVIEW_MAX_CHARS - 80)}… [truncated]` };
+  return {
+    preview: `${serialized.slice(0, TOOL_PREVIEW_MAX_CHARS - 80)}… [truncated]`
+  };
 }
 
 export function buildBoundedToolPreview(value) {
   const state = { truncated: false };
   const preview = safePreviewValue(value, 0, state);
-  return { value: compactPreview(preview, state), truncated: state.truncated };
+  return {
+    value: compactPreview(preview, state),
+    truncated: state.truncated
+  };
 }
 
 function basename(path = '') {
@@ -74,8 +94,8 @@ function basename(path = '') {
 }
 
 export function getToolProvider(name = '', toolType = '') {
-  const custom = getCustomToolProvider(name);
-  if (custom !== 'unknown') return custom;
+  const customProvider = getCustomToolProvider(name);
+  if (customProvider !== 'unknown') return customProvider;
   const normalizedType = String(toolType || '').toUpperCase();
   if (normalizedType.includes('GOOGLE_SEARCH')) return 'google-search';
   if (normalizedType.includes('URL_CONTEXT')) return 'url-context';
@@ -150,7 +170,15 @@ export function getToolDisplayTitle(activity) {
 }
 
 function createTextualActivity(session, type, start) {
-  return { id: `${session.messageId || 'assistant'}_activity_${++session.sequence}`, type, start, end: start, status: 'running', startedAt: nowMs(), completedAt: 0 };
+  return {
+    id: `${session.messageId || 'assistant'}_activity_${++session.sequence}`,
+    type,
+    start,
+    end: start,
+    status: 'running',
+    startedAt: nowMs(),
+    completedAt: 0
+  };
 }
 
 function closeLastTextual(session) {
@@ -174,12 +202,20 @@ function createToolActivity(session, event) {
   const sequence = ++session.sequence;
   const activity = {
     id: `${session.messageId || 'assistant'}_activity_${sequence}`,
-    type: 'tool', status: event.status || 'requested', provider,
-    name: String(event.name || event.toolType || 'tool'), toolType: event.toolType ? String(event.toolType) : '',
+    type: 'tool',
+    status: event.status || 'requested',
+    provider,
+    name: String(event.name || event.toolType || 'tool'),
+    toolType: event.toolType ? String(event.toolType) : '',
     callId: String(event.callId || event.id || `activity-call-${sequence}`),
     summary: event.summary || formatToolSummary({ provider, name: event.name, args: event.args || {}, toolType: event.toolType }),
-    args: argsPreview.value, argsTruncated: argsPreview.truncated,
-    resultPreview: null, resultTruncated: false, error: null, startedAt: nowMs(), completedAt: 0
+    args: argsPreview.value,
+    argsTruncated: argsPreview.truncated,
+    resultPreview: null,
+    resultTruncated: false,
+    error: null,
+    startedAt: nowMs(),
+    completedAt: 0
   };
   session.timeline.push(activity);
   return activity;
@@ -202,31 +238,76 @@ function updateToolResult(activity, event, status) {
 }
 
 export function createActivitySession({ messageId = '' } = {}) {
-  return { messageId, sequence: 0, content: '', thinking: '', timeline: [] };
+  return {
+    messageId,
+    sequence: 0,
+    content: '',
+    thinking: '',
+    timeline: []
+  };
 }
 
 export function applyActivityEvent(session, event = {}) {
   if (!session || !event?.type) return session;
   const last = session.timeline.at(-1);
+
   if (event.type === 'thinking.delta') {
-    const delta = String(event.delta || ''); if (!delta) return session;
-    const start = session.thinking.length; session.thinking += delta;
+    const delta = String(event.delta || '');
+    if (!delta) return session;
+    const start = session.thinking.length;
+    session.thinking += delta;
     let activity = last && last.type === 'thinking' && last.status === 'running' ? last : null;
-    if (!activity) { closeLastTextual(session); activity = createTextualActivity(session, 'thinking', start); session.timeline.push(activity); }
-    activity.end = session.thinking.length; return session;
+    if (!activity) {
+      closeLastTextual(session);
+      activity = createTextualActivity(session, 'thinking', start);
+      session.timeline.push(activity);
+    }
+    activity.end = session.thinking.length;
+    return session;
   }
+
   if (event.type === 'text.delta') {
-    const delta = String(event.delta || ''); if (!delta) return session;
-    const start = session.content.length; session.content += delta;
+    const delta = String(event.delta || '');
+    if (!delta) return session;
+    const start = session.content.length;
+    session.content += delta;
     let activity = last && last.type === 'text' && last.status === 'running' ? last : null;
-    if (!activity) { closeLastTextual(session); activity = createTextualActivity(session, 'text', start); session.timeline.push(activity); }
-    activity.end = session.content.length; return session;
+    if (!activity) {
+      closeLastTextual(session);
+      activity = createTextualActivity(session, 'text', start);
+      session.timeline.push(activity);
+    }
+    activity.end = session.content.length;
+    return session;
   }
-  if (event.type.endsWith('.requested')) { createToolActivity(session, { ...event, status: 'requested' }); return session; }
-  if (event.type.endsWith('.running')) { const activity = findTool(session, String(event.callId || event.id || '')) || createToolActivity(session, event); updateToolResult(activity, event, 'running'); return session; }
-  if (event.type.endsWith('.completed')) { const activity = findTool(session, String(event.callId || event.id || '')) || createToolActivity(session, event); updateToolResult(activity, event, 'completed'); return session; }
-  if (event.type.endsWith('.failed')) { const activity = findTool(session, String(event.callId || event.id || '')) || createToolActivity(session, event); updateToolResult(activity, event, 'failed'); return session; }
-  if (event.type.endsWith('.interrupted')) { const activity = findTool(session, String(event.callId || event.id || '')) || createToolActivity(session, event); updateToolResult(activity, event, 'interrupted'); }
+
+  if (event.type.endsWith('.requested')) {
+    createToolActivity(session, { ...event, status: 'requested' });
+    return session;
+  }
+
+  if (event.type.endsWith('.running')) {
+    const activity = findTool(session, String(event.callId || event.id || '')) || createToolActivity(session, event);
+    updateToolResult(activity, event, 'running');
+    return session;
+  }
+
+  if (event.type.endsWith('.completed')) {
+    const activity = findTool(session, String(event.callId || event.id || '')) || createToolActivity(session, event);
+    updateToolResult(activity, event, 'completed');
+    return session;
+  }
+
+  if (event.type.endsWith('.failed')) {
+    const activity = findTool(session, String(event.callId || event.id || '')) || createToolActivity(session, event);
+    updateToolResult(activity, event, 'failed');
+    return session;
+  }
+
+  if (event.type.endsWith('.interrupted')) {
+    const activity = findTool(session, String(event.callId || event.id || '')) || createToolActivity(session, event);
+    updateToolResult(activity, event, 'interrupted');
+  }
   return session;
 }
 
@@ -235,10 +316,12 @@ export function finalizeActivitySession(session, mode = 'completed') {
   const completedAt = nowMs();
   for (const activity of session.timeline) {
     if (['text', 'thinking'].includes(activity.type) && activity.status === 'running') {
-      activity.status = mode === 'completed' ? 'completed' : mode; activity.completedAt = completedAt;
+      activity.status = mode === 'completed' ? 'completed' : mode;
+      activity.completedAt = completedAt;
     }
     if (activity.type === 'tool' && ['requested', 'running'].includes(activity.status)) {
-      activity.status = mode === 'completed' ? 'interrupted' : mode; activity.completedAt = completedAt;
+      activity.status = mode === 'completed' ? 'interrupted' : mode;
+      activity.completedAt = completedAt;
     }
   }
   return session;
@@ -250,7 +333,15 @@ function sanitizeTextualActivity(item, sourceLength) {
   const rawEnd = Number.isInteger(Number(item?.end)) ? Number(item.end) : rawStart;
   const start = Math.max(0, Math.min(length, rawStart));
   const end = Math.max(start, Math.min(length, rawEnd));
-  return { id: String(item?.id || ''), type: item.type, start, end, status: ['running', 'completed', 'interrupted', 'failed'].includes(item?.status) ? item.status : 'completed', startedAt: Number(item?.startedAt) || 0, completedAt: Number(item?.completedAt) || 0 };
+  return {
+    id: String(item?.id || ''),
+    type: item.type,
+    start,
+    end,
+    status: ['running', 'completed', 'interrupted', 'failed'].includes(item?.status) ? item.status : 'completed',
+    startedAt: Number(item?.startedAt) || 0,
+    completedAt: Number(item?.completedAt) || 0
+  };
 }
 
 function sanitizeToolActivity(item) {
@@ -258,11 +349,21 @@ function sanitizeToolActivity(item) {
   const result = buildBoundedToolPreview(item?.resultPreview);
   const error = item?.error == null ? { value: null, truncated: false } : buildBoundedToolPreview(item.error);
   return {
-    id: String(item?.id || ''), type: 'tool', status: ['requested', 'running', 'completed', 'failed', 'interrupted'].includes(item?.status) ? item.status : 'completed',
-    provider: String(item?.provider || 'unknown'), name: String(item?.name || 'tool'), toolType: String(item?.toolType || ''), callId: String(item?.callId || ''), summary: String(item?.summary || ''),
-    args: args.value, argsTruncated: !!item?.argsTruncated || args.truncated, resultPreview: result.value,
-    resultTruncated: !!item?.resultTruncated || result.truncated || error.truncated, error: error.value,
-    startedAt: Number(item?.startedAt) || 0, completedAt: Number(item?.completedAt) || 0
+    id: String(item?.id || ''),
+    type: 'tool',
+    status: ['requested', 'running', 'completed', 'failed', 'interrupted'].includes(item?.status) ? item.status : 'completed',
+    provider: String(item?.provider || 'unknown'),
+    name: String(item?.name || 'tool'),
+    toolType: String(item?.toolType || ''),
+    callId: String(item?.callId || ''),
+    summary: String(item?.summary || ''),
+    args: args.value,
+    argsTruncated: !!item?.argsTruncated || args.truncated,
+    resultPreview: result.value,
+    resultTruncated: !!item?.resultTruncated || result.truncated || error.truncated,
+    error: error.value,
+    startedAt: Number(item?.startedAt) || 0,
+    completedAt: Number(item?.completedAt) || 0
   };
 }
 
@@ -278,11 +379,27 @@ export function sanitizeActivityTimeline(timeline, { content = '', thinking = ''
 }
 
 export function snapshotActivitySession(session) {
-  return { content: String(session?.content || ''), thinking: String(session?.thinking || ''), activityTimeline: sanitizeActivityTimeline(session?.timeline || [], { content: session?.content || '', thinking: session?.thinking || '' }) || [] };
+  return {
+    content: String(session?.content || ''),
+    thinking: String(session?.thinking || ''),
+    activityTimeline: sanitizeActivityTimeline(session?.timeline || [], {
+      content: session?.content || '',
+      thinking: session?.thinking || ''
+    }) || []
+  };
 }
 
 export function createFallbackTextTimeline(messageId, content) {
-  const text = String(content || ''); if (!text) return [];
+  const text = String(content || '');
+  if (!text) return [];
   const timestamp = nowMs();
-  return [{ id: `${messageId || 'assistant'}_activity_fallback`, type: 'text', start: 0, end: text.length, status: 'completed', startedAt: timestamp, completedAt: timestamp }];
+  return [{
+    id: `${messageId || 'assistant'}_activity_fallback`,
+    type: 'text',
+    start: 0,
+    end: text.length,
+    status: 'completed',
+    startedAt: timestamp,
+    completedAt: timestamp
+  }];
 }
