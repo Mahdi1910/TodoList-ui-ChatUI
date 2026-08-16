@@ -111,6 +111,8 @@ assert(executorSource.includes('this._tail.then(work, work)'), 'Todo tool queue 
 assert(executorSource.includes('this._tail = run.catch(() => {})'), 'Todo tool queue tail must stay recoverable.');
 assert(executorSource.includes('failRunningStages(operations)'), 'Failed multi-stage Todo operations must label the attempted stage as failed.');
 assert(executorSource.includes("const parentChanged = spec.parentSpecified && (current.parentId || null) !== targetParentId"), 'Repeating the same taxonomy parent must not reorder the entity to bottom.');
+assert(executorSource.includes('const prePositionPatch = { ...remainingPatch }'), 'Hierarchy+position updates must apply safe sort-affecting fields before taking a Custom-order snapshot.');
+assert(executorSource.includes('syncViewFromCurrentFilter?.();'), 'Workspace navigation must synchronize the new target view before applying a requested viewType.');
 assert(managerSource.includes('record.readyPromise = null'), 'Shared frame readiness promise must clear after settlement.');
 assert(!normalizerSource.includes('Object.protype'), 'Runtime Object.prototype typo must never return.');
 assert(selectorSource.includes('const includeCounts = args.includeCounts !== false'), 'Project/Tag counts must default to included.');
