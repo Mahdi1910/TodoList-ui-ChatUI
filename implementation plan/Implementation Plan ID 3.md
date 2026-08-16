@@ -4,862 +4,354 @@
 
 **Plan only. Do not implement until reviewed/approved.**
 
+Revision note: this version incorporates the source-validated findings from `implementation plan/Review Implementation Plan ID 3.md`, checked against current `main` after the review was added.
+
 ---
 
 # 1. Goal
 
-Add a new **To-Do AI tool** to ChatUI, presented with the same tool-card/toggle experience as the current Google Search, URL Context, Code Execution, and Workspace tools.
+Add a new **To-Do AI tool** to ChatUI with the same general tool-card/toggle experience as Google Search, URL Context, Code Execution, and Workspace.
 
-When the To-Do tool is enabled, Gemini should be able to read and control the existing TodoList application through a small, clear set of local function tools. The AI must be able to create, update, delete, organize, schedule, complete, search, and navigate Todo data without duplicating Todo business logic inside ChatUI.
+When enabled, Gemini can read and control the existing TodoList application through a small set of local function tools. It can find, create, update, delete, organize, schedule, complete/activate, search, and navigate Todo data without duplicating Todo business logic inside ChatUI.
 
-The feature must work while Todo is visible **or hidden**. This is important for normal chat and Live Voice. Example target flow:
+The feature must work while Todo is visible **or hidden**, including normal Chat and Live Voice.
+
+Target flow:
 
 ```text
-User is in ChatUI / Live Voice
+User in ChatUI / Live Voice
         ↓
-"Create a task called Study AI for tomorrow at 7 PM,
- high priority, remind me 30 minutes before"
+Gemini chooses a todo_* function
         ↓
-Gemini calls todo_create_tasks
+ChatUI custom-function executor
         ↓
-ChatUI sends a local tool request through the combined-app shell
+Shell exact-origin RPC bridge
         ↓
-Todo iframe executes against its real AppDataService
+Todo iframe tool executor
         ↓
-IndexedDB is updated
+existing AppDataService / hierarchy / taxonomy / repeat logic
         ↓
-AppState is updated
+IndexedDB
         ↓
-Todo UI re-renders immediately, even while hidden
+AppStateSync
         ↓
-Structured function result returns to Gemini
+Todo UI reconciliation
         ↓
-Gemini confirms the action
-        ↓
-User switches to Todo
-        ↓
-The new task is already visible; no refresh is required
+structured function result returns to Gemini
 ```
 
-This plan intentionally designs an **MCP-inspired local tool surface**, but it does **not** add an external MCP server. ChatUI already has a working Gemini client-side custom-function loop, and both apps already run as persistent same-origin iframes inside one shell. A network MCP server would add latency, authentication, another persistence boundary, and unnecessary duplication.
+When the user later switches to Todo, the new state must already be visible without a page refresh.
+
+This is an **MCP-inspired local function surface**, not a new network MCP server. ChatUI already has a working Gemini client-side custom-function loop and both applications already run in persistent same-origin iframes. Adding another network server would add unnecessary latency, authentication, persistence, and failure boundaries.
+
+### Important reminder limitation
+
+Current Todo supports **reminder configuration/storage**, but it does not yet have a completed browser/system notification-delivery engine.
+
+Therefore this implementation may configure reminder metadata such as “30 minutes before”, but tool descriptions/results and Gemini-facing guidance must **not promise that a real notification will fire**. A separate Todo problem remains responsible for real reminder delivery.
 
 ---
 
-# 2. Primary design decisions
+# 2. Review findings incorporated
 
-## 2.1 Keep the AI tool set small
+The review was checked against the actual application source. All of its 32 main findings are valid, and its additional semantic items A–F are also valid.
 
-Do not expose every small Todo action as a separate function.
+The revised plan therefore adds or changes these rules:
 
-For example, do **not** create separate tools such as:
+1. reminder configuration must not be described as guaranteed notification delivery;
+2. Todo RPC is never queued while the Todo iframe is not READY;
+3. mutation timeouts have idempotency/unknown-outcome rules to prevent duplicate retries;
+4. one item can partially mutate, so `PARTIAL_MUTATION` is distinct from batch `PARTIAL_FAILURE`;
+5. task updates use a final-state hierarchy planner, not one fixed update order;
+6. open Todo editors get optimistic-concurrency/lost-update protection;
+7. creating a subtask under a completed parent is rejected;
+8. AI dates/times are strictly validated before Todo services see them;
+9. repeat input is strictly validated before tolerant RepeatEngine normalization;
+10. AI-facing yearly repeat months use 1–12, not JavaScript 0–11;
+11. reminder conversion uses deterministic IDs through the normal task aggregate path;
+12. completion-state transitions cannot be combined with explicit position in one v1 item;
+13. current-view reads use the same family-aware display semantics as Todo rendering;
+14. read tools wait for pending Todo writes with `AppDataService.whenIdle()`;
+15. UI reconciliation runs after any durable mutation, including partial failures;
+16. Todo capability follows every frame lifecycle transition;
+17. generation tool permission uses the generation’s `activeTools` snapshot, not a live checkbox lookup;
+18. responses are size-bounded as well as requests;
+19. the 32 KiB/128 KiB protocol cap is selected before generic validation rejects a message;
+20. stable tool error codes come from prevalidation/known branches, not parsing English service errors;
+21. mutation results report real side-effect IDs, especially repeat/family changes;
+22. custom-sort activation uses the same full snapshot semantics as the current UI;
+23. project/tag parent+position changes use a deterministic taxonomy planner;
+24. task filter/count descendant and completed-state semantics are explicit;
+25. duplicate IDs in update batches are rejected before mutation;
+26. Gemini declarations use the schema style the existing ChatUI endpoint actually accepts;
+27. destructive deletes require Chat-side user approval before dispatch;
+28. the To-Do UI explains that selected Todo data used by AI tools is sent to the configured Gemini endpoint;
+29. ordinary Todo business failures stay structured inside the existing Gemini function loop;
+30. custom provider classification is centralized for Workspace/Todo;
+31. UI distinguishes saved Todo preference from live capability availability;
+32. CI/static/pure-JS/manual tests are expanded for the new bridge and modules.
 
-```text
-move_task
-complete_task
-reopen_task
-set_task_date
-clear_task_date
-set_task_time
-clear_task_time
-set_task_priority
-clear_task_priority
-set_task_repeat
-clear_task_repeat
-set_task_reminder
-clear_task_reminders
-create_subtask
-create_subproject
-create_subtag
-reorder_task
-reorder_subtask
-reorder_project
-reorder_tag
-```
+Additional clarified rules:
 
-These operations can be represented as fields of the main create/update functions and then translated internally into the correct existing Todo services.
+- AI task creation defaults to **no reminder** unless one is explicitly supplied;
+- a task whose final state is a subtask cannot also specify `projectId` because project is inherited;
+- position results distinguish persistent custom order from current sorted visual order;
+- project/tag deletion returns final parent IDs of promoted/reparented children;
+- update results carry original input index;
+- iframe reload during an in-flight mutation is treated as an uncertain outcome, never an automatic safe retry.
 
-## 2.2 One tool handles one or many objects
+---
 
-Do not create both:
+# 3. External tool/MCP design lessons retained
 
-```text
-create_task
-create_batch_tasks
-```
+Research used for the original plan remains useful:
 
-Use one plural tool:
+- MCP-style tools should have clear names, descriptions, bounded structured inputs, and explicit read/write/destructive metadata.
+- GitHub MCP demonstrates the value of keeping enabled tool surfaces small because excessive tools increase context and can reduce tool-selection quality.
+- Linear favors entity-centered find/create/update operations instead of one tool per UI action.
+- Notion demonstrates one plural create operation handling one or many objects.
+- Todoist/TickTick/task-board integrations show useful rich task properties, while also showing that mirroring every upstream action as a separate AI tool creates unnecessary fragmentation.
+- Taskboard-style designs show the value of AI and UI sharing one authoritative data path so AI-created items appear in the board immediately.
+
+Plan decision: expose a **small, entity-centered Todo surface** and let the Todo adapter translate it into the application’s existing specialized services.
+
+---
+
+# 4. Primary architectural rules
+
+## 4.1 Keep exactly 14 public Todo tools in v1
+
+Do not add separate public tools for move, complete, activate, set/clear date, set/clear time, reminders, repeat, priority, subtask creation, subproject creation, subtag creation, or individual reorder operations.
+
+Those capabilities belong inside create/update contracts.
+
+## 4.2 One plural tool handles one or many objects
+
+Use:
 
 ```text
 todo_create_tasks
+todo_update_tasks
+todo_delete_tasks
 ```
 
-with an array. An array with one element creates one task. An array with many elements creates many tasks.
+rather than separate single/batch variants.
 
-Apply the same principle to update/delete and to projects/tags.
+The same applies to projects and tags.
 
-Do **not** parse commas or semicolons as artificial task separators. Structured arrays are unambiguous and allow titles/descriptions to contain normal punctuation.
+Structured arrays must be used. Do not parse commas/semicolons as fake item separators.
 
-## 2.3 No public reorder tool in v1
+## 4.3 Existing objects are mutated by canonical ID
 
-Do not expose `todo_reorder_items` as an additional AI tool.
+Names are for conversation/readability. Existing objects must be resolved to canonical IDs before writes.
 
-Instead, task/project/tag create and update records receive an optional semantic `position` object. The Todo-side adapter translates that semantic request into the existing hierarchy/drag/order service methods.
+If “Study” is ambiguous, Gemini reads first, then mutates the intended ID.
 
-The AI should never calculate or manipulate raw `sortOrder` numbers.
+Do not invent IDs.
 
-Example:
+## 4.4 No direct ChatUI write into Todo state/storage
 
-```json
-{
-  "position": {
-    "placement": "after",
-    "relativeToId": "task-123"
-  }
-}
-```
-
-Supported placements:
+Hard rule:
 
 ```text
-top
-bottom
-before
-after
+ChatUI must not import Todo AppDataService,
+write TodoListDB,
+mutate Todo AppState,
+or reach into Todo DOM/globals.
 ```
 
-`relativeToId` is required only for `before`/`after`.
+Todo owns Todo business logic.
 
-## 2.4 Mutations require canonical IDs
+## 4.5 Reuse the existing Gemini custom-function loop
 
-The AI can talk to the user in names, but write tools should use canonical IDs for existing objects.
+Do not create another function-calling engine.
 
-Example:
+Current ChatUI already handles declarations, streamed function calls, client execution, `functionResponse`, multiple rounds, AbortSignal, activity display, and structured `{ok:false}` results.
+
+Todo plugs into that path beside Workspace.
+
+## 4.6 Normal Chat and Live Voice use the same Todo tools
+
+No voice-specific Todo tool engine.
+
+Live Voice sends its turn through normal `sendMessage()` / generation flow, so the same declarations/executor must be reused.
+
+## 4.7 No Todo RPC may use the shell’s deferred frame queue
+
+The existing frame manager queues normal messages while a frame is not READY. That behavior must **never** be used for Todo read or mutation RPC.
+
+Todo RPC must use an immediate-only path such as:
 
 ```text
-User: Move "Study AI" to University.
-
-AI:
-1. todo_find_tasks(query="Study AI")
-2. todo_list_projects(query="University")
-3. todo_update_tasks(task id + project id)
+frameManager.sendIfReady(app, message)
 ```
 
-This prevents the wrong object from being changed when duplicate names exist.
-
-Create operations naturally do not require an existing object ID.
-
-## 2.5 Reuse the real Todo service layer
-
-The new AI executor must **not** write directly to IndexedDB, mutate `AppState` manually, or reproduce repeat/reminder/hierarchy rules.
-
-The execution path must remain:
+Behavior:
 
 ```text
-Todo AI adapter
-   ↓
-AppDataService
-   ↓
-IndexedDB transaction(s)
-   ↓
-AppStateSync
-   ↓
-Todo UI refresh
+Todo READY + todo-tools-v1 capability → send immediately
+otherwise → fail immediately with TODO_UNAVAILABLE
 ```
 
-## 2.6 Use the existing ChatUI Gemini function loop
-
-Do not create a second function-calling engine.
-
-Current ChatUI already:
-
-- builds Gemini custom function declarations;
-- receives streamed `functionCall` parts;
-- executes local custom functions;
-- sends matching `functionResponse` parts back to Gemini;
-- preserves model content/thought signatures;
-- renders tool activity in the assistant timeline.
-
-The To-Do integration should register itself through the existing custom-function registry just like Workspace.
-
-## 2.7 Live Voice uses exactly the same tools
-
-Do not build a separate voice-specific Todo integration.
-
-Live Voice ultimately uses the normal chat generation path, so once `state.tools.todo` is enabled and the normal custom function registry knows the Todo tools, voice requests should automatically receive the same capability.
+No stale request may execute after a later iframe retry/recovery.
 
 ---
 
-# 3. External MCP/task-manager research
+# 5. Final public AI tool inventory
 
-The tool design below was based on current MCP specification guidance plus multiple real Todo/Kanban/ticket integrations.
-
-## 3.1 Model Context Protocol specification
-
-Sources:
-
-- https://modelcontextprotocol.io/specification/2025-11-25/schema
-- https://modelcontextprotocol.io/specification/2025-06-18/schema
-
-Relevant patterns:
-
-- a tool has a clear `name`, human-readable description/title, JSON Schema `inputSchema`, and optionally `outputSchema`;
-- the current schema defaults to JSON Schema 2020-12 when `$schema` is omitted;
-- tool annotations include `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint`;
-- annotations are hints, not enforcement.
-
-Plan decision:
-
-Keep an internal metadata descriptor for every Todo function so its read/write/destructive characteristics are explicit even though the current Gemini function declaration format does not directly use all MCP annotations.
-
-All Todo tools are local/closed-world, so conceptually:
-
-```text
-openWorldHint = false
-```
-
-## 3.2 GitHub official MCP server
-
-Source:
-
-- https://github.com/github/github-mcp-server
-
-GitHub explicitly supports toolsets and individual tool selection to reduce context size and improve the model's tool choice. It also has dynamic tool discovery because enabling too many tools can confuse models.
-
-Plan decision:
-
-- expose Todo declarations **only while the To-Do toggle is enabled**;
-- keep the public Todo surface small;
-- do not create dozens of micro-tools.
-
-## 3.3 Linear MCP
-
-Source:
-
-- https://linear.app/docs/mcp
-
-Linear describes its MCP around finding, creating, and updating major entities such as issues/projects/comments rather than making every UI action a separate function.
-
-Plan decision:
-
-Use entity-centered operations: find/create/update/delete tasks, projects, and tags.
-
-## 3.4 Notion MCP
-
-Source:
-
-- https://developers.notion.com/guides/mcp/mcp-supported-tools
-
-Important pattern:
-
-`notion-create-pages` creates **one or more pages** with one tool. Notion also has broad update operations that can change many properties.
-
-Plan decision:
-
-Use plural array-capable tools instead of separate single/batch variants.
-
-## 3.5 Todoist API / Todo MCP implementations
-
-Sources:
-
-- https://developer.todoist.com/api/v1/
-- https://github.com/Hint-Services/mcp-todoist
-
-Todoist internally has specialized movement/reorder commands, and third-party Todoist MCP implementations often expose separate move/complete tools. The Hint Services MCP also demonstrates one create tool accepting a `tasks` array for batch creation.
-
-Plan decision:
-
-Use the useful batch pattern, but hide Todo's internal movement/reorder mechanics behind `todo_update_tasks` + optional semantic `position`.
-
-## 3.6 TickTick connector inspected during planning
-
-The connected TickTick tool set exposes approximately 50 functions, including:
-
-```text
-create_task
-update_task
-delete_task
-complete_task
-move_task
-batch_add_tasks
-batch_update_tasks
-list_projects
-create_project
-update_project
-list_tags
-filter_tasks
-...
-```
-
-Its task object contains useful examples of full-property task arguments such as project, title, description/content, dates, priority, reminders, repeat, tags, parent, status, and sort order.
-
-Plan decision:
-
-Use that comprehensive task-property idea, but **do not copy its duplicate single/batch/move/complete tool fragmentation**.
-
-## 3.7 Taskboard MCP
-
-Source:
-
-- https://github.com/tcarac/taskboard
-
-Taskboard exposes 22 MCP tools for projects, tickets, teams, board state, and subtasks. Its Web UI and MCP operate over the same SQLite source of truth, so MCP-created tickets appear in the board without maintaining a second data model.
-
-Plan decision:
-
-Our equivalent should operate through Todo's existing authoritative service/state/IndexedDB path and then refresh the mounted UI immediately.
-
-## 3.8 Microsoft To Do MCP examples
-
-Sources:
-
-- https://github.com/jordanburke/microsoft-todo-mcp-server
-- https://github.com/MAG-Cie/mcp-microsoft-todo
-
-These servers use conventional read/create/update/delete task operations and provide full task properties on create/update. Some expose separate completion/move/batch tools due to their upstream API shapes.
-
-Plan decision:
-
-Our public schema does not need to mirror an upstream API. We can expose a simpler AI-facing contract and let the Todo adapter orchestrate the app's internal services.
-
-## 3.9 Kanban/board MCP examples
-
-Sources:
-
-- https://github.com/ChristianJStarr/kanboard-mcp
-- https://github.com/tcarac/taskboard
-
-These show a recurring useful pattern: read current board/state, create/update/delete primary entities, and move/order internally.
-
-Plan decision:
-
-Add one workspace-state reader and one workspace-state updater so the AI can understand/navigate/change the actual Todo UI without needing multiple view-specific tools.
-
----
-
-# 4. Current ChatUI architecture verified before planning
-
-## 4.1 Existing custom-function registry
-
-File:
-
-```text
-ChatUI/js/tools/function-tool-registry.js
-```
-
-Current registry only loads Workspace declarations when `activeTools.workspace` is enabled and routes Workspace calls to its executor.
-
-This is the correct extension point for Todo.
-
-Target shape:
-
-```text
-activeTools.workspace → WORKSPACE_FUNCTION_DECLARATIONS
-activeTools.todo      → TODO_FUNCTION_DECLARATIONS
-```
-
-and:
-
-```text
-workspace_* → executeWorkspaceToolCall(...)
-todo_*      → executeTodoToolCall(...)
-```
-
-## 4.2 Gemini already has the required execution loop
-
-File:
-
-```text
-ChatUI/js/api/gemini.js
-```
-
-Current behavior already performs iterative custom function execution and feeds `functionResponse` results back to Gemini.
-
-Do not alter the fundamental loop.
-
-Todo-specific work here should be limited to generic provider labeling/error wording if necessary. Current messages that say `Workspace tool loop` should become provider-neutral `custom tool loop` wording because Workspace will no longer be the only client function provider.
-
-## 4.3 Existing tool toggle UI
-
-Files:
-
-```text
-ChatUI/html/main-chat.html
-ChatUI/html/right-sidebar.html
-ChatUI/js/composer/composer.js
-ChatUI/js/state/store.js
-ChatUI/js/storage/load.js
-```
-
-Current tool choices are duplicated in:
-
-- compact composer Tools popup;
-- right-side AI Tools panel;
-- active-tool indicator pills.
-
-Add a To-Do card with the same visual structure.
-
-Recommended UI label:
-
-```text
-To-Do
-```
-
-Recommended icon:
-
-```text
-list-todo
-```
-
-Recommended description:
-
-```text
-Manage tasks, projects & tags
-```
-
-Add state:
-
-```js
-tools: {
-  googleSearch: false,
-  urlContext: false,
-  codeExecution: false,
-  workspace: false,
-  todo: false
-}
-```
-
-No IndexedDB schema migration is required because tools are already stored inside the existing app settings object.
-
-### Small maintainability improvement
-
-While adding To-Do, replace the repeated hard-coded JS toggle/pill wiring with one small tool UI descriptor list, for example:
-
-```text
-key
-label
-icon
-popupToggleId
-sidebarToggleId
-isAvailable()
-```
-
-This avoids adding another set of repeated `if (toggle...)` blocks every time a future tool is introduced.
-
-Do not refactor unrelated composer behavior.
-
-## 4.4 Tool activity timeline already supports custom tools
-
-File:
-
-```text
-ChatUI/js/chat/activity-timeline.js
-```
-
-Current provider detection explicitly recognizes `workspace_` functions and otherwise labels unknown custom functions as generic tools.
-
-Add:
-
-```text
-todo_* → provider "todo"
-```
-
-Add concise summaries such as:
-
-```text
-Created 3 tasks
-Updated 1 task
-Deleted 2 tasks
-Listed projects
-Updated To-Do view
-```
-
-The tool activity preview is already bounded/truncated, which is useful for batch Todo results.
-
----
-
-# 5. Current Todo architecture verified before planning
-
-## 5.1 Todo's authoritative mutation layer already exists
-
-Files:
-
-```text
-TodoList-ui/js/storage/data-service.js
-TodoList-ui/js/storage/data-service-taxonomy.js
-TodoList-ui/js/storage/data-service-hierarchy.js
-TodoList-ui/js/storage/data-service-drag.js
-TodoList-ui/js/storage/data-service-taxonomy-drag.js
-TodoList-ui/js/storage/data-service-reminders.js
-```
-
-Important existing capabilities include:
-
-- serialized write queue through `AppDataService.enqueue()`;
-- task create/update/delete;
-- completion/repeat lifecycle;
-- project/tag create/update/delete;
-- task hierarchy link/unlink/reparent/order;
-- project/tag hierarchy/order;
-- persisted sort/group settings;
-- reminder normalization/storage.
-
-The tool integration should orchestrate these functions rather than creating a parallel data layer.
-
-## 5.2 Task model
-
-File:
-
-```text
-TodoList-ui/js/task-model.js
-```
-
-Current task properties include:
-
-```text
-id
-title
-description
-project
-parentTaskId
-priority
-tags
-reminders
-repeat
-dueDate
-dueTime
-completed
-sortOrder
-createdAt
-updatedAt
-```
-
-AI-facing names should use clearer forms such as:
-
-```text
-projectId
-tagIds
-parentTaskId
-```
-
-The adapter maps them to the app's internal task shape.
-
-## 5.3 Completion must use existing repeat-aware behavior
-
-`AppDataService.updateTask()` currently preserves the existing completion state. Completion changes are handled by `toggleTaskStatus()`.
-
-Therefore `todo_update_tasks` can expose a simple desired value:
-
-```json
-{ "completed": true }
-```
-
-but the Todo adapter must implement it by comparing desired/current state and calling `toggleTaskStatus()` only when a state change is required.
-
-This preserves existing repeating-task behavior, including creation of the next occurrence.
-
-No separate `complete_task` or `reopen_task` AI tool is needed.
-
-## 5.4 Parent/subtask movement requires hierarchy services
-
-A subtask is a normal task with `parentTaskId`.
-
-The public AI tool may expose:
-
-```json
-{ "parentTaskId": "task-123" }
-```
-
-or:
-
-```json
-{ "parentTaskId": null }
-```
-
-but internally this must route through the hierarchy service rather than attempting to force `parentTaskId` through ordinary `updateTask()`.
-
-Existing hierarchy restrictions must remain authoritative, including:
-
-- a task cannot parent itself;
-- parent must be a valid normal/root task;
-- completed tasks cannot be used as parents;
-- hierarchy cycles/unsupported nested structures must remain rejected;
-- when a task becomes a subtask, project inheritance follows the parent.
-
-## 5.5 Ordering already has correct internal service methods
-
-Task hierarchy/order services support before/after relationships and sibling-scope renumbering. Taxonomy drag services do the same for projects/tags and protect against cycles.
-
-This is why public AI schemas should use semantic positions and not expose raw sort numbers.
-
-## 5.6 Project/tag delete semantics must be documented accurately
-
-Current project deletion does **not** mean "delete every task in the project".
-
-Existing behavior:
-
-- remove the selected project;
-- tasks directly assigned to it become unassigned/Inbox tasks;
-- direct child projects are promoted/reparented according to current taxonomy delete behavior.
-
-Current tag deletion:
-
-- removes the tag itself;
-- removes that tag assignment from affected tasks;
-- child tags are reparented according to existing taxonomy behavior.
-
-The AI tool descriptions/results must state these effects clearly.
-
-## 5.7 Reminder model
-
-Built-in reminder definitions currently include:
-
-```text
-On time
-5 minutes before
-10 minutes before
-15 minutes before
-30 minutes before
-1 hour before
-2 hours before
-3 hours before
-1 day before
-```
-
-Custom reminders are already supported by Todo's reminder service.
-
-Do not expose internal reminder IDs to Gemini. Use an AI-friendly schema:
-
-```json
-{
-  "reminders": [
-    { "minutesBefore": 30 },
-    { "minutesBefore": 1440 }
-  ]
-}
-```
-
-The Todo adapter converts minutes into an existing built-in ID or existing custom reminder representation.
-
-An empty array clears reminders.
-
-## 5.8 Repeat model
-
-File:
-
-```text
-TodoList-ui/js/repeat/repeat-engine.js
-```
-
-Supported repeat modes:
-
-```text
-none
-daily
-weekly
-monthly
-yearly
-custom
-```
-
-Custom units:
-
-```text
-day
-week
-month
-year
-```
-
-Custom fields already support interval, weekdays, month days, yearly dates, and end rules (`never`, `date`, `count`).
-
-Do not add separate repeat functions. This object belongs inside task create/update.
-
-## 5.9 Actual supported workspace views
-
-File:
-
-```text
-TodoList-ui/js/components/workspace-controls.js
-```
-
-The current application supports:
-
-```text
-viewType:
-  list
-  kanban
-
-sortKey:
-  custom
-  dueDate
-  priority
-  name
-  createdAt
-
-sortDirection:
-  asc
-  desc
-
-groupKey:
-  none
-  priority
-  date
-  project
-  tag
-```
-
-Do **not** expose Timeline because Timeline is not currently implemented in this Todo runtime.
-
-## 5.10 UI does not automatically render after every state mutation
-
-`AppDataService` correctly persists and updates `AppState`, but Todo UI components normally call `render()` after a user action.
-
-Therefore AI calls need a centralized post-mutation UI synchronization step.
-
-This is mandatory for the requirement that changes appear instantly without refresh.
-
----
-
-# 6. Final public AI tool inventory
-
-Use exactly these **14** tools for v1:
+Use exactly these 14 tools:
 
 | # | Tool | Purpose |
 |---|---|---|
-| 1 | `todo_find_tasks` | Get/search/filter task or subtask data |
+| 1 | `todo_find_tasks` | Read/search/filter tasks and subtasks |
 | 2 | `todo_create_tasks` | Create one or many tasks/subtasks |
-| 3 | `todo_update_tasks` | Update one or many tasks/subtasks, including completion, movement, scheduling and order |
-| 4 | `todo_delete_tasks` | Delete one or many tasks/subtasks |
+| 3 | `todo_update_tasks` | Update one or many tasks/subtasks |
+| 4 | `todo_delete_tasks` | Delete one or many tasks/subtasks after destructive approval |
 | 5 | `todo_list_projects` | Read projects/subprojects and hierarchy |
 | 6 | `todo_create_projects` | Create one or many projects/subprojects |
-| 7 | `todo_update_projects` | Update/reparent/reorder one or many projects/subprojects |
-| 8 | `todo_delete_projects` | Delete one or many projects/subprojects |
+| 7 | `todo_update_projects` | Update/reparent/reorder projects/subprojects |
+| 8 | `todo_delete_projects` | Delete projects/subprojects after destructive approval |
 | 9 | `todo_list_tags` | Read tags/subtags and hierarchy |
 | 10 | `todo_create_tags` | Create one or many tags/subtags |
-| 11 | `todo_update_tags` | Update/reparent/reorder one or many tags/subtags |
-| 12 | `todo_delete_tags` | Delete one or many tags/subtags |
+| 11 | `todo_update_tags` | Update/reparent/reorder tags/subtags |
+| 12 | `todo_delete_tags` | Delete tags/subtags after destructive approval |
 | 13 | `todo_get_workspace` | Read current Todo navigation/view/sort/group state |
-| 14 | `todo_update_workspace` | Navigate Todo and change view/sort/group settings |
+| 14 | `todo_update_workspace` | Navigate Todo and change supported view/sort/group state |
 
-This inventory intentionally removes separate tools for:
-
-```text
-get_task
-search_tasks
-filter_tasks
-batch_create_tasks
-batch_update_tasks
-batch_delete_tasks
-move_task
-complete_task
-reopen_task
-create_subtask
-set/clear date
-set/clear time
-set/clear reminder
-set/clear repeat
-set/clear priority
-create_subproject
-create_subtag
-move_project
-move_tag
-reorder_* tools
-navigate_to_* tools
-set_view_mode
-set_group_by
-set_sort_by
-```
-
-Their capabilities remain available through the 14 tools above.
+No Timeline value/tool is exposed because current Todo runtime supports List and Kanban only.
 
 ---
 
-# 7. MCP-inspired tool metadata
+# 6. Tool metadata and provider model
 
-Keep metadata next to each declaration for documentation/tests/future interoperability.
+Keep internal metadata beside every declaration:
 
 | Tool group | readOnly | destructive | idempotent | openWorld |
 |---|---:|---:|---:|---:|
 | find/list/get workspace | true | false | true | false |
 | create | false | false | false | false |
-| update task/project/tag | false | true | false (conservative) | false |
-| delete | false | true | false (conservative) | false |
-| update workspace UI | false | false | true for exact target state | false |
+| update | false | true/conservative | false/conservative | false |
+| delete | false | true | false | false |
+| exact workspace state update | false | false | true where target is exact | false |
 
-These are **hints**, not security enforcement.
+These are documentation/safety hints, not enforcement by themselves.
+
+Introduce one Chat-side custom provider resolver, for example:
+
+```text
+workspace_* → workspace
+todo_*      → todo
+otherwise   → unknown
+```
+
+Use it in Gemini activity emission and activity-timeline rendering rather than duplicating prefix checks in several files.
 
 ---
 
-# 8. Shared AI-facing schema conventions
+# 7. Shared AI-facing schema rules
 
-## 8.1 Batch limits
+## 7.1 Gemini declaration format
 
-Each plural mutation tool accepts:
+The TypeScript-like notation in this plan is conceptual documentation only.
+
+Actual `todo-tool-definitions.js` declarations must use the same Gemini-compatible style already used by Workspace:
 
 ```text
-1–50 objects per call
+OBJECT
+ARRAY
+STRING
+INTEGER
+BOOLEAN
+enum
+required
 ```
 
-Additionally reject an encoded tool request larger than the dedicated Todo RPC payload limit described later.
+Do not assume arbitrary JSON-Schema unions/conditionals are accepted by the current endpoint. Conditional relationships are enforced again in Todo normalizers/executor.
 
-## 8.2 Null versus omitted
+## 7.2 Batch limits
 
-Use standard PATCH semantics:
+Mutation arrays:
 
 ```text
-field omitted → leave current value unchanged
-field = null / empty collection → explicitly clear when that field is clearable
+1..50 items per call
+```
+
+Update arrays must reject duplicate target IDs before any mutation.
+
+Delete arrays may deduplicate IDs and report coverage semantics.
+
+Results must include original `inputIndex` where useful for correlation.
+
+## 7.3 Omitted vs explicit clear
+
+Update semantics:
+
+```text
+field omitted → leave unchanged
+null / empty collection → explicitly clear when clearable
 ```
 
 Examples:
 
 ```text
-projectId: null     → unassign root task from project / Inbox
-parentTaskId: null  → unlink a subtask to root, where allowed
-tagIds: []          → remove all tags
+projectId: null     → unassign a final root task / Inbox
+parentTaskId: null  → make subtask a root where legal
+tagIds: []          → clear tags
 dueDate: null       → clear date
 dueTime: null       → clear time
-reminders: []       → clear reminders
+reminders: []       → clear reminder configuration
 repeat: null        → clear repeat
 priority: "none"    → clear priority
 description: ""     → clear description
 ```
 
-`title`/project name/tag name may never become empty.
+Names/titles may never be empty.
 
-## 8.3 Dates
+## 7.4 Strict dates
 
-Canonical AI function format:
+AI contract:
 
 ```text
 YYYY-MM-DD
 ```
 
-Do not send natural-language dates into Todo persistence.
+Tool normalizer must strictly verify the exact calendar date. Reject impossible/invalid strings such as:
 
-Gemini may interpret "tomorrow" from conversation context, but the actual function argument should be the resolved date.
+```text
+2026-02-31
+2026-13-10
+random text
+```
 
-## 8.4 Time
+Use an exact local-date check equivalent to RepeatEngine’s strict year/month/day parser.
 
-Use the existing Todo format:
+Do not rely on `TaskModel.normalizeTask()` for validation because it accepts arbitrary non-empty strings.
+
+## 7.5 Strict times
+
+Canonical AI contract:
 
 ```text
 hh:mm AM
 hh:mm PM
 ```
 
-Examples:
+with hour `01..12` and minute `00..59`.
+
+Reject examples such as:
 
 ```text
-07:30 AM
-09:05 PM
+00:30 AM
+13:00 PM
+25:80 PM
+random text
 ```
 
-The Todo adapter validates it before mutation.
+Canonicalize accepted values to two-digit hour/minute + uppercase period.
 
-## 8.5 Priority
+## 7.6 Priority
 
-AI enum:
+AI values:
 
 ```text
 none
@@ -868,232 +360,115 @@ medium
 high
 ```
 
-Adapter maps `none` to Todo's internal empty priority.
+`none` maps to Todo’s internal empty priority.
 
-## 8.6 Position
+## 7.7 Semantic position
 
-Shared position schema:
+Never expose raw `sortOrder`.
 
-```json
-{
-  "placement": "top | bottom | before | after",
-  "relativeToId": "optional-id"
+Use:
+
+```text
+position?: {
+  placement: "top" | "bottom" | "before" | "after",
+  relativeToId?: string
 }
 ```
 
 Rules:
 
-- `relativeToId` required for `before`/`after`;
-- reference must exist in the target sibling scope;
-- omit `position` to preserve normal app default/current placement;
-- if explicit task positioning is requested while task sort is non-custom, activate custom sorting through existing service logic so the requested order is actually visible;
-- never expose raw `sortOrder`.
+- `relativeToId` required for before/after;
+- reference must exist in the requested **final sibling scope**;
+- position is prevalidated before durable mutation;
+- if explicit position is requested while task sort is non-custom, activate valid custom ordering using existing service semantics so the requested order is actually visible;
+- omit position to preserve the app’s normal placement behavior.
 
-## 8.7 Result size
+A returned order summary must distinguish:
 
-Return only the affected/matched objects and useful metadata. Never dump the entire Todo IndexedDB store as a write-tool result.
+```text
+persistent custom sibling order
+vs current rendered index under dueDate/name/priority/etc sorting
+```
+
+## 7.8 Completion transition + position
+
+For v1, reject a task create/update item that combines:
+
+```text
+explicit position
+AND a completion-state transition
+```
+
+Use two tool rounds if both are required.
+
+This avoids ambiguous ordering between active/completed lanes and avoids ambiguity when repeat completion creates a new occurrence ID.
 
 ---
 
-# 9. Tool arguments — tasks
+# 8. Reminder configuration contract
 
-## 9.1 `todo_find_tasks`
+Todo currently stores reminders but does not deliver real notifications.
 
-Purpose:
-
-One read tool replaces get/search/filter task tools.
-
-Arguments:
+AI-facing reminder input:
 
 ```text
-ids?: string[]
-query?: string
-projectIds?: string[]
-tagIds?: string[]
-tagMatch?: "any" | "all"             default: "any"
-dueFrom?: "YYYY-MM-DD"
-dueTo?: "YYYY-MM-DD"
-completed?: boolean
-priorities?: ("none"|"low"|"medium"|"high")[]
-parentTaskId?: string | null
-includeSubtasks?: boolean              default: true
-scope?: "all" | "current_view"        default: "all"
-limit?: integer 1..100                 default: 50
+reminders?: [
+  { minutesBefore: integer }
+]
 ```
 
-Filter semantics:
+### AI-facing range
 
-- supplied filter categories combine with AND;
-- `tagMatch` controls only the relation between supplied tags;
-- `query` searches title and description case-insensitively;
-- `ids` is exact matching;
-- `parentTaskId` string selects children of that task;
-- `parentTaskId: null` explicitly selects root tasks when the field is present;
-- `scope: current_view` uses the same effective filter currently visible in Todo.
-
-Result item should contain:
+Use a conservative maximum compatible with current UI expectations:
 
 ```text
-id
-title
-description
-projectId
-parentTaskId
-priority
-tagIds
-completed
-dueDate
-dueTime
-reminders (semantic minutesBefore form)
-repeat
-position/order summary
-createdAt
-updatedAt
+0..86400 minutes (0..60 days)
 ```
 
-Also include resolved project/tag names for model readability, but IDs remain canonical.
+### Conversion
 
-## 9.2 `todo_create_tasks`
+For every value:
 
-Arguments:
+1. reuse matching built-in IDs first (`on_time`, `5_min`, `10_min`, `15_min`, `30_min`, `1_hour`, `2_hour`, `3_hour`, `1_day`);
+2. otherwise convert total minutes canonically into day/hour/minute parts;
+3. create deterministic ID:
 
 ```text
-tasks: TaskCreateInput[]   // 1..50
+custom-<day>d-<hr>h-<min>m
 ```
 
-`TaskCreateInput`:
+4. pass that ID directly in the task create/update aggregate;
+5. let existing `resolveReminders()` / task aggregate persistence create/reuse the custom definition.
+
+Do **not** pre-save a custom reminder through `saveReminderDefinition()` unless a concrete separate need is proven. Pre-saving could leave an orphan if the task mutation later fails.
+
+Semantics:
 
 ```text
-title: string                         required
-description?: string
-projectId?: string | null
-parentTaskId?: string | null
-priority?: "none"|"low"|"medium"|"high"
-tagIds?: string[]
-dueDate?: "YYYY-MM-DD" | null
-dueTime?: "hh:mm AM/PM" | null
-reminders?: ReminderInput[]
-repeat?: RepeatInput | null
-completed?: boolean                   default false
-position?: PositionInput
+create: reminders omitted → no reminder configuration
+update: reminders omitted → unchanged
+update: reminders []      → clear reminders
 ```
 
-Rules:
-
-- a `parentTaskId` creates a subtask of an existing valid root task;
-- a subtask inherits its parent's project using existing Todo rules; reject conflicting explicit project assignment rather than silently accepting impossible state;
-- no nested subtask-of-subtask support because the current Todo hierarchy is one parent task level;
-- creating a parent and its children in one logical user request can use two normal tool rounds: create parent first, then use returned parent ID in the next `todo_create_tasks` call. This avoids introducing fragile temporary-reference syntax;
-- if `completed:true`, create first and then use existing completion semantics;
-- if repeat requires a date and none is supplied, preserve the current RepeatEngine behavior.
-
-## 9.3 `todo_update_tasks`
-
-Arguments:
+Tool results may say:
 
 ```text
-tasks: TaskUpdateInput[]   // 1..50
+30-minute reminder configuration saved
 ```
 
-`TaskUpdateInput`:
+They must not claim:
 
 ```text
-id: string                            required
-title?: string
-description?: string
-projectId?: string | null
-parentTaskId?: string | null
-priority?: "none"|"low"|"medium"|"high"
-tagIds?: string[]
-dueDate?: "YYYY-MM-DD" | null
-dueTime?: "hh:mm AM/PM" | null
-reminders?: ReminderInput[]
-repeat?: RepeatInput | null
-completed?: boolean
-position?: PositionInput
+you will receive a notification in 30 minutes
 ```
 
-This one tool absorbs:
-
-```text
-move task
-complete/uncomplete task
-link/unlink subtask
-change project
-affect tags
-set/clear date
-set/clear time
-set/clear reminder
-set/clear repeat
-set/clear priority
-reorder task/subtask
-```
-
-### Internal operation ordering
-
-For each update, execute in a stable order:
-
-1. resolve and validate task ID;
-2. validate all requested referenced project/tag/parent/position IDs;
-3. apply ordinary editable fields through `AppDataService.updateTask()`;
-4. if parent relationship changes, use hierarchy service to link/unlink/reparent;
-5. apply explicit semantic position through hierarchy/order service;
-6. apply desired completion state **last**, using `toggleTaskStatus()` only when current state differs;
-7. return the final affected state and any repeat-generated next occurrence metadata.
-
-Completion last is important because completing a repeating task may finalize one occurrence and create another.
-
-When a repeating completion creates a next occurrence, result metadata should make this explicit:
-
-```text
-requestedTaskId
-completedTaskId
-nextOccurrenceId
-```
-
-when applicable.
-
-## 9.4 `todo_delete_tasks`
-
-Arguments:
-
-```text
-taskIds: string[]   // 1..50
-```
-
-Rules:
-
-- deduplicate IDs before execution;
-- if both a root task and one of its subtasks are supplied, execute the root family deletion once and report the redundant child request as covered by the parent deletion;
-- deleting a root task uses existing `deleteTaskFamily()` behavior and therefore deletes its subtasks;
-- deleting a subtask removes only that subtask;
-- return deleted IDs/family IDs so Gemini knows exactly what disappeared.
+until real delivery exists.
 
 ---
 
-# 10. Shared reminder/repeat arguments
+# 9. Repeat contract
 
-## 10.1 ReminderInput
-
-```text
-minutesBefore: integer >= 0
-```
-
-Examples:
-
-```json
-[{ "minutesBefore": 0 }]
-[{ "minutesBefore": 30 }]
-[{ "minutesBefore": 30 }, { "minutesBefore": 1440 }]
-```
-
-The adapter:
-
-1. reuses a built-in definition when one matches;
-2. otherwise converts minutes into the current custom reminder representation and lets the existing reminder service persist/resolve it;
-3. deduplicates equal reminders.
-
-## 10.2 RepeatInput
+AI-facing repeat input:
 
 ```text
 mode: "daily" | "weekly" | "monthly" | "yearly" | "custom"
@@ -1103,7 +478,9 @@ custom?: {
   unit: "day" | "week" | "month" | "year"
   weekdays?: integer[]       // 0=Sunday ... 6=Saturday
   monthDays?: integer[]      // 1..31
-  yearDates?: object         // existing RepeatEngine month-index → days representation
+  yearDates?: [
+    { month: integer 1..12, days: integer[] 1..31 }
+  ]
 }
 
 end?: {
@@ -1113,21 +490,351 @@ end?: {
 }
 ```
 
-Always validate through the existing RepeatEngine before persistence.
+Validation is two-layered:
+
+1. **strict AI validation** with no silent clamping/filtering/default substitution for invalid supplied values;
+2. map 1-based yearly months to RepeatEngine’s internal 0-based structure and then call existing `RepeatEngine.validateRepeatRule()` / normalization.
+
+Reject out-of-range values rather than silently changing Gemini’s intent.
+
+Examples that must fail rather than clamp/filter:
+
+```text
+interval = 0 or 100
+end count = 0 or 201
+weekday = 8
+month day = 32
+month = 0 or 13
+invalid end date
+```
 
 ---
 
-# 11. Tool arguments — projects
+# 10. Task read tool — `todo_find_tasks`
 
-## 11.1 `todo_list_projects`
+Arguments conceptually:
+
+```text
+ids?: string[]
+query?: string
+projectIds?: string[]
+includeProjectDescendants?: boolean       default false
+tagIds?: string[]
+includeTagDescendants?: boolean           default false
+tagMatch?: "any" | "all"                 default "any"
+dueFrom?: YYYY-MM-DD
+dueTo?: YYYY-MM-DD
+completed?: boolean
+priorities?: (none|low|medium|high)[]
+parentTaskId?: string | null
+includeSubtasks?: boolean                  default true
+scope?: "all" | "current_view"            default "all"
+detail?: "summary" | "full"               default "summary"
+limit?: integer 1..100                     default 50
+```
+
+Before taking a read snapshot:
+
+```text
+await AppDataService.whenIdle()
+```
+
+so a pending manual Todo write cannot race the read.
+
+### Exact vs descendant behavior
+
+Explicit `projectIds` and `tagIds` are exact by default.
+
+Descendants are included only when their corresponding `include...Descendants` flag is true.
+
+`scope=current_view` follows the real current Todo filter behavior, including Project/Tag descendant behavior from `AppState.matchesFilter()`.
+
+### Family-aware current view
+
+Do not implement current-view scope with a new simple filter.
+
+Base it on the same family-aware source used by current rendering:
+
+```text
+TaskFilter.getDisplayTasks()
+```
+
+Then expand returned root families the same way the renderer represents them.
+
+Use one shared selector for:
+
+```text
+todo_find_tasks(scope=current_view)
+todo_get_workspace.displayScopeTaskIds
+todo_get_workspace.displayScopeTaskCount
+```
+
+Define:
+
+```text
+displayScopeTaskIds
+```
+
+as tasks represented by the current filtered root/family model, regardless of whether a child list is visually collapsed.
+
+If an actual DOM-expanded subset is useful, return it separately as an optional UI-only field; do not call the family scope “visible” if collapse state changes that meaning.
+
+### Output budget
+
+Summary results should contain compact fields:
+
+```text
+id
+title
+projectId/projectName
+parentTaskId
+priority
+tagIds/tagNames
+completed
+dueDate
+dueTime
+short description preview if needed
+repeat/reminder summary
+```
+
+`detail=full` may return bounded fuller data, but still obeys response budgets below.
+
+---
+
+# 11. Task creation — `todo_create_tasks`
 
 Arguments:
+
+```text
+tasks: TaskCreateInput[] // 1..50
+```
+
+`TaskCreateInput` conceptually:
+
+```text
+title: string                         required
+description?: string
+projectId?: string | null
+parentTaskId?: string | null
+priority?: none|low|medium|high
+tagIds?: string[]
+dueDate?: YYYY-MM-DD | null
+dueTime?: hh:mm AM/PM | null
+reminders?: ReminderInput[]
+repeat?: RepeatInput | null
+completed?: boolean                   default false
+position?: PositionInput
+```
+
+### Parent validation
+
+If `parentTaskId` is supplied, prevalidate **before create**:
+
+```text
+parent exists
+parent is root
+parent is not completed
+```
+
+Prefer extracting/reusing a generic Todo-domain parent validation helper so create/link/tool paths do not drift.
+
+### Project rule for subtasks
+
+If final state is a subtask, any explicit `projectId` is rejected as conflicting.
+
+The subtask inherits its parent’s project. Do not silently ignore a requested project and report success.
+
+No subtask-of-subtask is supported.
+
+### Parent + child in one natural-language request
+
+Create the parent first, use its returned real ID, then create children in a later tool round.
+
+Do not invent temporary client IDs in v1.
+
+### Completed create
+
+If `completed:true` is requested, create the item first and then use existing repeat-aware completion semantics.
+
+If a later completion stage unexpectedly fails after creation, return `PARTIAL_MUTATION` with the final authoritative created task state.
+
+A completed create cannot include explicit position in the same v1 item.
+
+### Position
+
+Prevalidate the target sibling scope before creation. Use existing hierarchy/order methods after creation, or add a narrow generic Todo compound helper if needed to avoid unsafe partial operation.
+
+---
+
+# 12. Task update — `todo_update_tasks`
+
+Arguments:
+
+```text
+tasks: TaskUpdateInput[] // 1..50
+```
+
+Each item:
+
+```text
+id: string                            required
+title?: string
+description?: string
+projectId?: string | null
+parentTaskId?: string | null
+priority?: none|low|medium|high
+tagIds?: string[]
+dueDate?: YYYY-MM-DD | null
+dueTime?: hh:mm AM/PM | null
+reminders?: ReminderInput[]
+repeat?: RepeatInput | null
+completed?: boolean
+position?: PositionInput
+```
+
+Reject duplicate `id` values in the same update array before any mutation.
+
+This tool absorbs task movement, project/tag changes, scheduling, reminder configuration, repeat, priority, hierarchy, completion/activation state, and semantic order.
+
+## 12.1 Final-state mutation planner
+
+Do **not** use one fixed sequence such as “ordinary update first, hierarchy second”.
+
+For each item:
+
+1. wait for prior writes and load the latest task;
+2. determine requested **final hierarchy state**;
+3. prevalidate all referenced project/tag/parent/position IDs and strict field values before the first durable write;
+4. reject explicit `projectId` whenever the final state is a subtask;
+5. apply hierarchy/position transition using the correct existing hierarchy method;
+6. only after the final hierarchy is established, apply ordinary editable fields through `AppDataService.updateTask()` so project inheritance/root project changes are interpreted in the correct final state;
+7. apply desired completion state last through `toggleTaskStatus()` only if current state differs;
+8. return final authoritative state + side effects.
+
+### Required hierarchy cases
+
+**Root → subtask**
+
+- reject explicit `projectId`;
+- without explicit position, use normal link semantics;
+- with explicit position, use hierarchy drag/placement semantics;
+- final project comes from the parent.
+
+**Subtask → different parent**
+
+- reject explicit `projectId`;
+- use hierarchy reparent/placement semantics;
+- final project comes from the new parent.
+
+**Subtask → root with `projectId`**
+
+- make it root first;
+- then apply the root project update;
+- this prevents the current service from ignoring the project while it is still a subtask.
+
+**Subtask → root without `projectId`**
+
+- preserve current unlink project semantics;
+- without explicit position, preserve current unlink placement behavior;
+- with explicit position, use hierarchy placement into the root scope.
+
+**Root project change**
+
+- use existing service behavior that propagates project to subtasks;
+- include affected child task IDs in result metadata.
+
+## 12.2 Completion state
+
+`completed:true/false` is an AI-facing desired state.
+
+Never directly persist the completed field.
+
+Use existing `toggleTaskStatus()` when a change is actually needed so repeat generation and family completion behavior stay correct.
+
+Do not expose a separate public “reopen” tool; `completed:false` means return the task to active state through the existing toggle semantics.
+
+## 12.3 Completion + position
+
+Reject an item that asks for both an explicit position and a completion-state transition in one call.
+
+## 12.4 Compound-operation safety
+
+Prevalidation must catch all predictable hierarchy/position/reference failures before the first durable mutation.
+
+However, existing services use separate queue entries/transactions for some compound changes. Therefore the implementation must not falsely claim every item is atomic.
+
+Preferred when practical: add **narrow generic Todo-domain compound helpers** for operations that cannot be safely represented by existing public calls. Such helpers must remain ordinary Todo service logic, not Gemini-specific logic.
+
+If a compound item still spans multiple durable stages and a later unexpected stage fails:
+
+```text
+error.code = PARTIAL_MUTATION
+```
+
+Return:
+
+```text
+inputIndex
+committedStages
+failedStage
+finalAuthoritativeState
+sideEffects
+```
+
+and force UI reconciliation.
+
+Do not parse service exception strings to guess which stage failed.
+
+---
+
+# 13. Task deletion — `todo_delete_tasks`
+
+Arguments:
+
+```text
+taskIds: string[] // 1..50
+```
+
+Rules:
+
+- deduplicate before execution;
+- if root + one of its children are both supplied, delete the root family once and report that the child request was covered;
+- root deletion uses existing family deletion;
+- subtask deletion removes only that subtask;
+- missing IDs are resolved into stable tool-layer NOT_FOUND/NO_OP semantics before/around the existing boolean-return service behavior.
+
+Return actual deleted family IDs.
+
+## Destructive approval
+
+Do **not** dispatch task/project/tag deletion to Todo immediately from a model call.
+
+V1 must use a Chat-visible approval step:
+
+1. model requests `todo_delete_*`;
+2. Chat resolves/displays exact targets and the consequences;
+3. execution waits for explicit user Approve/Cancel in ChatUI;
+4. only Approve allows the RPC to be sent to Todo;
+5. Cancel/approval timeout returns a structured denial result;
+6. there is no hidden Todo `window.confirm()`.
+
+Batch deletes display the target count and important cascading semantics.
+
+For Live Voice, the same visible approval is used; voice mode may tell the user that approval is required, but v1 must not silently interpret untrusted/model text as sufficient destructive authorization.
+
+---
+
+# 14. Project tools
+
+## `todo_list_projects`
+
+Conceptual args:
 
 ```text
 ids?: string[]
 query?: string
 includeCounts?: boolean   default true
-limit?: integer 1..100    default 100
+limit?: 1..100            default 100
 ```
 
 Return hierarchy-aware items:
@@ -1138,234 +845,211 @@ name
 icon
 parentId
 viewType
-position/order summary
-directTaskCount / treeTaskCount when requested
-children IDs
+childrenIds
+persistent order summary
+activeDirectTaskCount
+activeTreeTaskCount
+totalDirectTaskCount
+totalTreeTaskCount
 ```
 
-## 11.2 `todo_create_projects`
+Only include count fields requested/available within response budget.
 
-Arguments:
+## `todo_create_projects`
 
 ```text
-projects: ProjectCreateInput[]   // 1..50
+projects: [
+  {
+    name,
+    icon?,
+    parentId?,
+    viewType?: list|kanban,
+    position?
+  }
+]
 ```
 
-`ProjectCreateInput`:
+For parent + child created in one natural request, use sequential tool rounds and real returned IDs.
+
+## `todo_update_projects`
+
+Reject duplicate IDs before mutation.
+
+Each item may change:
 
 ```text
-name: string                    required
-icon?: string
-parentId?: string | null
-viewType?: "list" | "kanban"
-position?: PositionInput
+name
+icon
+parentId
+viewType
+position
 ```
 
-For a newly-created parent and child in the same user request, prefer sequential function rounds so the child receives the real parent ID. Do not invent client-only IDs in v1.
+### Taxonomy mutation planner
 
-## 11.3 `todo_update_projects`
+Prevalidate final parent/cycle and position target before mutation.
 
-Arguments:
+When parent + semantic position are requested together, use `commitTaxonomyDrag()` semantics for the hierarchy/order concerns instead of “reparent, then separately reorder”.
 
-```text
-projects: ProjectUpdateInput[]   // 1..50
-```
+Scalar name/icon/view updates use the narrowest existing service path.
 
-`ProjectUpdateInput`:
+If the operation still spans separate durable stages and one fails after another committed, return `PARTIAL_MUTATION` with final state rather than pretending the item was atomic.
 
-```text
-id: string                      required
-name?: string
-icon?: string
-parentId?: string | null
-viewType?: "list" | "kanban"
-position?: PositionInput
-```
+## `todo_delete_projects`
 
-This tool handles rename, reparent to subproject/top-level, view change, and reorder.
+Destructive approval required.
 
-Internally use taxonomy update/drag services so cycle validation and sibling renumbering remain correct.
-
-## 11.4 `todo_delete_projects`
-
-Arguments:
-
-```text
-projectIds: string[]   // 1..50
-```
-
-Tool description must state current app semantics:
+Current app semantics must be stated clearly:
 
 ```text
 Deleting a project does not delete its tasks.
 Tasks directly assigned to it become unassigned/Inbox tasks.
-Its direct child projects are promoted/reparented according to current Todo hierarchy rules.
+Child projects are promoted/reparented according to current taxonomy delete behavior.
 ```
 
-Return:
+For nested deletion, do not assume children simply move to the deleted project’s old parent. Return their actual final parent IDs.
 
-```text
-deletedProjectIds
-affectedTaskIds
-reparentedProjectIds
-```
-
-where available.
+Return affected task IDs and promoted/reparented project IDs.
 
 ---
 
-# 12. Tool arguments — tags
+# 15. Tag tools
 
-## 12.1 `todo_list_tags`
+## `todo_list_tags`
 
-Arguments:
+Conceptual args:
 
 ```text
 ids?: string[]
 query?: string
 includeCounts?: boolean   default true
-limit?: integer 1..100    default 100
+limit?: 1..100            default 100
 ```
 
-Return:
+Return hierarchy/order + explicit active/total direct/tree counts when requested.
+
+## `todo_create_tags`
+
+One or many tags/subtags with:
 
 ```text
-id
 name
-icon
-parentId
-viewType
-position/order summary
-direct/tree task counts when requested
-children IDs
+icon?
+parentId?
+viewType?: list|kanban
+position?
 ```
 
-## 12.2 `todo_create_tags`
+## `todo_update_tags`
 
-Arguments:
+Reject duplicate IDs before mutation.
 
-```text
-tags: TagCreateInput[]   // 1..50
-```
+Use the same deterministic taxonomy planner as Projects for scalar fields, final parent, cycle prevention, and semantic position.
 
-`TagCreateInput`:
+## `todo_delete_tags`
 
-```text
-name: string                    required
-icon?: string
-parentId?: string | null
-viewType?: "list" | "kanban"
-position?: PositionInput
-```
+Destructive approval required.
 
-## 12.3 `todo_update_tags`
-
-Arguments:
-
-```text
-tags: TagUpdateInput[]   // 1..50
-```
-
-`TagUpdateInput`:
-
-```text
-id: string                      required
-name?: string
-icon?: string
-parentId?: string | null
-viewType?: "list" | "kanban"
-position?: PositionInput
-```
-
-This handles rename, reparent/top-level, view, and order.
-
-## 12.4 `todo_delete_tags`
-
-Arguments:
-
-```text
-tagIds: string[]   // 1..50
-```
-
-Tool description must state:
+Current semantics:
 
 ```text
 Deleting a tag removes that tag assignment from affected tasks.
-It does not delete those tasks.
-Child tags are reparented according to current Todo hierarchy behavior.
+It does not delete tasks.
+Child tags are promoted/reparented according to existing taxonomy delete behavior.
 ```
 
-Return affected task/tag IDs.
+Return actual affected task IDs and final parent IDs of changed child tags.
 
 ---
 
-# 13. Tool arguments — Todo workspace/UI
+# 16. Workspace tools
 
-## 13.1 `todo_get_workspace`
+## `todo_get_workspace`
 
-No required arguments.
+Before reading:
+
+```text
+await AppDataService.whenIdle()
+```
 
 Return:
 
 ```text
 currentFilter: {
-  type: "smart" | "project" | "tag"
-  id: string
-  title: string
+  type: smart|project|tag,
+  id,
+  title
 }
 
-viewType: "list" | "kanban"
-sortKey: "custom" | "dueDate" | "priority" | "name" | "createdAt"
-sortDirection: "asc" | "desc"
-groupKey: "none" | "priority" | "date" | "project" | "tag"
-visibleTaskIds: string[]          bounded
-visibleTaskCount: integer
+viewType: list|kanban
+sortKey: custom|dueDate|priority|name|createdAt
+sortDirection: asc|desc
+groupKey: none|priority|date|project|tag
+
+displayScopeTaskIds: bounded string[]
+displayScopeTaskCount: integer
 ```
 
-This gives Gemini enough UI context to answer requests such as:
+Use the family-aware current-view selector defined earlier.
+
+## `todo_update_workspace`
+
+Conceptual input:
 
 ```text
-"Create this in the project I am currently looking at."
-"What is on this page?"
-"Change this project to Kanban."
+navigate?: {
+  type: smart|project|tag,
+  value?: inbox|today|completed,
+  id?: string
+}
+
+viewType?: list|kanban
+viewTarget?: {
+  type: current|project|tag,
+  id?: string
+}
+
+sortKey?: custom|dueDate|priority|name|createdAt
+sortDirection?: asc|desc
+groupKey?: none|priority|date|project|tag
 ```
 
-## 13.2 `todo_update_workspace`
+Actual Gemini declaration uses one compatible OBJECT schema; executor validates which fields are legal for each `type`.
 
-Arguments:
+### Custom sort
+
+When changing to `sortKey=custom`, use the same current UI path:
 
 ```text
-navigate?:
-  { type: "smart", value: "inbox" | "today" | "completed" }
-  | { type: "project", id: string }
-  | { type: "tag", id: string }
-
-viewType?: "list" | "kanban"
-
-viewTarget?:
-  { type: "current" }
-  | { type: "project", id: string }
-  | { type: "tag", id: string }
-
-sortKey?: "custom" | "dueDate" | "priority" | "name" | "createdAt"
-sortDirection?: "asc" | "desc"
-groupKey?: "none" | "priority" | "date" | "project" | "tag"
+WorkspaceControls.buildCustomOrderSnapshot()
+→ AppDataService.activateCustomSort(snapshot)
 ```
 
-Rules:
+Never persist `sortKey=custom` alone.
 
-- `navigate` changes the active Todo page/filter;
-- `viewType` without `viewTarget` applies to current effective target;
-- project/tag view changes use existing `setEntityViewType()` so the setting persists on that entity;
-- global sort/group/direction use `AppDataService.setSetting()` / existing custom-sort activation behavior;
-- switching to `custom` must preserve/activate a valid current custom-order snapshot exactly as the existing UI does;
-- after any change, synchronize Sidebar active selection/title, WorkspaceControls state, and task rendering.
+The snapshot must cover every sibling scope expected by the existing service.
+
+If a hierarchy mutation and custom-sort activation are part of one logical operation, take the snapshot at the state where it is valid for the final hierarchy.
+
+### Sort direction in custom mode
+
+Current UI disables direction while custom sort is active.
+
+V1 rule: reject a request that tries to change `sortDirection` while the **final** sort key is custom. Preserve the stored direction silently when simply entering custom mode.
+
+### View persistence
+
+Project/Tag view changes persist on that entity through existing `setEntityViewType()` behavior.
+
+Smart views (Inbox/Today/Completed) have no entity-level persisted view record. A view change there is session/UI state only. Tool result must report whether the view change was persisted or session-only.
+
+After workspace changes, synchronize Sidebar selection/title, WorkspaceControls state/UI, task rendering, and counts.
 
 ---
 
-# 14. Structured result/error contract
+# 17. Stable structured result/error contract
 
-Every Todo tool returns a JSON object and should avoid throwing ordinary business validation failures past the custom function executor.
+Business validation failures must remain normal structured function results. Do not throw them through the Gemini custom-function loop.
 
 Success:
 
@@ -1393,24 +1077,7 @@ Failure:
 }
 ```
 
-Batch partial failure:
-
-```json
-{
-  "ok": false,
-  "error": {
-    "code": "PARTIAL_FAILURE",
-    "message": "Some requested operations were committed before a later item failed."
-  },
-  "data": {
-    "succeeded": [],
-    "failed": {},
-    "unattempted": []
-  }
-}
-```
-
-Recommended stable error codes:
+Recommended codes:
 
 ```text
 TODO_TOOL_DISABLED
@@ -1422,59 +1089,168 @@ TAG_NOT_FOUND
 INVALID_PARENT
 HIERARCHY_CONFLICT
 POSITION_CONFLICT
+RESULT_TOO_LARGE
 STORAGE_ERROR
 BRIDGE_TIMEOUT
+MUTATION_OUTCOME_UNKNOWN
 REQUEST_ABORTED
+DESTRUCTIVE_APPROVAL_REQUIRED
+DESTRUCTIVE_APPROVAL_DENIED
 PARTIAL_FAILURE
+PARTIAL_MUTATION
 INTERNAL_TODO_ERROR
 ```
 
-Do not expose stack traces, IndexedDB internals, or raw exception objects to Gemini.
-
----
-
-# 15. Batch execution semantics
-
-The existing Todo service methods contain complex purpose-specific IndexedDB transactions and repeat/hierarchy logic. Do not rewrite all of them merely to force a giant cross-operation transaction.
-
-Use this safe v1 policy:
-
-1. validate the entire request envelope and basic object schemas first;
-2. pre-resolve referenced IDs when possible;
-3. execute items sequentially in input order through existing AppDataService queue/services;
-4. stop on the first item that fails;
-5. return `PARTIAL_FAILURE` if earlier items were already durably committed;
-6. include succeeded/failed/unattempted items so Gemini can explain or retry intelligently;
-7. refresh Todo UI **once at the end of the whole tool call**, not after every item.
-
-This preserves existing business logic and avoids false claims of atomicity.
-
-Future fully atomic batch transactions may be added only if there is a real product need.
-
----
-
-# 16. ChatUI ↔ Shell ↔ Todo communication architecture
-
-## 16.1 Do not cross-import sibling application modules
-
-The Chat iframe must not import Todo's `AppDataService` or reach directly into Todo DOM/globals.
-
-The iframe boundary should remain an architectural boundary.
-
-## 16.2 Use the existing exact-origin shell protocol
-
-Current files:
+Use a tool-layer error type such as:
 
 ```text
-shell/js/protocol.js
-shell/js/frame-bridge.js
-ChatUI/js/embedded/shell-bridge.js
-TodoList-ui/js/embedded/shell-bridge.js
+TodoToolError(code, message, details)
 ```
 
-Add correlated request/response messages.
+Codes must come from explicit prevalidation/known branches, not English substring matching of AppDataService errors.
 
-Recommended message flow:
+Unexpected service/IndexedDB failures may map to `STORAGE_ERROR` / `INTERNAL_TODO_ERROR` without exposing stack traces or raw internals.
+
+`AbortError` and true transport/runtime failures may reject where the existing function loop expects them; ordinary Todo business errors should not.
+
+---
+
+# 18. Mutation side-effect reporting
+
+Results must report actual Todo side effects rather than one root ID when the underlying service changed more records.
+
+When relevant, task results include:
+
+```text
+requestedTaskId
+updatedTaskIds
+completedTaskIds
+activatedTaskIds
+createdTaskIds
+nextOccurrenceId
+nextOccurrenceChildIds
+deletedTaskIds
+affectedChildTaskIds
+```
+
+Examples that require expanded reporting:
+
+- completing a non-repeating root also completes children;
+- completing a repeating root may finish old root/children and create a new root + child occurrences;
+- changing a root project propagates project to its subtasks;
+- deleting a root removes the whole family;
+- deleting a Project unassigns tasks;
+- deleting a Tag removes relations from tasks.
+
+Use scoped before/after authoritative snapshots or narrow service helpers where necessary to identify real side effects. Do not make Gemini infer them.
+
+---
+
+# 19. Batch and partial-mutation semantics
+
+Before mutation:
+
+1. validate request envelope and object schemas;
+2. reject duplicate target IDs for update arrays;
+3. pre-resolve referenced IDs and predictable hierarchy/position conflicts;
+4. run items sequentially in input order through the existing serialized Todo service path.
+
+If item N fails after earlier array items fully committed:
+
+```text
+PARTIAL_FAILURE
+```
+
+Return:
+
+```text
+succeeded[]
+failed { inputIndex, ... }
+unattempted[]
+```
+
+If one logical item itself committed some stages before a later stage failed:
+
+```text
+PARTIAL_MUTATION
+```
+
+Return the committed stages and final authoritative state.
+
+Stop further batch items after the first failed/partially failed item unless a future product rule explicitly changes this.
+
+Do not claim cross-item atomicity.
+
+---
+
+# 20. RPC delivery, idempotency, timeout, and uncertain outcome
+
+## 20.1 Request identity
+
+Every Todo RPC has:
+
+```text
+requestId
+functionName
+args
+```
+
+Todo keeps a bounded in-memory request registry keyed by:
+
+```text
+requestId + functionName
+```
+
+Duplicate delivery of the same request ID:
+
+- while in flight → reuse the same in-flight Promise/result;
+- after completion while cached → return the cached result;
+- never execute twice.
+
+Use a bounded TTL/LRU policy so this registry does not grow forever.
+
+This protects duplicate delivery inside one iframe lifetime only.
+
+## 20.2 No automatic retry of uncertain mutations
+
+A timed-out non-idempotent create/update/delete is **never automatically retried with a new request ID**.
+
+If Chat stops waiting after dispatch and cannot prove the final outcome:
+
+```text
+MUTATION_OUTCOME_UNKNOWN
+```
+
+Gemini should read/reconcile current Todo state before proposing or attempting another mutation.
+
+A full Todo iframe reload loses the in-memory dedupe registry. Therefore an in-flight reload is also an uncertain outcome requiring read-back reconciliation.
+
+## 20.3 Timeouts
+
+Use operation-aware timeouts rather than one aggressive 15-second value:
+
+```text
+read RPC:              15 seconds
+ordinary workspace UI: 20 seconds
+Todo mutations:        60 seconds
+user destructive approval: separate UI approval timeout, before Todo dispatch
+```
+
+These are defensive limits, not guarantees that a timed-out mutation did not commit.
+
+## 20.4 Abort
+
+Before RPC dispatch: abort can safely cancel.
+
+After mutation dispatch: Chat may stop waiting, but must not imply rollback. Todo committed state remains authoritative.
+
+Late responses after a cancelled/expired pending Chat request are ignored by Chat, while Todo’s dedupe registry may retain the completed result for same-ID duplicate delivery.
+
+---
+
+# 21. ChatUI ↔ Shell ↔ Todo RPC architecture
+
+## 21.1 Message path
 
 ```text
 Gemini functionCall
@@ -1482,18 +1258,18 @@ Gemini functionCall
 ChatUI todo-tool-executor
    ↓
 Chat TodoBridgeClient
-   ↓ postMessage
+   ↓
 chatui:todo-tool-request
    ↓
 Shell frame bridge
-   ↓ postMessage
+   ↓ immediate-only sendIfReady
 shell:todo-tool-request
    ↓
 Todo embedded bridge
    ↓
 TodoToolExecutor
    ↓
-TodoToolService / AppDataService
+Todo AppDataService/domain services
    ↓
 Todo UI sync
    ↓
@@ -1503,111 +1279,121 @@ Shell
    ↑
 shell:todo-tool-response
    ↑
-Chat pending Promise
+Chat pending request
    ↑
 Gemini functionResponse
 ```
 
-## 16.3 Request envelope
+## 21.2 Exact origin/source validation
 
-```json
-{
-  "requestId": "todo:<uuid>",
-  "functionName": "todo_create_tasks",
-  "args": {}
-}
-```
+Keep exact-origin checks and known-window direction checks:
 
-## 16.4 Response envelope
+- Shell accepts Chat Todo requests only from the registered Chat iframe;
+- Shell forwards only to the registered Todo iframe;
+- Shell accepts Todo result only from the registered Todo iframe;
+- Todo accepts only explicit shell Todo request types + allowlisted `todo_*` names;
+- Chat resolves only matching `requestId + expected functionName`;
+- no `postMessage('*')`.
 
-```json
-{
-  "requestId": "todo:<uuid>",
-  "functionName": "todo_create_tasks",
-  "result": {
-    "ok": true,
-    "data": {}
-  }
-}
-```
+## 21.3 Capability lifecycle
 
-## 16.5 Source/origin validation
-
-Keep current exact-origin validation and additionally enforce direction:
-
-- shell accepts `chatui:todo-tool-request` only from the registered Chat iframe;
-- shell forwards it only to the registered Todo iframe;
-- shell accepts `todo:tool-response` only from the registered Todo iframe;
-- shell forwards response only to Chat;
-- Todo only accepts the explicit shell request type and allowlisted `todo_*` function names;
-- Chat only resolves a pending request when both request ID and expected function name match.
-
-Do not use `postMessage('*')`.
-
-## 16.6 Availability/capability negotiation
-
-Todo's `app:ready` should advertise an additive capability:
+Todo advertises:
 
 ```text
 todo-tools-v1
 ```
 
-The shell tells Chat whether Todo tools are available.
+only after Todo storage hydration/repair and tool/UI dependencies are ready.
 
-Chat keeps a runtime capability flag separate from the saved user preference.
-
-Effective declaration rule:
+Availability rules:
 
 ```text
-saved tools.todo == true
-AND
-Todo bridge capability == ready
+Todo frame READY + ready payload contains todo-tools-v1 → available
+Todo LOADING/FAILED/navigation-away/frame replacement → unavailable immediately
+new READY with capability → available again
 ```
 
-Only then include Todo function declarations in a Gemini request.
+Shell rebroadcasts capability state to Chat on every relevant transition.
 
-This prevents tool calls before Todo startup/hydration is complete.
+Saved `tools.todo` preference is not erased when capability disappears.
 
-## 16.7 Timeout and abort
+If capability disappears after a generation already received Todo declarations, executor returns `TODO_UNAVAILABLE`; it never queues the call.
 
-Chat bridge client:
+## 21.4 Generation-snapshot permission
 
-- one pending Promise per requestId;
-- default timeout: 15 seconds;
-- remove pending entry on result, timeout, or abort;
-- respect the generation AbortSignal;
-- late responses after abort/timeout are ignored.
+Current generation already captures `assistantMessage.activeTools`.
 
-## 16.8 Payload limits
+Rule:
 
-Current shell protocol globally limits payload JSON to about 32 KiB. Batch task descriptions can legitimately exceed that.
+```text
+Enabled for this generation = context.activeTools.todo from generation snapshot
+Available right now          = live Todo bridge capability
+```
 
-Do **not** simply remove the limit.
+A user toggling the checkbox during an already-started generation does not silently change that generation’s declared permission.
 
-Recommended approach:
+## 21.5 Message-size policy
 
-- retain the normal 32 KiB cap for ordinary shell messages;
-- introduce a dedicated Todo RPC validator with a hard cap of **128 KiB** for Todo tool request/response envelopes;
-- still enforce per-field lengths and 50-object batch limits;
-- reject over-limit requests before execution with `INVALID_ARGUMENT`.
+Current ordinary shell messages remain capped near:
 
-Suggested field limits:
+```text
+32 KiB
+```
+
+Todo RPC request/response envelopes use:
+
+```text
+128 KiB hard envelope cap
+```
+
+The message type must be identified from an allowlist **before** applying the size cap. Do not let the current generic 32 KiB validator reject an 80 KiB valid Todo RPC before the Todo-specific rule is considered.
+
+Implement the same message-type-aware contract in Shell, Chat embedded bridge, and Todo embedded bridge, with static tests that keep the three validators in agreement.
+
+Do not remove ordinary-message limits.
+
+Suggested input field guardrails:
 
 ```text
 title/name: 500 characters
-description: 4,000 characters
+AI-supplied description: 4,000 characters
 query: 1,000 characters
-IDs: 512 characters each
-arrays: defined per schema
+IDs: 512 characters
+mutation arrays: max 50
 ```
 
-These are guardrails, not database schema changes.
+These limits apply to AI requests; existing stored Todo data may already contain larger strings.
 
 ---
 
-# 17. Todo-side executor architecture
+# 22. Response/context budget
 
-Create a small dedicated Todo tool layer instead of putting a large switch statement into `shell-bridge.js`.
+Every Todo response must be serialized through a bounded AI-facing serializer.
+
+Rules:
+
+- enforce the 128 KiB RPC envelope cap on responses;
+- target a smaller result budget (for example ~96 KiB) so envelope metadata has room;
+- bound every returned string independently;
+- default task search/list output to compact summaries;
+- description in summary mode is only a bounded preview;
+- full mode still truncates oversized stored text and reports truncation metadata;
+- cap results by actual serialized size as well as item count;
+- mutation results return affected objects/IDs only, not the whole database.
+
+If requested output cannot fit safely:
+
+```text
+RESULT_TOO_LARGE
+```
+
+with guidance to narrow the query or lower the limit.
+
+Do not silently drop the whole response or exceed Gemini context unnecessarily.
+
+---
+
+# 23. Todo-side executor modules
 
 Recommended new modules:
 
@@ -1618,63 +1404,88 @@ TodoList-ui/js/tools/todo-tool-normalizers.js
 TodoList-ui/js/tools/todo-tool-ui-sync.js
 ```
 
-Responsibilities:
+## Registry
 
-## `todo-tool-registry.js`
+- exact allowlist of the 14 names;
+- handler mapping;
+- metadata readOnly/destructive/idempotent/openWorld.
 
-- allowlist supported `todo_*` function names;
-- map function name → handler;
-- carry metadata such as readOnly/destructive.
+## Normalizers
 
-## `todo-tool-normalizers.js`
+- strict date/time validation;
+- strict AI repeat validation + 1-based month mapping;
+- reminder total-minute conversion;
+- AI `projectId/tagIds` mapping to internal fields;
+- priority `none` mapping;
+- semantic position validation;
+- bounded AI serializers;
+- stable `TodoToolError` helpers.
 
-- validate dates/times/enums;
-- map `projectId` → internal `project`;
-- map `tagIds` → internal `tags`;
-- map priority `none` → `''`;
-- convert semantic reminders to existing reminder IDs/custom definitions;
-- normalize repeat objects through RepeatEngine;
-- validate semantic position objects;
-- serialize task/project/tag data into bounded AI-facing results.
+## Executor
 
-## `todo-tool-executor.js`
+- validate function + generation/tool capability context;
+- call `whenIdle()` before reads and correctness-sensitive snapshots;
+- batch orchestration;
+- final-state task mutation planner;
+- taxonomy mutation planner;
+- request dedupe registry;
+- side-effect capture;
+- `PARTIAL_FAILURE` / `PARTIAL_MUTATION` / unknown-outcome behavior;
+- call existing Todo services rather than IndexedDB directly.
 
-- validate function call + args;
-- implement batch orchestration;
-- call existing AppDataService/hierarchy/taxonomy/order methods;
-- return stable structured results/errors;
-- never directly access IndexedDB stores.
+## UI sync
 
-## `todo-tool-ui-sync.js`
+Track:
 
-Centralize exactly one post-call refresh/reconciliation based on mutation domains.
+```text
+mutationOccurred
+mutationDomains = task/project/tag/workspace
+```
 
-Do not scatter UI rendering throughout each tool handler.
+Run one final UI reconciliation in `finally` whenever any durable mutation occurred, even if overall result is `ok:false` because of `PARTIAL_FAILURE` or `PARTIAL_MUTATION`.
 
 ---
 
-# 18. Immediate Todo UI synchronization
+# 24. Existing Todo service changes
 
-This is a core acceptance requirement, not an optional polish item.
+Prefer reusing current AppDataService/hierarchy/taxonomy methods, but the old rule “prefer no existing service changes” is too strict.
 
-After a successful AI mutation, refresh the mounted Todo UI immediately.
+If implementation proves that one logical Todo operation cannot be composed safely from current public methods, add a **narrow generic Todo-domain compound helper**.
 
-Recommended synchronization matrix:
+Requirements for such helpers:
 
-## Task mutations
+- generic Todo behavior, not Gemini-specific naming/logic;
+- one clear queue ownership boundary where practical;
+- one consistent operation plan/transaction where practical;
+- reuse existing mappers/repositories/repeat rules;
+- no duplicate storage architecture.
 
-Call the equivalent of:
+Do not call public methods that each enqueue from inside another queued operation in a way that could deadlock. If a compound helper needs one queue entry, extract/reuse lower-level non-queued primitives instead.
+
+If full atomic composition is too invasive for a specific edge case, retain truthful staged semantics and return `PARTIAL_MUTATION`.
+
+---
+
+# 25. Immediate Todo UI synchronization
+
+Immediate synchronization is a core acceptance requirement.
+
+After any durable AI mutation, including partial mutation/failure, reconcile the mounted Todo UI once.
+
+## Task domain
+
+Equivalent refresh responsibilities:
 
 ```text
 TasksComponent.refreshAfterTaskMutation()
 SidebarComponent.updateCounts()
 ```
 
-If project/tag metadata shown in task menus changed during the same logical operation, rebuild those menus as needed.
+plus menus when taxonomy metadata changed.
 
-## Project mutations
+## Project domain
 
-Refresh:
+Refresh/reconcile:
 
 ```text
 SidebarComponent.renderProjects()
@@ -1684,11 +1495,9 @@ TasksComponent.render()
 SidebarComponent.updateCounts()
 ```
 
-If the current project was deleted, existing state logic falls back to Inbox; the visual navigation must be synchronized to that new state.
+## Tag domain
 
-## Tag mutations
-
-Refresh:
+Refresh/reconcile:
 
 ```text
 SidebarComponent.renderTags()
@@ -1698,156 +1507,212 @@ TasksComponent.render()
 SidebarComponent.updateCounts()
 ```
 
-## Workspace mutations
+## Workspace domain
 
-Synchronize:
+Synchronize active filter/title, WorkspaceControls, tasks, and counts.
 
-```text
-Sidebar active filter/title
-WorkspaceControls internal state + UI
-TasksComponent render
-counts
-```
-
-## Important performance rule
-
-For a batch of 30 tasks:
+Performance rule:
 
 ```text
 30 data operations
-1 final UI refresh
+1 final UI reconciliation
 ```
 
-not:
+not 30 full renders.
+
+Because the iframe remains mounted while hidden, its DOM still updates. Switching back to Todo must show the new state without reload/rehydration.
+
+---
+
+# 26. Open-editor optimistic concurrency
+
+The original “do not repopulate an open editor” rule is insufficient because current Task/Subtask editors submit full payloads and can later overwrite AI changes with stale values.
+
+V1 must add lost-update protection.
+
+## 26.1 Base snapshot
+
+When a Task/Subtask editor opens, capture:
 
 ```text
-30 data operations
-30 full renders
+entity id
+base updatedAt
+base normalized editable values
 ```
 
-Because the Todo iframe remains mounted while hidden, this render still updates its DOM. Switching back to Todo therefore shows the new state instantly without a page reload or rehydration.
+## 26.2 Detect stale editor
+
+If an AI mutation changes the same entity while its editor is open:
+
+- do not overwrite the user’s visible draft;
+- mark the editor stale/conflicted;
+- preserve typed text and selections.
+
+## 26.3 Safe save
+
+On Save after the base entity changed:
+
+1. compare current draft to base snapshot to find user-dirty fields;
+2. compare latest AppState entity to base snapshot to find externally changed fields;
+3. if the user and AI changed different fields, submit/merge only user-dirty fields onto latest state;
+4. if both changed the same field, block silent save and show a conflict message/banner while preserving the draft;
+5. user can review/reload/resolve explicitly.
+
+Do not allow the old full payload to silently overwrite newer AI state.
+
+## 26.4 Related invalidation
+
+AI UI sync must also handle:
+
+- edited entity deleted → close editor + nested Schedule/Repeat safely;
+- selected Project deleted in open Task editor → remove invalid selected ID and notify/mark draft changed as appropriate;
+- selected Tags deleted → remove invalid tag IDs from Task/Subtask draft;
+- parent task deleted while Subtask editor open → close invalid subtask editor stack;
+- taxonomy editor open for an entity AI deletes/changes → invalidate/close or mark stale consistently;
+- rebuild menus **and** reconcile internal selected IDs, not only DOM options.
+
+Use existing `ModalFocusManager` for safe focus restoration.
 
 ---
 
-# 19. Open editor/modal conflict handling
+# 27. Chat-side modules
 
-An AI tool may modify data while the user has a Todo editor/modal open.
-
-Do not blindly overwrite the user's currently typed, unsaved form controls.
-
-V1 policy:
-
-- underlying persisted/AppState data changes immediately;
-- task list/sidebar/counts update immediately;
-- do not repopulate an open editor's text fields solely because an AI call completed;
-- if the AI deletes the exact entity currently being edited, close the now-invalid editor safely and restore focus;
-- if project/tag deletion invalidates a menu selection, rebuild the menu from state;
-- after the user closes/reopens an editor, it reads the committed latest state.
-
-A future optimistic conflict banner can be added later; it is not required for the initial integration.
-
----
-
-# 20. Chat-side modules and registry
-
-Recommended new modules:
+Recommended additions:
 
 ```text
 ChatUI/js/todo/todo-tool-definitions.js
 ChatUI/js/todo/todo-tool-executor.js
 ChatUI/js/todo/todo-bridge-client.js
+ChatUI/js/tools/custom-tool-provider.js   // or equivalent centralized provider resolver
 ```
 
-## `todo-tool-definitions.js`
+## Definitions
 
-Contains only AI-facing function declarations and metadata.
+- the 14 Gemini-compatible declarations;
+- concise but precise descriptions;
+- tell model to read first when ID is unknown/ambiguous;
+- explain plural one-or-many arrays;
+- explain omitted/null semantics;
+- explain project/tag delete side effects;
+- explain reminder configuration is not guaranteed delivery;
+- explain position semantics;
+- never invent IDs.
 
-Descriptions should tell the model:
+## Bridge client
 
-- use read tools first when an existing ID is unknown/ambiguous;
-- create/update tools accept one or many objects;
-- updates use omitted-vs-null semantics;
-- project/tag/task delete effects;
-- position is semantic;
-- do not invent IDs.
+- live capability state;
+- pending request map;
+- immediate-only RPC through Shell;
+- operation-aware timeout behavior;
+- AbortSignal handling;
+- uncertain-outcome status;
+- ignore mismatched/late responses;
+- never contain Todo business rules.
 
-Keep descriptions precise enough for tool choice but not unnecessarily verbose, to reduce prompt/context cost.
+## Todo tool executor
 
-## `todo-bridge-client.js`
+- check `context.activeTools.todo` generation snapshot;
+- check live Todo capability;
+- route destructive calls through Chat approval before dispatch;
+- call bridge client;
+- normalize transport failures into stable structured Todo results.
 
-- tracks Todo capability readiness;
-- sends correlated requests to shell;
-- owns pending request map/timeouts/abort;
-- never executes Todo business logic.
+## Generic custom-function registry
 
-## `todo-tool-executor.js`
+Make current registry provider-neutral and register both Workspace and Todo.
 
-- verifies tool is currently enabled/effectively available;
-- sends request through bridge client;
-- normalizes bridge-level failures into stable Todo tool results.
+Preserve the existing behavior where `{ok:false}` business results are sent back to Gemini as `functionResponse` instead of crashing the whole assistant turn.
 
-## Generic function registry update
-
-`ChatUI/js/tools/function-tool-registry.js` should become provider-neutral and register both Workspace and Todo.
-
-A small descriptor registry is preferable to adding repeated conditional code for each future provider.
-
----
-
-# 21. ChatUI tool toggle/availability behavior
-
-## Combined app
-
-When Todo capability is ready:
-
-- To-Do toggle is enabled;
-- saved state can be turned on/off like Workspace;
-- active pill appears when enabled;
-- Gemini declarations are sent only when enabled.
-
-## Before Todo is ready
-
-The To-Do option can render disabled with a small unavailable/loading state. Do not let the user enable a tool the current generation cannot execute.
-
-## Standalone ChatUI
-
-Standalone ChatUI has no sibling Todo iframe.
-
-Preserve standalone behavior:
-
-- do not throw during startup;
-- show To-Do as unavailable/disabled (or hide it consistently if UI design prefers, but disabled is more self-explanatory);
-- do not include Todo function declarations;
-- do not erase the stored `tools.todo` preference merely because Todo is temporarily unavailable.
-
-If the same settings database is later used in the combined shell and `tools.todo` was enabled, it can become effective once the capability is ready.
+Rename Workspace-specific custom-loop error wording to provider-neutral wording where needed.
 
 ---
 
-# 22. Live Voice behavior
+# 28. ChatUI To-Do tool UI and privacy
 
-No special voice-only tool declarations.
+Add To-Do in:
 
-Acceptance flow:
+- composer Tools popup;
+- right-side AI Tools panel;
+- active tool pill system.
+
+Recommended label/icon:
 
 ```text
-1. Enable To-Do tool.
-2. Open Live Voice.
-3. Say: "Create a task called Buy medicine tomorrow at 5 PM and remind me 30 minutes before."
-4. Live Voice transcribes/sends the normal user turn.
-5. Gemini calls todo_create_tasks.
-6. Todo hidden iframe persists task and refreshes its DOM.
-7. Function result returns to Gemini.
-8. Gemini speaks confirmation.
-9. Switch to Todo.
-10. Task is already visible without refresh.
+To-Do
+list-todo
 ```
 
-The same must work for update/delete/project/tag/view operations.
+Recommended short description:
+
+```text
+Read & manage tasks, projects and tags
+```
+
+Add clear user-facing disclosure near/when enabling the tool:
+
+```text
+Allows ChatUI to read and change your To-Do data.
+Todo information used by AI tools may be sent to your configured Gemini endpoint.
+```
+
+Do not imply that Todo data remains entirely local after a read result is sent to Gemini.
+
+## Preference vs availability
+
+UI descriptor must represent both:
+
+```text
+saved preference
+live capability availability
+```
+
+Example states:
+
+```text
+preference=false + available=true  → unchecked enabled
+preference=true  + available=true  → checked active
+preference=true  + available=false → preference retained, visibly unavailable, declarations disabled
+preference=false + available=false → unchecked disabled
+```
+
+Active pill represents **effective active availability**, not merely saved preference.
+
+Do not clear saved `tools.todo` when Todo temporarily reloads/fails or standalone ChatUI is opened.
+
+Add `tools.todo` to Chat state/load/persistence without an IndexedDB schema-version change.
+
+While touching tool UI wiring, replace repeated hard-coded toggle/pill conditionals with a small descriptor table rather than adding another full duplicated block. Do not refactor unrelated composer behavior.
 
 ---
 
-# 23. File-by-file implementation plan
+# 29. Live Voice behavior
+
+No special voice-only declarations.
+
+Normal read/create/update flow:
+
+```text
+Enable To-Do
+→ start Live Voice
+→ speak request
+→ normal sendMessage/generation
+→ Gemini todo_* call
+→ Todo hidden iframe persists + reconciles UI
+→ result returns
+→ Gemini can speak confirmation
+→ switch to Todo
+→ state already visible
+```
+
+Reminder wording must say the reminder configuration was saved, not promise a real notification.
+
+Destructive delete requests use the same Chat-visible approval step before Todo dispatch. No hidden iframe confirmation.
+
+Cross-app switching must not reload either frame or stop Chat generation/recording/Live Voice/Read Aloud.
+
+---
+
+# 30. File-by-file implementation plan
 
 ## ChatUI — modify
 
@@ -1855,57 +1720,63 @@ The same must work for update/delete/project/tag/view operations.
 ChatUI/js/state/store.js
 ```
 
-- add `tools.todo` default false;
-- add runtime bridge availability only if a dedicated bridge client does not encapsulate it.
+- add `tools.todo: false`.
 
 ```text
 ChatUI/js/storage/load.js
+ChatUI/js/storage/records.js (only fallback/default shape if needed)
 ```
 
-- normalize persisted `savedTools.todo`;
-- no DB version/schema change.
+- load/save todo preference without DB schema migration.
 
 ```text
 ChatUI/html/main-chat.html
 ChatUI/html/right-sidebar.html
 ```
 
-- add To-Do tool option/card matching current tool UI.
+- add To-Do card/toggle + privacy/unavailable disclosure consistent with current UI.
 
 ```text
 ChatUI/js/composer/composer.js
 ```
 
-- wire Todo state/toggle/pill;
-- preferably introduce small data-driven descriptor for current tool UI synchronization rather than one more duplicated set of selectors.
+- use tool descriptor model for toggle/pill synchronization;
+- distinguish saved preference vs effective availability.
 
 ```text
 ChatUI/js/tools/function-tool-registry.js
 ```
 
-- register Todo declarations/executor when effectively enabled;
-- make unsupported-function error generic rather than Workspace-specific.
+- provider-neutral Workspace + Todo registration.
 
 ```text
 ChatUI/js/api/gemini.js
 ```
 
-- keep current function loop;
-- classify `todo_` provider in emitted activity or use centralized provider helper;
-- rename Workspace-specific loop-limit error text to generic custom-tool wording where applicable.
+- keep current custom loop;
+- provider-neutral loop wording;
+- use centralized custom provider resolver;
+- preserve structured business failure behavior.
 
 ```text
 ChatUI/js/chat/activity-timeline.js
 ```
 
-- recognize `todo_` provider;
-- add To-Do display label and compact summaries.
+- Todo provider label/summaries through centralized provider resolver.
 
 ```text
 ChatUI/js/embedded/shell-bridge.js
 ```
 
-- integrate Todo availability/results only if the dedicated Todo bridge client hooks into this module; avoid duplicate message listeners/validators where possible.
+- Todo capability/result message integration with type-aware size validation, avoiding duplicate competing listeners.
+
+Potential approval UI module/markup:
+
+```text
+ChatUI/js/todo/todo-destructive-approval.js
+```
+
+or equivalent small module integrated with existing modal/focus conventions.
 
 ## ChatUI — add
 
@@ -1913,20 +1784,28 @@ ChatUI/js/embedded/shell-bridge.js
 ChatUI/js/todo/todo-tool-definitions.js
 ChatUI/js/todo/todo-tool-executor.js
 ChatUI/js/todo/todo-bridge-client.js
+ChatUI/js/tools/custom-tool-provider.js   // if not placed elsewhere
 ```
 
 ## Shell — modify
 
 ```text
-shell/js/frame-bridge.js
-shell/js/protocol.js
+shell/js/frame-manager.js
 ```
 
-- add allowlisted Todo RPC routing/capability/result messages;
-- maintain exact-origin + known-frame validation;
-- keep existing message behavior backward compatible.
+- add immediate-only `sendIfReady()` (or equivalent) that never queues Todo RPC.
 
-Only modify frame-manager/main shell code if needed to retain/rebroadcast Todo capability readiness cleanly.
+```text
+shell/js/frame-bridge.js
+shell/js/protocol.js
+shell/js/app-shell.js
+```
+
+- route correlated Todo requests/results;
+- type-aware 32/128 KiB validation;
+- capability lifecycle broadcasts;
+- exact source/window checks;
+- no stale RPC queue.
 
 ## Todo — modify
 
@@ -1934,17 +1813,27 @@ Only modify frame-manager/main shell code if needed to retain/rebroadcast Todo c
 TodoList-ui/js/embedded/shell-bridge.js
 ```
 
-- advertise `todo-tools-v1` only after app initialization;
-- receive allowlisted Todo tool requests;
-- execute asynchronously;
-- send correlated result.
+- advertise `todo-tools-v1` only when ready;
+- type-aware payload validation;
+- execute allowlisted Todo RPC asynchronously;
+- correlated response.
 
 ```text
 TodoList-ui/js/app-main.js
 ```
 
-- pass/register any tool executor dependencies required by embedded bridge after state/storage/UI initialization;
-- do not change startup order unnecessarily.
+- initialize tool executor/bridge dependencies only after persistence/state/UI are ready;
+- keep startup order otherwise stable.
+
+```text
+TodoList-ui/js/components/tasks.js
+TodoList-ui/js/components/subtask-editor.js
+```
+
+- optimistic-concurrency base snapshots/dirty-field merge/conflict handling;
+- reconcile invalid project/tag selections.
+
+Other modal/taxonomy modules only as needed for safe stale/deleted-entity handling.
 
 ## Todo — add
 
@@ -1955,227 +1844,216 @@ TodoList-ui/js/tools/todo-tool-normalizers.js
 TodoList-ui/js/tools/todo-tool-ui-sync.js
 ```
 
-## Existing Todo services
+## Todo existing services — narrow changes allowed where proven necessary
 
-Prefer no changes.
-
-Only add narrowly-scoped internal service helpers if implementation discovers an operation cannot safely be composed from current AppDataService/hierarchy/taxonomy APIs. Do not add AI-specific logic to generic storage repositories.
+Potentially add generic compound/validation helpers in the appropriate existing storage/domain modules. Do not add AI-specific storage repositories or a second mutation architecture.
 
 ## Build scripts
 
-No expected changes.
-
-Current combined/standalone static build scripts already copy the `js` trees recursively, so new modules under `ChatUI/js` and `TodoList-ui/js` should be included automatically.
+No runtime copy-list change expected because current root build recursively copies `ChatUI/js` and `TodoList-ui/js`.
 
 ---
 
-# 24. Validation and safety rules
+# 31. Safety rules
 
-## 24.1 Function allowlist
+## Function allowlist
 
-Todo iframe must execute only names registered in the local Todo tool registry.
+Only exact registered `todo_*` names execute.
 
-Never execute arbitrary property names supplied by the model.
+No dynamic model-provided method lookup beyond exact registry mapping.
 
-## 24.2 No dynamic code execution
+## No dynamic code execution
 
-No `eval`, dynamic imports from model arguments, or model-provided method names beyond exact allowlist lookup.
+No `eval`, model-provided imports, or arbitrary JavaScript.
 
-## 24.3 Referential validation
+## Referential validation
 
 Before mutation:
 
-- task/project/tag/parent/reference IDs must exist;
-- before/after target must be in legal sibling scope;
-- taxonomy parent must not create a cycle;
-- task parent rules must remain enforced;
-- project/tag IDs assigned to tasks must exist.
+- target IDs exist;
+- project/tag IDs exist;
+- parent is legal;
+- completed parent cannot receive a new subtask;
+- taxonomy parent cannot create cycle;
+- before/after target is in final sibling scope;
+- final subtask cannot specify project;
+- dates/times/repeat/reminders pass strict AI validators.
 
-## 24.4 Destructive semantics
+## Destructive protection
 
-Delete tools remain separate so destructive intent is obvious to both model and activity UI.
+Delete calls require Chat-visible user approval before dispatch.
 
-Do not hide deletion under a generic `action` field inside update.
+No hidden Todo confirmation.
 
-The tool description should instruct the model to call deletion only when the user's request actually asks for deletion/removal.
+No automatic retry of deletion after timeout/uncertain outcome.
 
-Do not display a hidden Todo `window.confirm()` dialog during AI execution; that could block a hidden iframe indefinitely. Authorization is the explicit conversational request plus model tool call. A future Chat-level confirmation policy may be added separately if desired.
+## Closed-world Todo results
 
-## 24.5 Closed-world result data
+Todo functions read only local Todo data. They do not fetch network data themselves.
 
-Todo tools may only return data from the local Todo app. They should not fetch network content.
-
-## 24.6 Abort does not pretend to roll back committed work
-
-If generation is aborted after Todo already committed an operation, do not lie and report that the mutation was undone. Abort should stop waiting/future calls, while committed Todo state remains authoritative.
+Selected returned data is still transmitted to the configured Gemini endpoint as part of function responses; UI must disclose this.
 
 ---
 
-# 25. Testing plan
+# 32. Testing and CI plan
 
-## 25.1 Declaration/UI tests
+Respect the existing project testing preference: **do not add headless Chrome as a requirement**. Keep browser/voice behavior in the manual matrix and add pure-JS/static tests where possible.
+
+## 32.1 UI/declaration
 
 Verify:
 
-- To-Do appears in composer Tools popup;
-- To-Do appears in right sidebar with same visual pattern;
-- both toggles stay synchronized;
-- active indicator pill appears/disappears;
-- state persists across refresh;
-- Todo declarations absent when toggle off;
-- declarations present when toggle on + capability ready;
-- declarations absent safely in standalone ChatUI.
+- To-Do appears in both tool UI locations;
+- toggles synchronized;
+- saved preference persists;
+- live unavailable state does not erase preference;
+- active pill reflects effective availability;
+- declarations absent when toggle snapshot off;
+- declarations absent when capability unavailable;
+- standalone ChatUI starts safely with Todo unavailable.
 
-## 25.2 Read tools
+## 32.2 RPC lifecycle
 
-Test:
+Verify:
 
-- exact IDs;
-- text search;
-- project/tag filters;
-- any/all tag matching;
-- date ranges;
-- completed true/false;
-- priority filters;
-- root/subtask filters;
-- current-view scope;
-- limits/bounded output;
-- project/tag hierarchy/counts;
-- current workspace state.
+1. Todo LOADING + create call → immediate `TODO_UNAVAILABLE`; never delivered later.
+2. Todo FAILED/retry → no stale queued mutation after READY.
+3. capability drop during active generation → tool returns unavailable; never queues.
+4. same requestId delivered twice → executes once.
+5. mutation timeout → no automatic new-ID retry.
+6. frame reload mid-mutation → outcome treated uncertain; read reconciliation required.
+7. request >32 KiB and <128 KiB Todo RPC accepted.
+8. ordinary shell message >32 KiB still rejected.
+9. Todo request/response >128 KiB rejected/bounded.
+10. wrong origin/source/mismatched function/request response ignored.
 
-## 25.3 Task create
+## 32.3 Strict normalizers
 
-Test one and batch:
+Pure-JS tests for:
 
-- title only;
-- description;
-- Inbox task;
-- project;
-- multiple tags;
-- all priorities including none;
-- date only;
-- time only if current app allows it;
-- date + time;
-- built-in reminder;
-- custom reminder;
-- multiple reminders;
-- daily/weekly/monthly/yearly/custom repeat;
-- repeat end by date/count;
-- existing parent subtask;
-- explicit top/bottom/before/after position;
-- completed create when explicitly requested;
-- invalid project/tag/parent rejected cleanly.
+- valid/invalid date;
+- valid/invalid time;
+- priority;
+- repeat ranges;
+- yearDates January/December 1-based mapping;
+- reminder built-in mapping/custom deterministic IDs/max range;
+- position scope/required relative target;
+- duplicate update IDs;
+- final-subtask project conflict.
 
-## 25.4 Task update
+## 32.4 Read consistency
 
-Test:
+Verify:
 
-- rename/description;
-- change/clear project;
-- add/replace/clear tags;
-- set/clear date;
-- set/clear time;
-- set/clear reminders;
-- set/clear repeat;
-- set/clear priority;
-- complete active task;
-- change completed task back to active using the same `completed` field, with no separate tool;
-- repeating completion generates next occurrence exactly according to existing RepeatEngine;
-- root → subtask;
-- subtask → root;
-- legal reparent;
-- illegal hierarchy rejected;
-- position within root scope;
-- position within subtask sibling scope;
-- batch mixed updates;
-- one mid-batch failure reports partial results.
+- read waits for pending manual service write;
+- current_view matches real family-aware TaskFilter/render semantics;
+- exact vs descendant project/tag filters;
+- active vs total count labels;
+- large search results stay within result budget or return `RESULT_TOO_LARGE`.
 
-## 25.5 Task delete
+## 32.5 Task create/update/delete
 
 Test:
 
-- one root task without children;
-- root with subtasks deletes family;
-- one subtask only;
-- several tasks;
-- parent+child duplicated input does not double-delete;
-- missing ID result.
+- one/many create;
+- title/description/project/tags/priority/date/time;
+- reminder configuration (without claiming actual delivery);
+- all repeat modes/end conditions;
+- create subtask under valid active root;
+- completed parent rejected;
+- root→subtask conflict project rejected;
+- subtask→different parent;
+- subtask→root + new project yields requested final project;
+- root project change reports affected children;
+- completion uses repeat-aware semantics;
+- repeat root completion reports old family + new occurrence IDs;
+- completion transition + position rejected;
+- task family delete semantics;
+- update duplicate IDs rejected before mutation;
+- mid-batch failure returns `PARTIAL_FAILURE`;
+- single multi-stage failure returns `PARTIAL_MUTATION` + final state;
+- partial mutation still refreshes Todo UI once.
 
-## 25.6 Projects/tags
+## 32.6 Project/tag
 
-For both entity types test:
+For each:
 
-- create one/many;
-- child creation under existing parent;
+- one/many create;
+- child create;
 - rename/icon/view;
 - reparent;
-- make top-level;
-- before/after/top/bottom order;
+- top-level;
+- top/bottom/before/after;
+- parent+position planner;
 - cycle rejection;
-- delete current selection;
-- delete parent and verify existing child promotion behavior;
-- project deletion unassigns tasks rather than deleting them;
-- tag deletion removes tag relation rather than deleting tasks.
+- duplicate update IDs rejected;
+- delete requires approval;
+- delete returns actual promoted child parent IDs;
+- Project deletion unassigns tasks;
+- Tag deletion removes relations only.
 
-## 25.7 Workspace/UI
+## 32.7 Workspace
 
-Test:
+- navigate Inbox/Today/Completed/project/tag;
+- List/Kanban;
+- project/tag view persistence;
+- smart view session-only result;
+- all group/sort values;
+- custom sort uses full snapshot + activateCustomSort;
+- sortDirection change rejected when final sort is custom;
+- no Timeline accepted.
 
-- navigate Inbox/Today/Completed;
-- navigate project;
-- navigate tag;
-- set List/Kanban;
-- persist project/tag view;
-- group all supported values;
-- sort all supported values;
-- direction asc/desc;
-- custom sort activation;
-- no Timeline declaration/value accepted.
+## 32.8 Editor concurrency
 
-## 25.8 Immediate rendering
+Verify:
 
-With Todo visible:
+- AI updates task while Task editor open → later Save does not silently erase AI fields;
+- same field changed both places → conflict shown, draft preserved;
+- different fields → safe dirty-field merge;
+- AI deletes edited task → editor/nested schedule closes safely;
+- selected project/tag deleted → internal draft IDs reconciled, not only menu DOM;
+- parent task deleted while Subtask editor open → invalid editor closes safely;
+- taxonomy editor stale/deleted behavior is safe.
 
-- AI create/update/delete appears instantly without refresh.
+## 32.9 Destructive approval/privacy
 
-With Todo hidden:
+- delete tool never reaches Todo before explicit Chat approval;
+- Cancel leaves data unchanged;
+- batch delete shows count/effects;
+- Live Voice surfaces approval rather than silently deleting;
+- ambiguous/untrusted tool content cannot bypass approval;
+- To-Do UI clearly states AI data-sharing boundary.
 
-- perform AI calls from Chat;
-- switch to Todo;
-- changed state is already rendered.
+## 32.10 Immediate rendering and Live Voice
 
-Verify sidebar counts, task list/Kanban, project/tag trees, current view title, and menus are correct.
+Todo visible and hidden:
 
-## 25.9 Live Voice
+- create/update/delete/project/tag/workspace changes appear without refresh;
+- partial committed state also appears immediately;
+- sidebar counts/current title/menus correct;
+- Live Voice read/create/update goes through normal generation path;
+- switching apps does not reload frames or stop generation/recording/Live Voice/Read Aloud.
 
-Test repeated voice cycles:
+## 32.11 CI/static integration
 
-- read Todo;
-- create task;
-- update task;
-- create project/tag;
-- completion;
-- deletion explicitly requested;
-- change workspace view;
-- switch between Todo/Chat during voice generation;
-- no iframe reload and no dropped tool result.
+Update:
 
-## 25.10 Bridge/security
+```text
+.github/workflows/iframe-integration-check.yml
+scripts/verify-integration.mjs
+```
 
-Test:
+Add syntax checks for all new Chat/Todo/shell tool modules.
 
-- wrong-origin message rejected;
-- unknown source window rejected;
-- unsupported function rejected;
-- mismatched request/function response ignored;
-- duplicate/late response ignored;
-- timeout returns `BRIDGE_TIMEOUT`;
-- aborted generation clears pending request;
-- payload > allowed cap rejected;
-- malformed array/enum/date/time rejected;
-- Todo not ready/unavailable handled without crash.
+Replace the old invariant that says future Todo command bridge must not exist with new assertions for:
 
-## 25.11 Build/regression
+- `todo-tools-v1` capability;
+- exact-origin Todo RPC routing;
+- immediate-only/no-queue Todo RPC;
+- type-aware 32/128 KiB limits;
+- `todo_` function declarations;
+- no direct sibling iframe storage/DOM coupling;
+- static build contains new modules.
 
 Run existing:
 
@@ -2184,107 +2062,116 @@ node scripts/verify-integration.mjs
 node scripts/build-static.mjs
 ```
 
-and standalone ChatUI/Todo build verification if present.
+and standalone ChatUI/Todo build checks if present.
 
-Extend integration verification to confirm:
-
-- Todo capability exists in embedded mode;
-- shell protocol contains expected Todo RPC route;
-- Chat declarations use `todo_` prefix;
-- no direct sibling iframe DOM/service coupling was introduced;
-- static build contains new Todo tool modules.
-
-Regression-check:
-
-- Workspace tool still works;
-- Google Search/URL Context/Code Execution unaffected;
-- normal chat unaffected when Todo disabled;
-- Todo manual UI CRUD still works;
-- persistence survives reload;
-- reminder/repeat behavior remains unchanged outside tool calls;
-- combined routing/persistent frames unchanged;
-- standalone apps still start.
+Regression-check Workspace, Google Search, URL Context, Code Execution, manual Todo CRUD, persistence, repeat/reminder storage, combined routing, and standalone startup.
 
 ---
 
-# 26. Recommended implementation order
+# 33. Recommended implementation order
 
-## Phase 1 — Todo local executor
+## Phase 1 — Pure Todo contract/normalizer tests
 
-Build and test Todo-side normalizers, registry, handlers, and UI sync directly against existing services before connecting Gemini.
+Implement/test strict dates, times, repeat, reminders, position, serializers, error type, batch duplicate rules.
 
-This proves the 14 contracts map correctly onto current Todo behavior.
+No Gemini connection yet.
 
-## Phase 2 — Shell RPC bridge
+## Phase 2 — Todo executor + mutation planners
 
-Add correlated Chat→Shell→Todo and Todo→Shell→Chat routing, capability negotiation, payload limits, timeout behavior.
+Implement read selectors, final-state Task planner, taxonomy planner, side-effect reporting, partial semantics, UI sync, and narrow generic service helpers only where proven necessary.
 
-Verify with synthetic requests from Chat iframe before Gemini registration.
+Test directly against existing Todo services.
 
-## Phase 3 — Chat definitions/executor
+## Phase 3 — Editor concurrency protection
 
-Add Todo function declarations, bridge client, function registry integration, provider activity display.
+Add base snapshots, dirty-field merge/conflict handling, and deleted/invalid related-entity reconciliation before background AI mutations can be enabled.
 
-Keep Gemini loop unchanged.
+## Phase 4 — Shell RPC + capability lifecycle
 
-## Phase 4 — Tool UI toggle
+Implement immediate-only `sendIfReady`, exact-origin correlated messages, capability transitions, type-aware payload limits, dedupe, timeout/unknown outcome behavior.
 
-Add To-Do to popup/sidebar/active pill/persistence and availability states.
+Test with synthetic requests before Gemini registration.
 
-## Phase 5 — Live Voice + cross-view verification
+## Phase 5 — Chat definitions/executor/activity
 
-Test hidden Todo iframe mutation while speaking in Chat Live Voice.
+Add 14 declarations, bridge client, provider-neutral registry/activity classification, generation-snapshot permission checks, bounded function responses.
 
-## Phase 6 — Full regression/build/PR
+## Phase 6 — Tool UI + privacy + destructive approval
 
-When implementation is explicitly authorized later:
+Add To-Do cards/toggles/pill, saved-vs-available states, privacy disclosure, and Chat-visible delete approval.
 
-- create a feature branch from the exact latest `main`;
+## Phase 7 — Live Voice and cross-view verification
+
+Verify hidden Todo updates during normal Chat/Live Voice and no refresh/reload.
+
+## Phase 8 — Full regression/build/PR
+
+When runtime implementation is explicitly authorized:
+
+- re-fetch exact latest `main`;
+- create a feature branch from that exact SHA;
 - implement phases above;
-- run automated verification;
-- manually test browser/Live Voice behavior;
-- open a PR;
+- run static/pure-JS/build verification;
+- user manually verifies browser/voice behavior;
+- open PR;
 - do not merge until reviewed/approved.
 
 ---
 
-# 27. Non-goals
+# 34. Non-goals
 
-This implementation must **not**:
+This plan does **not**:
 
 - create a network MCP server;
-- expose Todo data to an external service other than data Gemini already receives through requested tool results;
-- add a second Todo database;
-- write Todo records directly from ChatUI;
-- duplicate AppDataService business rules;
-- add Timeline view that the current app does not support;
-- add new Todo hierarchy levels beyond current task/subtask and project/tag hierarchy rules;
-- add a separate completion/reopen/move/reorder/reminder/repeat tool;
+- create another Todo database;
+- merge ChatUI_DB and TodoListDB;
+- let ChatUI directly write Todo storage/state;
+- add Timeline view;
+- add additional task hierarchy levels;
+- add separate public move/completion/activation/date/time/reminder/repeat/reorder tools;
+- promise actual notification delivery from stored reminder metadata;
+- expose raw sortOrder;
 - add a generic dangerous `todo_execute_action` tool;
-- make UI refresh depend on a full page reload;
-- rewrite existing repeat/reminder/storage architecture unless a concrete missing primitive is proven during implementation.
+- automatically retry an uncertain mutation;
+- depend on page refresh for UI synchronization;
+- require headless Chrome testing;
+- rewrite repeat/storage architecture unless a concrete generic helper is required for correctness.
 
 ---
 
-# 28. Definition of done
+# 35. Definition of done
 
-The feature is complete only when all of these are true:
+The feature is complete only when all are true:
 
-1. ChatUI has a To-Do toggle visually consistent with existing tools.
-2. Only the 14 planned Todo function declarations are exposed.
-3. Tool declarations are sent to Gemini only when enabled and Todo capability is ready.
-4. Normal chat and Live Voice use the same function path.
-5. AI can read/search/filter tasks and read project/tag/workspace context.
-6. AI can create/update/delete one or many tasks.
-7. AI can control task description, project, tags, priority, date, time, reminders, repeat, completion, parent/subtask relationship, and semantic position through create/update rather than extra micro-tools.
-8. AI can create/update/delete projects and tags, including hierarchy, views, and position.
-9. AI can navigate Todo and change actual supported list/kanban/sort/group settings.
-10. All mutations flow through Todo's existing services and IndexedDB/AppState path.
-11. Todo UI updates immediately after tool execution, including while its iframe is hidden.
-12. Switching from Chat/Live Voice back to Todo shows the result without refresh.
-13. Errors are structured, bounded, and understandable to Gemini.
-14. Bridge messages are exact-origin/source validated, allowlisted, size-limited, correlated, timeout-safe, and abort-safe.
-15. Workspace and other Chat tools continue to work.
-16. Standalone ChatUI/Todo remain functional.
-17. Existing builds/integration checks pass.
-18. No runtime implementation is merged until this plan is reviewed and explicit implementation approval is given.
+1. ChatUI has a To-Do toggle matching existing tool UI patterns.
+2. Only the 14 planned Todo functions are exposed.
+3. Function declarations use the current Gemini-compatible declaration style.
+4. Declarations are enabled by the generation tool snapshot and only while Todo capability is live.
+5. Todo capability becomes unavailable immediately on LOADING/FAILED/navigation/replacement and returns on READY.
+6. Todo RPC is never queued for later frame recovery.
+7. Normal Chat and Live Voice use the same tool path.
+8. Read tools wait for pending writes and use family-aware current-view semantics.
+9. AI can create/update/delete one or many tasks, Projects and Tags with the planned contracts.
+10. Task final-state hierarchy/project behavior is correct, including subtask→root + project change.
+11. Completed parents cannot receive new AI-created subtasks.
+12. Strict date/time/repeat/reminder validation rejects invalid intent instead of silently coercing it.
+13. Reminder configuration is supported without falsely promising real notification delivery.
+14. Mutation results report actual repeat/family/taxonomy side effects.
+15. Batch partial failure and single-item partial mutation are reported truthfully.
+16. Duplicate same-request delivery executes at most once in one iframe lifetime.
+17. Mutation timeout/reload uncertain outcomes are never automatically retried; reconciliation is required.
+18. Requests and responses are bounded, with ordinary 32 KiB and Todo RPC 128 KiB protocol behavior preserved correctly.
+19. Stable error codes come from tool prevalidation/known branches, not English exception parsing.
+20. Project/Tag parent+position changes use deterministic existing hierarchy/order semantics.
+21. `sortKey=custom` uses the same full snapshot + activateCustomSort path as current UI.
+22. Smart-view vs Project/Tag view persistence is reported accurately.
+23. Todo UI reconciles immediately after all committed changes, including partial-error cases, while visible or hidden.
+24. Open editors cannot silently overwrite newer AI changes; user drafts are preserved/conflicts surfaced.
+25. Delete calls require explicit Chat-visible user approval and never use hidden Todo confirmation.
+26. User-facing To-Do UI explains that Todo content used by AI may be sent to the configured Gemini endpoint.
+27. Business validation errors remain structured function results inside the existing Gemini loop.
+28. Workspace and other Chat tools remain functional.
+29. Standalone ChatUI/Todo remain functional.
+30. CI/static/pure-JS/manual test matrix covers the revised review cases.
+31. Existing combined build/integration checks pass after their Todo-bridge invariants are updated.
+32. No runtime implementation is merged until this revised plan is reviewed and explicit implementation approval is given.
