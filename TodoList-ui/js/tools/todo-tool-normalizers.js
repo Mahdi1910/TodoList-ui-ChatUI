@@ -300,7 +300,7 @@ export function normalizeTaskUpdateInput(current, input) {
       ? (source.parentTaskId == null ? null : normalizeId(source.parentTaskId, 'parentTaskId'))
       : undefined,
     projectSpecified: Object.prototype.hasOwnProperty.call(source, 'projectId'),
-    projectId: Object.protype.hasOwnProperty.call(source, 'projectId')
+    projectId: Object.prototype.hasOwnProperty.call(source, 'projectId')
       ? (source.projectId == null ? null : normalizeId(source.projectId, 'projectId'))
       : undefined,
     completedSpecified: Object.prototype.hasOwnProperty.call(source, 'completed'),
