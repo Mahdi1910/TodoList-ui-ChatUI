@@ -1,7 +1,6 @@
 import { AppState } from '../state.js';
 import { TaxonomyOrder } from '../taxonomy-order.js';
 import { AppDataService } from '../storage/data-service.js';
-import { RepeatEngine } from '../repeat/repeat-engine.js';
 import { isTodoToolName } from './todo-tool-registry.js';
 import {
   TodoToolValidationError,
@@ -9,7 +8,6 @@ import {
   normalizeDeleteEnvelope,
   normalizeId,
   normalizeMutationEnvelope,
-  normalizePosition,
   normalizeTaskCreateInput,
   normalizeTaskUpdateInput,
   normalizeTaxonomyCreateInput,
@@ -32,7 +30,7 @@ const MAX_SETTLED_REQUESTS = 200;
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
   if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableValue(value[key])]))
+  return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableValue(value[key])]));
 }
 
 function fingerprint(value) {
@@ -62,6 +60,26 @@ function failure(code, message, details = {}, data = undefined, meta = {}) {
     ...(data !== undefined ? { data } : {}),
     meta
   };
+}
+
+function beginStages(operations, ...names) {
+  names.forEach(name => {
+    if (Object.prototype.hasOwnProperty.call(operations, name) && operations[name] === 'skipped') {
+      operations[name] = 'running';
+    }
+  });
+}
+
+function completeStages(operations, ...names) {
+  names.forEach(name => {
+    if (operations[name] === 'running') operations[name] = 'success';
+  });
+}
+
+function failRunningStages(operations) {
+  Object.keys(operations).forEach(name => {
+    if (operations[name] === 'running') operations[name] = 'failed';
+  });
 }
 
 function taskListTree(tasks = [], max = 20) {
@@ -115,7 +133,13 @@ function cleanRegistry(registry) {
 
 function entityOrError(type, id) {
   const entity = type === 'project' ? AppState.getProject(id) : AppState.getTag(id);
-  if (!entity) throw new TodoToolValidationError(`${type === 'project' ? 'Project' : 'Tag'} not found.`, { id }, `${type.toUpperCase()}_NOT_FOUND`);
+  if (!entity) {
+    throw new TodoToolValidationError(
+      `${type === 'project' ? 'Project' : 'Tag'} not found.`,
+      { id },
+      `${type.toUpperCase()}_NOT_FOUND`
+    );
+  }
   return entity;
 }
 
@@ -142,7 +166,9 @@ function positionRefsForTasks(taskId, parentTaskId, position) {
   const relative = taskOrError(position.relativeToId);
   if ((relative.parentTaskId || null) !== (parentTaskId || null) || relative.id === taskId) {
     throw new TodoToolValidationError('Position target is not in the legal task sibling scope.', {
-      taskId, relativeToId: relative.id, parentTaskId: parentTaskId || null
+      taskId,
+      relativeToId: relative.id,
+      parentTaskId: parentTaskId || null
     }, 'POSITION_CONFLICT');
   }
   return position.placement === 'before'
@@ -158,7 +184,9 @@ function positionRefsForTaxonomy(type, entityId, parentId, position) {
   const relative = entityOrError(type, position.relativeToId);
   if ((relative.parentId || null) !== (parentId || null) || relative.id === entityId) {
     throw new TodoToolValidationError('Position target is not in the legal taxonomy sibling scope.', {
-      entityId, relativeToId: relative.id, parentId: parentId || null
+      entityId,
+      relativeToId: relative.id,
+      parentId: parentId || null
     }, 'POSITION_CONFLICT');
   }
   return position.placement === 'before'
@@ -396,20 +424,23 @@ const TodoToolExecutorCore = {
         } else if (spec.taskData.project) validateProject(spec.taskData.project);
         validateTags(spec.taskData.tags);
 
+        beginStages(operations, 'create');
         const created = await this.mutationStage(entry, () => AppDataService.createTask(spec.taskData));
         requestedId = created.id;
         itemMutation = true;
-        operations.create = 'success';
+        completeStages(operations, 'create');
 
         if (spec.position) {
+          beginStages(operations, 'position');
           positionMeta = await this.applyTaskPosition(requestedId, spec.position, entry);
-          operations.position = 'success';
+          completeStages(operations, 'position');
         }
         if (spec.completed) {
+          beginStages(operations, 'completion');
           const beforeCompletionIds = new Set(AppState.tasks.map(task => task.id));
           const returned = await this.mutationStage(entry, () => AppDataService.toggleTaskStatus(requestedId));
           repeatTransition = this.captureRepeatTransition(requestedId, beforeCompletionIds, returned);
-          operations.completion = 'success';
+          completeStages(operations, 'completion');
         }
 
         const finalTask = AppState.getTask(requestedId);
@@ -429,6 +460,7 @@ const TodoToolExecutorCore = {
         });
       } catch (error) {
         if (error instanceof AbortBeforeMutation) throw error;
+        failRunningStages(operations);
         const mapped = toolError(error);
         const finalTask = requestedId && AppState.getTask(requestedId) ? serializeTaskFull(AppState.getTask(requestedId)) : null;
         const newIds = AppState.tasks.filter(task => !beforeIds.has(task.id)).map(task => task.id);
@@ -530,37 +562,42 @@ const TodoToolExecutorCore = {
         let positionHandled = false;
         if ((current.parentTaskId || null) !== targetParentId) {
           if (spec.position) {
+            beginStages(operations, 'hierarchy', 'position');
             positionMeta = await this.applyTaskHierarchyPosition(id, targetParentId, spec.position, entry);
-            operations.position = 'success';
+            completeStages(operations, 'hierarchy', 'position');
             positionHandled = true;
           } else {
+            beginStages(operations, 'hierarchy');
             await this.moveTaskHierarchy(id, current, targetParentId, entry);
+            completeStages(operations, 'hierarchy');
           }
-          operations.hierarchy = 'success';
           itemMutation = true;
           current = taskOrError(id);
         }
 
         if (Object.keys(spec.patch).length) {
+          beginStages(operations, 'fields');
           await this.mutationStage(entry, () => AppDataService.updateTask(id, spec.patch));
-          operations.fields = 'success';
+          completeStages(operations, 'fields');
           itemMutation = true;
           current = taskOrError(id);
         }
 
         if (spec.position && !positionHandled) {
+          beginStages(operations, 'position');
           positionMeta = await this.applyTaskPosition(id, spec.position, entry);
-          operations.position = 'success';
+          completeStages(operations, 'position');
           itemMutation = true;
           current = taskOrError(id);
         }
 
         let repeatTransition = null;
         if (spec.completedSpecified && Boolean(current.completed) !== spec.completed) {
+          beginStages(operations, 'completion');
           const beforeIds = new Set(AppState.tasks.map(task => task.id));
           const returned = await this.mutationStage(entry, () => AppDataService.toggleTaskStatus(id));
           repeatTransition = spec.completed ? this.captureRepeatTransition(id, beforeIds, returned) : null;
-          operations.completion = 'success';
+          completeStages(operations, 'completion');
           itemMutation = true;
         }
 
@@ -580,6 +617,7 @@ const TodoToolExecutorCore = {
         });
       } catch (error) {
         if (error instanceof AbortBeforeMutation) throw error;
+        failRunningStages(operations);
         const mapped = toolError(error);
         const partial = itemMutation;
         failed = {
@@ -595,14 +633,15 @@ const TodoToolExecutorCore = {
     }
 
     const changedCount = succeeded.filter(item => item.mutationOccurred).length;
-    const changed = entry.mutationOccurred || changedCount > 0;
+    const failedChangedCount = failed?.result?.meta?.mutationOccurred ? 1 : 0;
+    const changed = entry.mutationOccurred || changedCount > 0 || failedChangedCount > 0;
     if (changed) TodoToolUiSync.reconcile('task', { hierarchyChanged: true });
     if (failed) {
       return failure(changed ? 'PARTIAL_FAILURE' : failed.result.error.code,
         changed ? 'Some task updates were saved before a later update failed.' : failed.result.error.message,
         { failed: failed.result.error },
         { succeeded, failed, unattempted: items.slice(failed.inputIndex + 1).map((_, i) => failed.inputIndex + 1 + i) },
-        { mutationOccurred: changed, affectedCount: changedCount });
+        { mutationOccurred: changed, affectedCount: changedCount + failedChangedCount });
     }
     return success({ items: succeeded }, `Updated ${succeeded.length} ${succeeded.length === 1 ? 'task' : 'tasks'}.`, {
       mutationOccurred: changed,
@@ -688,18 +727,21 @@ const TodoToolExecutorCore = {
         const spec = prepared[index];
         if (spec.data.parentId) entityOrError(type, spec.data.parentId);
         const method = type === 'project' ? 'createProject' : 'createTag';
+        beginStages(operations, 'create');
         let created = await this.mutationStage(entry, () => AppDataService[method](spec.data));
         createdId = created.id;
         itemMutation = true;
-        operations.create = 'success';
+        completeStages(operations, 'create');
         if (spec.position) {
+          beginStages(operations, 'position');
           positionMeta = await this.applyTaxonomyPosition(type, created.id, created.parentId || null, spec.position, entry);
-          operations.position = 'success';
+          completeStages(operations, 'position');
         }
         created = entityOrError(type, created.id);
         succeeded.push({ inputIndex: index, id: created.id, operations, finalEntity: { ...created }, sideEffects: positionMeta, mutationOccurred: true });
       } catch (error) {
         if (error instanceof AbortBeforeMutation) throw error;
+        failRunningStages(operations);
         const mapped = toolError(error);
         failed = {
           inputIndex: index,
@@ -746,16 +788,20 @@ const TodoToolExecutorCore = {
         let current = entityOrError(type, id);
         const spec = normalizeTaxonomyUpdateInput(items[index], type === 'project' ? 'Project' : 'Tag');
         const targetParentId = spec.parentSpecified ? (spec.data.parentId || null) : (current.parentId || null);
+        const parentChanged = spec.parentSpecified && (current.parentId || null) !== targetParentId;
         if (targetParentId) entityOrError(type, targetParentId);
-        if (type === 'project') TodoToolUiGuard.assertProjectMutation({ projectId: id, parentRelationshipChanges: spec.parentSpecified || !!spec.position });
-        else TodoToolUiGuard.assertTagMutation({ tagId: id, parentRelationshipChanges: spec.parentSpecified || !!spec.position });
+        if (type === 'project') {
+          TodoToolUiGuard.assertProjectMutation({ projectId: id, parentRelationshipChanges: parentChanged || !!spec.position });
+        } else {
+          TodoToolUiGuard.assertTagMutation({ tagId: id, parentRelationshipChanges: parentChanged || !!spec.position });
+        }
         TodoToolUiGuard.assertTaxonomyRelationshipSafe(type, id, targetParentId);
 
-        if (spec.parentSpecified || spec.position) {
+        if (parentChanged || spec.position) {
           const position = spec.position || { placement: 'bottom', relativeToId: null };
+          beginStages(operations, ...(parentChanged ? ['hierarchy'] : []), ...(spec.position ? ['position'] : []));
           const meta = await this.applyTaxonomyPosition(type, id, targetParentId, position, entry);
-          operations.hierarchy = spec.parentSpecified ? 'success' : 'skipped';
-          operations.position = spec.position ? 'success' : 'skipped';
+          completeStages(operations, ...(parentChanged ? ['hierarchy'] : []), ...(spec.position ? ['position'] : []));
           itemMutation = true;
           current = entityOrError(type, id);
           spec.positionMeta = meta;
@@ -764,15 +810,17 @@ const TodoToolExecutorCore = {
         const fieldData = { ...spec.data };
         delete fieldData.parentId;
         if (Object.keys(fieldData).length) {
+          beginStages(operations, 'fields');
           const method = type === 'project' ? 'updateProject' : 'updateTag';
           await this.mutationStage(entry, () => AppDataService[method](id, fieldData));
-          operations.fields = 'success';
+          completeStages(operations, 'fields');
           itemMutation = true;
         }
         const finalEntity = { ...entityOrError(type, id) };
         succeeded.push({ inputIndex: index, id, operations, finalEntity, sideEffects: spec.positionMeta || {}, mutationOccurred: itemMutation });
       } catch (error) {
         if (error instanceof AbortBeforeMutation) throw error;
+        failRunningStages(operations);
         const mapped = toolError(error);
         failed = {
           inputIndex: index,
@@ -786,18 +834,20 @@ const TodoToolExecutorCore = {
       }
     }
 
-    const changed = succeeded.some(item => item.mutationOccurred) || entry.mutationOccurred;
+    const changedCount = succeeded.filter(item => item.mutationOccurred).length;
+    const failedChangedCount = failed?.result?.meta?.mutationOccurred ? 1 : 0;
+    const changed = changedCount > 0 || failedChangedCount > 0 || entry.mutationOccurred;
     if (changed) TodoToolUiSync.reconcile(type, { hierarchyChanged: true });
     if (failed) {
       return failure(changed ? 'PARTIAL_FAILURE' : failed.result.error.code,
         changed ? `Some ${type} updates were saved before a later update failed.` : failed.result.error.message,
         { failed: failed.result.error },
         { succeeded, failed, unattempted: items.slice(failed.inputIndex + 1).map((_, i) => failed.inputIndex + 1 + i) },
-        { mutationOccurred: changed, affectedCount: succeeded.length });
+        { mutationOccurred: changed, affectedCount: changedCount + failedChangedCount });
     }
     return success({ items: succeeded }, `Updated ${succeeded.length} ${type === 'project' ? 'projects' : 'tags'}.`, {
       mutationOccurred: changed,
-      affectedCount: succeeded.length
+      affectedCount: changedCount
     });
   },
 
@@ -818,7 +868,9 @@ const TodoToolExecutorCore = {
         if (type === 'project') TodoToolUiGuard.assertProjectMutation({ projectId: id, operation: 'delete', parentRelationshipChanges: true });
         else TodoToolUiGuard.assertTagMutation({ tagId: id, operation: 'delete', parentRelationshipChanges: true });
         const children = TaxonomyOrder.getChildren(type, id).map(child => child.id);
-        const tasks = AppState.tasks.filter(task => type === 'project' ? task.project === id : (task.tags || []).includes(id)).map(task => task.id);
+        const tasks = AppState.tasks
+          .filter(task => type === 'project' ? task.project === id : (task.tags || []).includes(id))
+          .map(task => task.id);
         const method = type === 'project' ? 'deleteProject' : 'deleteTag';
         await this.mutationStage(entry, () => AppDataService[method](id));
         deleted.push(id);
@@ -888,45 +940,50 @@ const TodoToolExecutorCore = {
     let mutationOccurred = false;
     try {
       if (source.navigation != null) {
+        beginStages(stages, 'navigation');
         this.assertNotCancelled(entry);
         const nav = assertPlainObject(source.navigation, 'navigation');
         const type = String(nav.type || '');
         if (!['inbox', 'today', 'completed', 'project', 'tag'].includes(type)) {
           throw new TodoToolValidationError('navigation.type is invalid.');
         }
+        let nextType = 'smart';
+        let nextId = type;
         if (type === 'project') {
-          const id = normalizeId(nav.id, 'navigation.id');
-          entityOrError('project', id);
-          AppState.currentFilterType = 'project';
-          AppState.currentFilter = id;
+          nextType = 'project';
+          nextId = normalizeId(nav.id, 'navigation.id');
+          entityOrError('project', nextId);
         } else if (type === 'tag') {
-          const id = normalizeId(nav.id, 'navigation.id');
-          entityOrError('tag', id);
-          AppState.currentFilterType = 'tag';
-          AppState.currentFilter = id;
-        } else {
-          AppState.currentFilterType = 'smart';
-          AppState.currentFilter = type;
+          nextType = 'tag';
+          nextId = normalizeId(nav.id, 'navigation.id');
+          entityOrError('tag', nextId);
         }
-        stages.navigation = 'success';
-        mutationOccurred = true;
-        this.markMutation(entry);
-      }
-
-      if (source.viewType != null) {
-        if (!['list', 'kanban'].includes(source.viewType)) throw new TodoToolValidationError('viewType must be list or kanban.');
-        this.assertNotCancelled(entry);
-        const previous = window.WorkspaceControls?.viewType;
-        const next = await window.WorkspaceControls?.setViewType?.(source.viewType, { persist: true, render: false });
-        if (next !== source.viewType) throw new Error('Todo could not save the requested view.');
-        stages.view = 'success';
-        if (previous !== next) {
+        const changed = AppState.currentFilterType !== nextType || AppState.currentFilter !== nextId;
+        if (changed) {
+          AppState.currentFilterType = nextType;
+          AppState.currentFilter = nextId;
           mutationOccurred = true;
           this.markMutation(entry);
         }
+        completeStages(stages, 'navigation');
+      }
+
+      if (source.viewType != null) {
+        beginStages(stages, 'view');
+        if (!['list', 'kanban'].includes(source.viewType)) throw new TodoToolValidationError('viewType must be list or kanban.');
+        this.assertNotCancelled(entry);
+        const previous = window.WorkspaceControls?.viewType;
+        if (previous !== source.viewType) {
+          const next = await window.WorkspaceControls?.setViewType?.(source.viewType, { persist: true, render: false });
+          if (next !== source.viewType) throw new Error('Todo could not save the requested view.');
+          mutationOccurred = true;
+          this.markMutation(entry);
+        }
+        completeStages(stages, 'view');
       }
 
       if (source.sortKey != null) {
+        beginStages(stages, 'sort');
         const allowed = ['custom', 'dueDate', 'priority', 'name', 'createdAt'];
         if (!allowed.includes(source.sortKey)) throw new TodoToolValidationError('sortKey is invalid.');
         const controls = window.WorkspaceControls;
@@ -939,30 +996,39 @@ const TodoToolExecutorCore = {
             await this.mutationStage(entry, () => AppDataService.setSetting('sortKey', source.sortKey));
           }
           controls.sortKey = source.sortKey;
-          stages.sort = 'success';
           mutationOccurred = true;
         }
+        completeStages(stages, 'sort');
       }
 
       const finalSort = window.WorkspaceControls?.normalizeSortKey?.(window.WorkspaceControls?.sortKey || 'custom') || 'custom';
       if (source.sortDirection != null) {
-        if (!['asc', 'desc'].includes(source.sortDirection)) throw new TodoToolValidationError('sortDirection must be asc or desc.');
-        if (finalSort !== 'custom' && window.WorkspaceControls.sortDirection !== source.sortDirection) {
-          await this.mutationStage(entry, () => AppDataService.setSetting('sortDirection', source.sortDirection));
-          window.WorkspaceControls.sortDirection = source.sortDirection;
-          stages.sortDirection = 'success';
-          mutationOccurred = true;
+        if (!['asc', 'desc'].includes(source.sortDirection)) {
+          beginStages(stages, 'sortDirection');
+          throw new TodoToolValidationError('sortDirection must be asc or desc.');
+        }
+        if (finalSort !== 'custom') {
+          beginStages(stages, 'sortDirection');
+          if (window.WorkspaceControls.sortDirection !== source.sortDirection) {
+            await this.mutationStage(entry, () => AppDataService.setSetting('sortDirection', source.sortDirection));
+            window.WorkspaceControls.sortDirection = source.sortDirection;
+            mutationOccurred = true;
+          }
+          completeStages(stages, 'sortDirection');
         }
       }
 
       if (source.groupKey != null) {
-        if (!['none', 'priority', 'date', 'project', 'tag'].includes(source.groupKey)) throw new TodoToolValidationError('groupKey is invalid.');
+        beginStages(stages, 'group');
+        if (!['none', 'priority', 'date', 'project', 'tag'].includes(source.groupKey)) {
+          throw new TodoToolValidationError('groupKey is invalid.');
+        }
         if (window.WorkspaceControls.groupKey !== source.groupKey) {
           await this.mutationStage(entry, () => AppDataService.setSetting('groupKey', source.groupKey));
           window.WorkspaceControls.groupKey = source.groupKey;
-          stages.group = 'success';
           mutationOccurred = true;
         }
+        completeStages(stages, 'group');
       }
 
       TodoToolUiSync.reconcile('workspace');
@@ -972,6 +1038,7 @@ const TodoToolExecutorCore = {
       });
     } catch (error) {
       if (error instanceof AbortBeforeMutation) throw error;
+      failRunningStages(stages);
       if (mutationOccurred) TodoToolUiSync.reconcile('workspace');
       const mapped = toolError(error);
       return failure(mutationOccurred ? 'PARTIAL_MUTATION' : mapped.code,
