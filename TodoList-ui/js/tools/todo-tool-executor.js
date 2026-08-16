@@ -558,9 +558,39 @@ const TodoToolExecutorCore = {
           delete spec.patch.project;
         }
 
+        const hierarchyChanged = (current.parentTaskId || null) !== targetParentId;
+        let remainingPatch = { ...spec.patch };
         let positionMeta = {};
         let positionHandled = false;
-        if ((current.parentTaskId || null) !== targetParentId) {
+
+        // If hierarchy and position are committed together while a non-Custom
+        // sort is active, apply safe sort-affecting fields first so the snapshot
+        // captures the authoritative state at the exact pre-drag stage. A
+        // subtask's requested root Project is deferred until after unlinking,
+        // because Todo intentionally ignores a child's independent Project.
+        if (hierarchyChanged && spec.position && Object.keys(remainingPatch).length) {
+          const prePositionPatch = { ...remainingPatch };
+          const deferRootProject = Boolean(
+            current.parentTaskId &&
+            targetParentId === null &&
+            Object.prototype.hasOwnProperty.call(prePositionPatch, 'project')
+          );
+          if (deferRootProject) {
+            remainingPatch = { project: prePositionPatch.project };
+            delete prePositionPatch.project;
+          } else {
+            remainingPatch = {};
+          }
+          if (Object.keys(prePositionPatch).length) {
+            beginStages(operations, 'fields');
+            await this.mutationStage(entry, () => AppDataService.updateTask(id, prePositionPatch));
+            itemMutation = true;
+            current = taskOrError(id);
+            if (!Object.keys(remainingPatch).length) completeStages(operations, 'fields');
+          }
+        }
+
+        if (hierarchyChanged) {
           if (spec.position) {
             beginStages(operations, 'hierarchy', 'position');
             positionMeta = await this.applyTaskHierarchyPosition(id, targetParentId, spec.position, entry);
@@ -575,9 +605,9 @@ const TodoToolExecutorCore = {
           current = taskOrError(id);
         }
 
-        if (Object.keys(spec.patch).length) {
+        if (Object.keys(remainingPatch).length) {
           beginStages(operations, 'fields');
-          await this.mutationStage(entry, () => AppDataService.updateTask(id, spec.patch));
+          await this.mutationStage(entry, () => AppDataService.updateTask(id, remainingPatch));
           completeStages(operations, 'fields');
           itemMutation = true;
           current = taskOrError(id);
@@ -965,6 +995,9 @@ const TodoToolExecutorCore = {
           mutationOccurred = true;
           this.markMutation(entry);
         }
+        // View is entity-specific. Synchronize to the newly selected target
+        // before applying an optional requested viewType in the next stage.
+        window.WorkspaceControls?.syncViewFromCurrentFilter?.();
         completeStages(stages, 'navigation');
       }
 
