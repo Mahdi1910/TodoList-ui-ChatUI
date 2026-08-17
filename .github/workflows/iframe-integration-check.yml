@@ -15,6 +15,8 @@ jobs:
         run: node scripts/verify-integration.mjs
       - name: Verify Todo tool behavior
         run: node scripts/verify-todo-tools.mjs
+      - name: Verify File URI recovery behavior
+        run: node scripts/verify-file-uri-recovery.mjs
       - name: Check integration JavaScript syntax
         run: |
           node --check shell/js/protocol.js
@@ -26,6 +28,10 @@ jobs:
           node --check ChatUI/js/router/chat-router.js
           node --check ChatUI/js/app.js
           node --check ChatUI/js/embedded/shell-bridge.js
+          node --check ChatUI/js/api/gemini-files.js
+          node --check ChatUI/js/chat/attachment-file-errors.js
+          node --check ChatUI/js/chat/attachment-transport.js
+          node --check ChatUI/js/chat/file-reference-recovery.js
           node --check ChatUI/js/chat/streaming.js
           node --check ChatUI/js/todo/todo-tool-definitions.js
           node --check ChatUI/js/todo/todo-tool-executor.js
