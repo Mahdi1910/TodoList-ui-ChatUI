@@ -139,6 +139,7 @@ export function buildSettingsRecord() {
     id: 'app',
     currentModel: state.currentModel,
     thinkingLevel: state.thinkingLevel,
+    customToolRoundLimit: state.customToolRoundLimit,
     theme: state.theme,
     accentColor: state.accentColor,
     activeChatId: state.activeChatId,
