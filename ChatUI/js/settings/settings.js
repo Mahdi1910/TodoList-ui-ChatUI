@@ -9,6 +9,11 @@ import { initReadSettingsUI } from '../voice/read-settings.js';
 import { initBackupRestoreUI } from './backup-restore-ui.js';
 import { syncModelDisplay, syncThinkingDisplay } from '../ui/menus.js';
 import { getModelConfig } from '../models/models.js';
+import {
+  customToolRoundLimitError,
+  isValidCustomToolRoundLimit,
+  normalizeCustomToolRoundLimit
+} from '../tools/custom-tool-limits.js';
 
 export function applyTheme(mode) {
   setState({ theme: mode });
@@ -99,9 +104,7 @@ export function initSettingsUI() {
 
   const selectedModel = getModelConfig(state.currentModel);
   const thinkingWasCorrected = !selectedModel.thinkingLevels.includes(state.thinkingLevel);
-  if (thinkingWasCorrected) {
-    setState({ thinkingLevel: selectedModel.defaultThinkingLevel });
-  }
+  if (thinkingWasCorrected) setState({ thinkingLevel: selectedModel.defaultThinkingLevel });
 
   if (state.theme) applyTheme(state.theme);
   if (state.accentColor) {
@@ -121,18 +124,51 @@ export function initSettingsUI() {
   const accentColorSelect = document.getElementById('accent-color-select');
   const settingsModelSelect = document.getElementById('settings-model-select');
   const settingsThinkingLevel = document.getElementById('settings-thinking-level');
+  const customToolLimitInput = document.getElementById('custom-tool-round-limit-input');
+  const customToolLimitError = document.getElementById('custom-tool-round-limit-error');
 
   const persistSettingsChange = async () => {
     try {
       await persistSettings();
+      return true;
     } catch (err) {
       console.error('Failed to save settings:', err);
       alert('Failed to save settings: ' + err.message);
+      return false;
     }
   };
 
   if (thinkingWasCorrected) persistSettingsChange();
   if (appearanceSelect && state.theme) appearanceSelect.value = state.theme;
+
+  if (customToolLimitInput) {
+    customToolLimitInput.value = String(normalizeCustomToolRoundLimit(state.customToolRoundLimit));
+    const saveCustomToolLimit = async () => {
+      const raw = customToolLimitInput.value;
+      if (!isValidCustomToolRoundLimit(raw)) {
+        customToolLimitInput.setAttribute('aria-invalid', 'true');
+        if (customToolLimitError) {
+          customToolLimitError.textContent = customToolRoundLimitError();
+          customToolLimitError.classList.remove('hidden');
+        }
+        return;
+      }
+
+      const previous = state.customToolRoundLimit;
+      const next = normalizeCustomToolRoundLimit(raw);
+      customToolLimitInput.removeAttribute('aria-invalid');
+      customToolLimitError?.classList.add('hidden');
+      setState({ customToolRoundLimit: next });
+      const saved = await persistSettingsChange();
+      if (!saved) {
+        setState({ customToolRoundLimit: previous });
+        customToolLimitInput.value = String(previous);
+      } else {
+        customToolLimitInput.value = String(next);
+      }
+    };
+    customToolLimitInput.addEventListener('change', () => void saveCustomToolLimit());
+  }
 
   if (openSettingsTrigger) {
     openSettingsTrigger.addEventListener('click', () => openSettingsModal());
