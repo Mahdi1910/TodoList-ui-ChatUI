@@ -62,6 +62,14 @@
             <div class="input-with-icon"><i data-lucide="globe" class="api-input-icon"></i><input type="url" class="modal-input" id="text-base-url-input" placeholder="https://generativelanguage.googleapis.com" /></div>
             <span class="api-default-hint">Default: https://generativelanguage.googleapis.com</span>
           </div>
+          <div class="setting-row custom-tool-limit-row">
+            <div class="setting-info">
+              <div class="setting-label">Custom tool round limit</div>
+              <div class="setting-desc">Maximum client-tool rounds per answer. Use -1 for unlimited. Changes apply to the next answer.</div>
+            </div>
+            <input type="number" class="modal-input custom-tool-limit-input" id="custom-tool-round-limit-input" min="-1" step="1" inputmode="numeric" aria-label="Custom tool round limit" />
+          </div>
+          <div class="setting-validation-message hidden" id="custom-tool-round-limit-error" role="alert"></div>
         </div>
       </div>
 
