@@ -15,7 +15,11 @@ import { TasksComponent } from './components/tasks.js';
 import { ScheduleComponent } from './components/schedule.js';
 import { SubtaskEditorComponent } from './components/subtask-editor.js';
 import { SettingsComponent } from './components/settings.js';
+import { TaskSelectionController } from './components/task-selection.js';
+import { installTaskSelectionRenderSync } from './components/task-selection-render-sync.js';
+import { installWorkspaceDueDateSort } from './components/task-sort-utils.js';
 import { TodoToolExecutor } from './tools/todo-tool-executor.js';
+import { installTodoToolMutationCoordination } from './tools/todo-mutation-coordinator.js';
 import { initializeTodoEmbeddedBridge } from './embedded/shell-bridge.js';
 
 function assertMethod(owner, name, label) {
@@ -39,6 +43,7 @@ function assertIntegrations() {
   assertMethod(AppDataService, 'whenIdle', 'AppDataService');
   assertMethod(AppDataService, 'repairRepeatState', 'AppDataService');
   assertMethod(TodoToolExecutor, 'executeRequest', 'TodoToolExecutor');
+  assertMethod(TaskSelectionController, 'install', 'TaskSelectionController');
 }
 
 export async function startApplication({ runStage, setStorageErrorReporter }) {
@@ -55,11 +60,21 @@ export async function startApplication({ runStage, setStorageErrorReporter }) {
     SidebarComponent.init();
     SidebarComponent.initTaxonomyDrag();
     WorkspaceControls.init();
+    installWorkspaceDueDateSort(WorkspaceControls);
+    TaskSelectionController.install({
+      tasks: TasksComponent,
+      sidebar: SidebarComponent,
+      workspace: WorkspaceControls,
+      schedule: ScheduleComponent
+    });
+    installTaskSelectionRenderSync(TaskSelectionController);
     TasksComponent.init();
     ScheduleComponent.init();
     ScheduleComponent.initRepeatEndUi();
     SubtaskEditorComponent.init();
     SettingsComponent.init();
+    TaskSelectionController.init();
+    installTodoToolMutationCoordination(TodoToolExecutor);
     initializeTodoEmbeddedBridge({
       settingsComponent: SettingsComponent,
       appState: AppState,
