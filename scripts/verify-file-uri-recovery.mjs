@@ -65,6 +65,7 @@ assert.equal(isRemoteFileLookupUnavailable({ httpStatus: 401, apiStatus: 'UNAUTH
 const transportSource = await readFile(new URL('../ChatUI/js/chat/attachment-transport.js', import.meta.url), 'utf8');
 const streamingSource = await readFile(new URL('../ChatUI/js/chat/streaming.js', import.meta.url), 'utf8');
 const recoverySource = await readFile(new URL('../ChatUI/js/chat/file-reference-recovery.js', import.meta.url), 'utf8');
+const wrapperSource = await readFile(new URL('../ChatUI/js/api/gemini-file-recovery-wrapper.js', import.meta.url), 'utf8');
 
 assert(
   transportSource.includes('await invalidateAttachmentRemoteMetadata(attachment);') &&
@@ -76,9 +77,14 @@ assert(
   'Upload authentication/permission failures must stay fatal instead of looping.'
 );
 assert(
-  streamingSource.includes('generationAlreadyStarted') &&
-  streamingSource.includes('recoverGenerationFilePermissionFailure'),
-  'Generation retry must be one-shot and only before visible/tool activity starts.'
+  streamingSource.includes('streamChatWithFileRecovery as streamChat'),
+  'Normal send and Regenerate must both use the File-recovery wrapper through the shared streaming path.'
+);
+assert(
+  wrapperSource.includes('generationStarted') &&
+  wrapperSource.includes('recoverGenerationFilePermissionFailure') &&
+  wrapperSource.includes('return streamChat(options);'),
+  'Generation retry must happen once and only before text/thinking/tool activity starts.'
 );
 assert(
   recoverySource.includes('isFileSpecificPermissionDeniedError'),
