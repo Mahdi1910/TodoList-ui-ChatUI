@@ -3,6 +3,7 @@
  */
 
 import { loadChat } from './conversation.js';
+import { pushChatMessageRoute, replaceChatMessageRoute } from '../router/chat-router.js';
 
 let highlightTimer = null;
 
@@ -33,8 +34,11 @@ export function focusMessageTarget(messageId, { smooth = true } = {}) {
 }
 
 export async function openChatAtMessage(chatId, messageId, updateSidebarCallback = null, options = {}) {
-  const chat = await loadChat(chatId, updateSidebarCallback, { historyMode: options.historyMode || 'push' });
+  const historyMode = options.historyMode === 'replace' ? 'replace' : 'push';
+  const chat = await loadChat(chatId, updateSidebarCallback, { historyMode: 'none' });
   if (!chat) return null;
+  if (historyMode === 'replace') replaceChatMessageRoute(chatId, messageId);
+  else pushChatMessageRoute(chatId, messageId);
   requestAnimationFrame(() => focusMessageTarget(messageId));
   return chat;
 }
