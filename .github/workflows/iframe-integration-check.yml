@@ -13,6 +13,8 @@ jobs:
           node-version: 22
       - name: Verify integration invariants
         run: node scripts/verify-integration.mjs
+      - name: Verify ChatUI Implementation Plan ID 4
+        run: node scripts/verify-chatui-plan4.mjs
       - name: Verify Todo tool behavior
         run: node scripts/verify-todo-tools.mjs
       - name: Verify Todo selection behavior
@@ -27,22 +29,42 @@ jobs:
           node --check shell/js/frame-bridge.js
           node --check shell/js/app-shell.js
           node --check ChatUI/js/layout-loader.js
+          node --check ChatUI/js/router/app-links.js
           node --check ChatUI/js/router/chat-router.js
           node --check ChatUI/js/app.js
           node --check ChatUI/js/embedded/shell-bridge.js
+          node --check ChatUI/js/api/gemini.js
           node --check ChatUI/js/api/gemini-files.js
           node --check ChatUI/js/api/gemini-file-recovery-wrapper.js
           node --check ChatUI/js/chat/attachment-file-errors.js
           node --check ChatUI/js/chat/attachment-transport.js
           node --check ChatUI/js/chat/file-reference-recovery.js
+          node --check ChatUI/js/chat/message-navigation.js
+          node --check ChatUI/js/chat/message-renderer.js
+          node --check ChatUI/js/chat/markdown.js
           node --check ChatUI/js/chat/streaming.js
+          node --check ChatUI/js/composer/composer.js
+          node --check ChatUI/js/settings/workspace-backup-ui.js
+          node --check ChatUI/js/sidebar/search.js
+          node --check ChatUI/js/sidebar/sidebar-actions.js
+          node --check ChatUI/js/sidebar/sidebar-layout.js
+          node --check ChatUI/js/sidebar/sidebar-render.js
+          node --check ChatUI/js/storage/search.js
+          node --check ChatUI/js/tools/custom-tool-limits.js
+          node --check ChatUI/js/tools/custom-tool-provider.js
+          node --check ChatUI/js/tools/custom-tool-generation-context.js
+          node --check ChatUI/js/tools/function-tool-registry.js
           node --check ChatUI/js/todo/todo-tool-definitions.js
           node --check ChatUI/js/todo/todo-tool-executor.js
           node --check ChatUI/js/todo/todo-bridge-client.js
           node --check ChatUI/js/todo/todo-mutation-replay-guard.js
-          node --check ChatUI/js/tools/custom-tool-provider.js
-          node --check ChatUI/js/tools/custom-tool-generation-context.js
-          node --check ChatUI/js/tools/function-tool-registry.js
+          node --check ChatUI/js/ui/action-menu.js
+          node --check ChatUI/js/ui/chat-controls.js
+          node --check ChatUI/js/workspace/workspace-backup.js
+          node --check ChatUI/js/workspace/workspace-navigation-bridge.js
+          node --check ChatUI/js/workspace/workspace-storage.js
+          node --check ChatUI/js/workspace/workspace-ui.js
+          node --check ChatUI/js/workspace/workspace-zip.js
           node --check TodoList-ui/js/bootstrap.js
           node --check TodoList-ui/js/app-main.js
           node --check TodoList-ui/js/components/task-sort-utils.js
@@ -70,7 +92,11 @@ jobs:
           curl -fsS http://127.0.0.1:8765/todo-list-ui > /tmp/todo-shell.html
           curl -fsS http://127.0.0.1:8765/chat-ui > /tmp/chat-shell.html
           curl -fsS http://127.0.0.1:8765/chat-ui/chat/test-id > /tmp/chat-deep-shell.html
+          curl -fsS http://127.0.0.1:8765/workspace > /tmp/workspace-shell.html
+          curl -fsS http://127.0.0.1:8765/workspace/University/Research/notes.md > /tmp/workspace-deep-shell.html
           test "$(curl -s -o /tmp/missing.js -w '%{http_code}' http://127.0.0.1:8765/ChatUI/js/definitely-missing.js)" = "404"
           grep -q 'id="app-shell"' /tmp/todo-shell.html
           grep -q 'id="app-shell"' /tmp/chat-shell.html
           grep -q 'id="app-shell"' /tmp/chat-deep-shell.html
+          grep -q 'id="app-shell"' /tmp/workspace-shell.html
+          grep -q 'id="app-shell"' /tmp/workspace-deep-shell.html
