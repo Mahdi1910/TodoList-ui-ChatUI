@@ -19,9 +19,14 @@ import {
   getCustomFunctionDeclarations,
   isCustomFunctionCallSupported
 } from '../tools/function-tool-registry.js';
+import { getCustomToolProvider } from '../tools/custom-tool-provider.js';
+import {
+  MAX_CUSTOM_CALLS_PER_ROUND,
+  normalizeCustomToolRoundLimit
+} from '../tools/custom-tool-limits.js';
 
-const MAX_CUSTOM_TOOL_ROUNDS = 12;
-const MAX_CUSTOM_FUNCTION_CALLS = 32;
+const CUSTOM_TOOL_LIMIT_CODE = 'CUSTOM_TOOL_ROUND_LIMIT_REACHED';
+const CUSTOM_TOOL_LIMIT_MESSAGE = 'The configured custom tool round limit was reached before this call could run.';
 
 // Kept as a compatibility helper for callers that explicitly need inlineData.
 // Plan 15 no longer uses it for the normal attachment fast path.
@@ -75,9 +80,6 @@ export async function buildGeminiHistory(messages = [], options = {}) {
   const attachmentContext = options.attachmentContext || null;
   let preparedAttachmentParts = null;
   if (attachmentContext) {
-    // Prepare each unique attachment exactly once for the whole history build.
-    // The resolver owns one shared concurrency limit, then message construction
-    // below restores the original message and attachment order.
     const entries = collectUniqueMessageAttachments(conversationalMessages);
     preparedAttachmentParts = await prepareAttachmentsForHistory(entries, attachmentContext);
   }
@@ -109,8 +111,6 @@ export async function buildGeminiHistory(messages = [], options = {}) {
           continue;
         }
 
-        // Compatibility path for direct buildGeminiHistory() callers that did
-        // not supply a Files-aware preparation context.
         if (att.inlineData) {
           parts.push({ inlineData: att.inlineData });
         } else if (att.blob) {
@@ -388,7 +388,7 @@ function emitPartActivity(part, context) {
       callId: functionCall.id,
       name: functionCall.name,
       args: cloneJson(functionCall.args || {}),
-      provider: String(functionCall.name || '').startsWith('workspace_') ? 'workspace' : 'unknown',
+      provider: getCustomToolProvider(functionCall.name),
       round,
       partSequence
     });
@@ -527,6 +527,70 @@ function extractCustomFunctionCalls(parts = []) {
   return calls;
 }
 
+function limitedFunctionResult() {
+  return {
+    ok: false,
+    error: {
+      code: CUSTOM_TOOL_LIMIT_CODE,
+      message: CUSTOM_TOOL_LIMIT_MESSAGE
+    }
+  };
+}
+
+function validateFunctionCallIdentity(functionCall) {
+  if (typeof functionCall?.id !== 'string' || !functionCall.id) {
+    throw new Error(`Gemini custom function call ${functionCall?.name || 'unknown'} did not include the required call ID.`);
+  }
+}
+
+async function streamLimitNarration({
+  apiSettings,
+  cleanBaseUrl,
+  modelId,
+  model,
+  workingContents,
+  nativeTools,
+  signal,
+  onChunk,
+  onThoughtChunk,
+  onActivityEvent,
+  metadata,
+  totals,
+  roundNumber
+}) {
+  const payload = {
+    contents: workingContents,
+    generationConfig: {
+      thinkingConfig: {
+        thinkingLevel: resolveThinkingLevel(model),
+        includeThoughts: true
+      }
+    },
+    ...(nativeTools.length > 0 ? {
+      tools: nativeTools,
+      toolConfig: { includeServerSideToolInvocations: true }
+    } : {})
+  };
+  const codeExecutionQueue = [];
+  return streamGenerateContentRound({
+    apiSettings,
+    cleanBaseUrl,
+    modelId,
+    payload,
+    signal,
+    onCandidate: candidate => recordCandidateMetadata(candidate, metadata),
+    onPart: (part, { partSequence }) => emitPartActivity(part, {
+      round: roundNumber,
+      partSequence,
+      onActivityEvent,
+      onChunk,
+      onThoughtChunk,
+      totals,
+      codeExecutionQueue
+    })
+  });
+}
+
 async function runStreamingFunctionLoop({
   apiSettings,
   cleanBaseUrl,
@@ -535,6 +599,7 @@ async function runStreamingFunctionLoop({
   contents,
   activeTools,
   customDeclarations,
+  customToolRoundLimit,
   signal,
   onChunk,
   onThoughtChunk,
@@ -549,11 +614,12 @@ async function runStreamingFunctionLoop({
   const workingContents = cloneJson(contents) || [...contents];
   const metadata = createMetadataAccumulator();
   const totals = { text: '', thinking: '' };
-  let totalFunctionCalls = 0;
+  let roundNumber = 0;
 
   try {
-    for (let roundNumber = 1; roundNumber <= MAX_CUSTOM_TOOL_ROUNDS; roundNumber += 1) {
+    while (customToolRoundLimit === -1 || roundNumber < customToolRoundLimit) {
       throwIfAborted(signal);
+      roundNumber += 1;
       const payload = {
         contents: workingContents,
         generationConfig: {
@@ -589,7 +655,7 @@ async function runStreamingFunctionLoop({
 
       const modelContent = round.content;
       if (!modelContent || !Array.isArray(modelContent.parts)) {
-        throw new Error('Gemini streaming function-tool response did not contain valid candidate content.');
+        throw new Error('Gemini streaming custom-tool response did not contain valid candidate content.');
       }
       const functionCalls = extractCustomFunctionCalls(modelContent.parts);
       if (functionCalls.length === 0) {
@@ -604,31 +670,82 @@ async function runStreamingFunctionLoop({
         return finalContent;
       }
 
-      if (roundNumber >= MAX_CUSTOM_TOOL_ROUNDS) {
-        throw new Error(`Gemini Workspace tool loop exceeded ${MAX_CUSTOM_TOOL_ROUNDS} rounds.`);
+      if (functionCalls.length > MAX_CUSTOM_CALLS_PER_ROUND) {
+        throw new Error(`Gemini returned ${functionCalls.length} custom function calls in one response; the safety limit is ${MAX_CUSTOM_CALLS_PER_ROUND} per round.`);
       }
-      if (totalFunctionCalls + functionCalls.length > MAX_CUSTOM_FUNCTION_CALLS) {
-        throw new Error(`Gemini Workspace tool loop exceeded ${MAX_CUSTOM_FUNCTION_CALLS} custom function calls.`);
-      }
+      functionCalls.forEach(validateFunctionCallIdentity);
 
       // Preserve the exact streamed model Content, including thought signatures,
       // before returning any functionResponse parts to Gemini.
       workingContents.push(cloneJson(modelContent) || modelContent);
+
+      const finiteLimitReached = customToolRoundLimit !== -1 && roundNumber >= customToolRoundLimit;
+      if (finiteLimitReached) {
+        const responseParts = functionCalls.map(functionCall => {
+          const result = limitedFunctionResult();
+          onActivityEvent?.({
+            type: 'custom_tool.failed',
+            callId: functionCall.id,
+            name: functionCall.name,
+            result: cloneJson(result),
+            error: cloneJson(result.error),
+            provider: getCustomToolProvider(functionCall.name),
+            round: roundNumber
+          });
+          return {
+            functionResponse: {
+              name: functionCall.name,
+              id: functionCall.id,
+              response: result
+            }
+          };
+        });
+        responseParts.push({
+          text: 'The configured custom tool round limit has been reached. Do not request more client custom functions in this answer. Summarize the work that completed successfully, clearly mention any work that could not run because of the limit, and explain that the remaining work can continue in the next user turn.'
+        });
+        workingContents.push({ role: 'user', parts: responseParts });
+        throwIfAborted(signal);
+
+        const narrationRound = await streamLimitNarration({
+          apiSettings,
+          cleanBaseUrl,
+          modelId,
+          model,
+          workingContents,
+          nativeTools,
+          signal,
+          onChunk,
+          onThoughtChunk,
+          onActivityEvent,
+          metadata,
+          totals,
+          roundNumber: roundNumber + 1
+        });
+        const narrationParts = narrationRound.content?.parts || [];
+        const finalContent = totals.text || 'The configured custom tool round limit was reached.';
+        await onComplete?.(
+          finalContent,
+          totals.thinking,
+          lastThoughtSignature(narrationParts),
+          narrationParts.map(cloneGeminiPart).filter(Boolean),
+          metadataResult(metadata)
+        );
+        return finalContent;
+      }
+
       const responseParts = [];
       for (const functionCall of functionCalls) {
         throwIfAborted(signal);
-        totalFunctionCalls += 1;
         if (!isCustomFunctionCallSupported(functionCall.name)) {
           onActivityEvent?.({
             type: 'custom_tool.failed',
             callId: functionCall.id,
             name: functionCall.name,
-            error: { message: `Unsupported client function: ${String(functionCall.name || 'unknown')}` }
+            error: { message: `Unsupported client function: ${String(functionCall.name || 'unknown')}` },
+            provider: getCustomToolProvider(functionCall.name),
+            round: roundNumber
           });
           throw new Error(`Gemini requested an unsupported client function: ${String(functionCall.name || 'unknown')}`);
-        }
-        if (typeof functionCall.id !== 'string' || !functionCall.id) {
-          throw new Error(`Gemini function call ${functionCall.name} did not include the required call ID.`);
         }
 
         onActivityEvent?.({
@@ -636,7 +753,8 @@ async function runStreamingFunctionLoop({
           callId: functionCall.id,
           name: functionCall.name,
           args: cloneJson(functionCall.args || {}),
-          provider: String(functionCall.name || '').startsWith('workspace_') ? 'workspace' : 'unknown'
+          provider: getCustomToolProvider(functionCall.name),
+          round: roundNumber
         });
 
         const result = await executeCustomFunctionCall(functionCall, { signal, activeTools });
@@ -648,7 +766,8 @@ async function runStreamingFunctionLoop({
           name: functionCall.name,
           result: cloneJson(result),
           error: failed ? cloneJson(result?.error || null) : null,
-          provider: String(functionCall.name || '').startsWith('workspace_') ? 'workspace' : 'unknown'
+          provider: getCustomToolProvider(functionCall.name),
+          round: roundNumber
         });
 
         responseParts.push({
@@ -667,7 +786,7 @@ async function runStreamingFunctionLoop({
     throw attachPartialToolMetadata(error, metadata);
   }
 
-  throw new Error(`Gemini Workspace tool loop exceeded ${MAX_CUSTOM_TOOL_ROUNDS} rounds.`);
+  throw new Error('Custom tool loop ended unexpectedly.');
 }
 
 function attachmentMimeForCapability(attachment) {
@@ -724,6 +843,7 @@ export async function streamChat({
   let contents = await buildGeminiHistory(messages, { attachmentContext });
   const resolvedTools = activeTools || state.tools || {};
   const customDeclarations = getCustomFunctionDeclarations(resolvedTools);
+  const customToolRoundLimit = normalizeCustomToolRoundLimit(state.customToolRoundLimit);
   let activityStarted = false;
 
   const trackedActivity = event => {
@@ -764,6 +884,7 @@ export async function streamChat({
       contents: currentContents,
       activeTools: resolvedTools,
       customDeclarations,
+      customToolRoundLimit,
       signal,
       onChunk: trackedChunk,
       onThoughtChunk: trackedThoughtChunk,
@@ -779,14 +900,9 @@ export async function streamChat({
       try {
         let shouldRetry = false;
 
-        // Official GenerateContent semantics: 404 means the referenced resource
-        // was not found. We still verify each File with files.get before deciding
-        // that a stored File reference is stale and safe to rebuild.
         if (Number(initialError?.httpStatus) === 404) {
           shouldRetry = await recoverMissingRemoteAttachments(messages, attachmentContext);
         } else if (Number(initialError?.httpStatus) === 400 && isMachineUnsupportedFileError(initialError)) {
-          // Only machine-readable unsupported-media reasons may trigger this
-          // compatibility fallback. Human-readable error text is not a classifier.
           shouldRetry = markCurrentRemoteMimesUnsupported(messages, attachmentContext) > 0;
         }
 

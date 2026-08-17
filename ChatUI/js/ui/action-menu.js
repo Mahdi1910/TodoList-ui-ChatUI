@@ -28,11 +28,12 @@ export function closeActionMenu({ restoreFocus = false } = {}) {
   activeAnchor = null;
   if (restoreFocus) anchor?.focus?.();
 }
+
 function positionMenu(menu, anchor) {
   const rect = anchor.getBoundingClientRect();
   const gap = 6;
   const viewportPadding = 8;
-  const width = menu.offsetWidth || 180;
+  const width = menu.offsetWidth || 224;
   const height = menu.offsetHeight || 0;
   let left = rect.right - width;
   let top = rect.bottom + gap;
@@ -45,20 +46,27 @@ function positionMenu(menu, anchor) {
   menu.style.top = `${Math.round(top)}px`;
 }
 
-function createMenuItem(item) {
+function createMenuNode(item) {
+  if (item?.type === 'separator') {
+    const separator = document.createElement('div');
+    separator.className = 'action-menu-separator';
+    separator.setAttribute('role', 'separator');
+    return separator;
+  }
+
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = `action-menu-item${item.danger ? ' danger' : ''}`;
+  button.className = `action-menu-item${item?.danger ? ' danger' : ''}`;
   button.setAttribute('role', 'menuitem');
-  button.disabled = !!item.disabled;
-  if (item.id) button.id = item.id;
-  button.innerHTML = `${item.icon ? `<i data-lucide="${item.icon}"></i>` : ''}<span>${item.label}</span>`;
-  if (item.disabled && item.disabledReason) button.title = item.disabledReason;
+  button.disabled = !!item?.disabled;
+  if (item?.id) button.id = item.id;
+  button.innerHTML = `${item?.icon ? `<i data-lucide="${item.icon}"></i>` : '<span class="action-menu-icon-spacer"></span>'}<span>${item?.label || ''}</span>`;
+  if (item?.disabled && item.disabledReason) button.title = item.disabledReason;
   button.addEventListener('click', async event => {
     event.stopPropagation();
     if (button.disabled) return;
     closeActionMenu();
-    try { await item.onSelect?.(); }
+    try { await item?.onSelect?.(); }
     catch (error) {
       console.error('Action menu command failed:', error);
       alert('Action failed: ' + (error?.message || 'Unknown error'));
@@ -80,28 +88,42 @@ export function openActionMenu(anchor, items = []) {
   anchor.setAttribute('aria-expanded', 'true');
   menu.setAttribute('role', 'menu');
   menu.setAttribute('aria-label', 'Actions');
-  menu.replaceChildren(...items.map(createMenuItem));
+  menu.replaceChildren(...items.map(createMenuNode));
   menu.removeAttribute('hidden');
   menu.classList.add('show');
   positionMenu(menu, anchor);
   initializeIcons();
   menu.querySelector('.action-menu-item:not(:disabled)')?.focus();
 }
+
+function focusMenuBoundary(menu, end = false) {
+  const buttons = [...menu.querySelectorAll('.action-menu-item:not(:disabled)')];
+  if (!buttons.length) return;
+  buttons[end ? buttons.length - 1 : 0].focus();
+}
+
 export function initActionMenu() {
   if (initialized) return;
   initialized = true;
+
   document.addEventListener('pointerdown', event => {
     const menu = getMenu();
     if (!menu?.classList.contains('show')) return;
     if (menu.contains(event.target) || activeAnchor?.contains?.(event.target)) return;
     closeActionMenu();
   });
+
   document.addEventListener('keydown', event => {
     const menu = getMenu();
     if (!menu?.classList.contains('show')) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       closeActionMenu({ restoreFocus: true });
+      return;
+    }
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      focusMenuBoundary(menu, event.key === 'End');
       return;
     }
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;

@@ -13,13 +13,8 @@
   gap: 8px;
 }
 
-.message-row.user {
-  align-items: flex-end;
-}
-
-.message-row.assistant {
-  align-items: flex-start;
-}
+.message-row.user { align-items: flex-end; }
+.message-row.assistant { align-items: flex-start; }
 
 .message-bubble {
   padding: 12px 16px;
@@ -34,6 +29,7 @@
   background-color: var(--bg-hover);
   color: var(--text-primary);
   border-bottom-right-radius: 4px;
+  overflow-x: auto;
 }
 
 .assistant-bubble {
@@ -50,14 +46,22 @@
   text-align: start;
 }
 
-.markdown-content[dir="rtl"] {
-  text-align: right;
+.markdown-content ul,
+.markdown-content ol {
+  margin-block: 8px 14px;
+  margin-inline: 0;
+  padding-inline-start: 1.5rem;
 }
 
-.markdown-content[dir="rtl"] ul,
-.markdown-content[dir="rtl"] ol {
-  margin-inline: 24px 0;
+.markdown-content ul ul,
+.markdown-content ul ol,
+.markdown-content ol ul,
+.markdown-content ol ol {
+  margin-block: 4px;
+  padding-inline-start: 1.35rem;
 }
+
+.markdown-content li { text-align: start; }
 
 .markdown-content blockquote {
   border-inline-start: 3px solid var(--accent-blue);
@@ -70,4 +74,19 @@
   width: 100%;
   unicode-bidi: plaintext;
   text-align: start;
+}
+
+.user-bubble .markdown-content > :first-child { margin-top: 0; }
+.user-bubble .markdown-content > :last-child { margin-bottom: 0; }
+.user-bubble pre,
+.user-bubble .code-block-wrapper,
+.user-bubble table { max-width: 100%; overflow-x: auto; }
+
+.search-target-highlight .message-bubble {
+  animation: searchTargetPulse 1.8s ease-out;
+}
+
+@keyframes searchTargetPulse {
+  0%, 35% { box-shadow: 0 0 0 2px var(--accent-blue); }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }

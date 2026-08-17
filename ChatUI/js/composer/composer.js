@@ -1,10 +1,11 @@
 /**
- * composer.js — Textarea Auto-Resize, Enter Key & Dynamic Send/Stop Button State
+ * composer.js — Textarea, live Markdown preview, tools, and send/stop button state.
  */
 
 import { state, setState, runtime } from '../state/store.js';
 import { persistSettings } from '../storage/storage.js';
 import { sendMessage } from '../chat/chat.js';
+import { renderMarkdown } from '../chat/markdown.js';
 import { isTodoBridgeSupported } from '../todo/todo-bridge-client.js';
 
 const TOOL_DESCRIPTORS = Object.freeze([
@@ -15,9 +16,46 @@ const TOOL_DESCRIPTORS = Object.freeze([
   { key: 'todo', icon: 'list-todo', label: 'To-Do', toggle: 'toggle-todo', sidebarToggle: 'sidebar-toggle-todo' }
 ]);
 let todoSupportListenerInstalled = false;
+let previewFrame = null;
 
 function toolAvailable(key) {
   return key !== 'todo' || isTodoBridgeSupported();
+}
+
+function ensureMarkdownPreview() {
+  let preview = document.getElementById('composer-markdown-preview');
+  if (preview) return preview;
+  const composerBar = document.getElementById('composer-bar');
+  if (!composerBar?.parentElement) return null;
+  preview = document.createElement('div');
+  preview.id = 'composer-markdown-preview';
+  preview.className = 'composer-markdown-preview hidden';
+  preview.setAttribute('aria-hidden', 'true');
+  composerBar.before(preview);
+  return preview;
+}
+
+export function syncComposerMarkdownPreview() {
+  const textarea = document.getElementById('composer-textarea');
+  const preview = ensureMarkdownPreview();
+  if (!textarea || !preview) return;
+  const source = textarea.value || '';
+  if (!source.trim()) {
+    preview.replaceChildren();
+    preview.classList.add('hidden');
+    return;
+  }
+  preview.innerHTML = renderMarkdown(source, { isFinal: false });
+  preview.classList.remove('hidden');
+  if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+}
+
+function scheduleMarkdownPreview() {
+  if (previewFrame !== null) cancelAnimationFrame(previewFrame);
+  previewFrame = requestAnimationFrame(() => {
+    previewFrame = null;
+    syncComposerMarkdownPreview();
+  });
 }
 
 export function updateComposerButtons() {
@@ -26,6 +64,7 @@ export function updateComposerButtons() {
   const startVoiceBtn = document.getElementById('open-voice-mode-btn');
   const stopGeneratingBtn = document.getElementById('stop-generating-btn');
 
+  scheduleMarkdownPreview();
   if (!sendBtn || !startVoiceBtn || !stopGeneratingBtn) return;
 
   if (runtime.isGenerating) {
@@ -36,7 +75,6 @@ export function updateComposerButtons() {
   }
 
   stopGeneratingBtn.classList.add('hidden');
-
   const hasText = composerTextarea ? composerTextarea.value.trim().length > 0 : false;
   const hasAttachments = runtime.attachedFiles.length > 0;
   const shouldShowSend = hasText || hasAttachments || runtime.isRecordingAudio;
@@ -59,11 +97,8 @@ function syncToolToggle(id, key, tools) {
   const card = input.closest('.tool-option, .sidebar-tool-card');
   card?.classList.toggle('tool-unavailable', !available);
   card?.setAttribute('aria-disabled', available ? 'false' : 'true');
-  if (!available && key === 'todo') {
-    input.title = 'To-Do tools are available only inside the combined Chat + Todo application.';
-  } else {
-    input.removeAttribute('title');
-  }
+  if (!available && key === 'todo') input.title = 'To-Do tools are available only inside the combined Chat + Todo application.';
+  else input.removeAttribute('title');
 }
 
 export function renderToolsUI() {
@@ -86,7 +121,6 @@ export function renderToolsUI() {
       btn.title = `${pill.label} (Click to turn off)`;
       btn.setAttribute('aria-label', `Turn off ${pill.label}`);
       btn.innerHTML = `<span class="pill-icon"><i data-lucide="${pill.icon}"></i></span>`;
-
       btn.addEventListener('click', async e => {
         e.stopPropagation();
         setState({ tools: { ...state.tools, [pill.key]: false } });
@@ -106,7 +140,6 @@ export function initToolsMenuListeners() {
   const closeBtn = document.getElementById('close-tools-menu-btn');
 
   renderToolsUI();
-
   if (!todoSupportListenerInstalled) {
     todoSupportListenerInstalled = true;
     window.addEventListener('todo-bridge-support-changed', () => renderToolsUI());
@@ -174,8 +207,10 @@ export function initComposerListeners(updateSidebarCallback = null) {
   const sendBtn = document.getElementById('send-btn');
 
   initToolsMenuListeners();
+  ensureMarkdownPreview();
 
   if (composerTextarea) {
+    composerTextarea.setAttribute('dir', 'auto');
     composerTextarea.addEventListener('input', () => {
       composerTextarea.style.height = 'auto';
       composerTextarea.style.height = `${Math.min(composerTextarea.scrollHeight, 200)}px`;
@@ -190,7 +225,6 @@ export function initComposerListeners(updateSidebarCallback = null) {
     });
   }
 
-  if (sendBtn) {
-    sendBtn.addEventListener('click', () => sendMessage(updateSidebarCallback));
-  }
+  sendBtn?.addEventListener('click', () => sendMessage(updateSidebarCallback));
+  syncComposerMarkdownPreview();
 }

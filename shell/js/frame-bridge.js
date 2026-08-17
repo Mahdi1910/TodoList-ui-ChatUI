@@ -44,10 +44,23 @@ export function createFrameBridge(frameManager, callbacks = {}) {
     return frameManager.sendNow(app, createShellMessage(type, payload));
   }
 
-  function navigateChat(chatId, source = 'shell') {
+  function navigateChatRoute(route = {}, source = 'shell') {
     const requestId = safeRequestId('navigate');
-    send('chat', 'shell:navigate-chat', { requestId, chatId: chatId || null, source });
+    const surface = route.surface === 'workspace' ? 'workspace' : 'chat';
+    send('chat', 'shell:navigate-chat', {
+      requestId,
+      surface,
+      chatId: surface === 'chat' ? (route.chatId || null) : null,
+      messageId: surface === 'chat' ? (route.messageId || null) : null,
+      workspacePath: surface === 'workspace' ? (route.workspacePath || '/') : null,
+      invalidWorkspacePath: Boolean(route.invalidWorkspacePath),
+      source
+    });
     return requestId;
+  }
+
+  function navigateChat(chatId, source = 'shell') {
+    return navigateChatRoute({ surface: 'chat', chatId: chatId || null }, source);
   }
 
   function setActive(app, active) {
@@ -83,7 +96,6 @@ export function createFrameBridge(frameManager, callbacks = {}) {
         { mutationOccurred, affectedCount }
       );
     }
-    // A response is safe to defer while Chat itself is reloading. The mutation request is never deferred.
     frameManager.send('chat', createShellMessage('shell:todo-tool-response', payload));
   }
 
@@ -107,8 +119,6 @@ export function createFrameBridge(frameManager, callbacks = {}) {
         sendTodoResultToChat(requestId, toolFailure('TODO_UNAVAILABLE', 'Todo became unavailable before the request could be dispatched.'));
         return;
       }
-      // Let Chat start the read/mutation execution timeout only after the Todo
-      // request has actually crossed the readiness boundary and been posted.
       send('chat', 'shell:todo-tool-dispatched', { requestId });
     } catch (error) {
       cancelledTodoRequests.delete(requestId);
@@ -139,32 +149,18 @@ export function createFrameBridge(frameManager, callbacks = {}) {
       case 'app:ready':
         frameManager.markReady(app, payload);
         callbacks.onReady?.(app, payload);
-        if (app === 'chat') {
-          sendNow('chat', 'shell:todo-rpc-capabilities', { supported: true, version: 'todo-rpc-v1' });
-        }
+        if (app === 'chat') sendNow('chat', 'shell:todo-rpc-capabilities', { supported: true, version: 'todo-rpc-v1' });
         break;
       case 'app:error':
         frameManager.markFailed(app, String(payload.message || payload.stage || 'Application startup failed.'));
         callbacks.onError?.(app, payload);
         break;
-      case 'app:command-error':
-        callbacks.onCommandError?.(app, payload);
-        break;
-      case 'app:appearance':
-        callbacks.onAppearance?.(app, payload);
-        break;
-      case 'app:title':
-        callbacks.onTitle?.(app, payload);
-        break;
-      case 'chatui:route-change':
-        if (app === 'chat') callbacks.onChatRouteChange?.(payload);
-        break;
-      case 'chatui:todo-tool-request':
-        if (app === 'chat') void handleTodoRequest(payload);
-        break;
-      case 'chatui:todo-tool-cancel':
-        if (app === 'chat') handleTodoCancel(payload);
-        break;
+      case 'app:command-error': callbacks.onCommandError?.(app, payload); break;
+      case 'app:appearance': callbacks.onAppearance?.(app, payload); break;
+      case 'app:title': callbacks.onTitle?.(app, payload); break;
+      case 'chatui:route-change': if (app === 'chat') callbacks.onChatRouteChange?.(payload); break;
+      case 'chatui:todo-tool-request': if (app === 'chat') void handleTodoRequest(payload); break;
+      case 'chatui:todo-tool-cancel': if (app === 'chat') handleTodoCancel(payload); break;
       case 'todo:tool-response':
         if (app === 'todo') {
           cancelledTodoRequests.delete(String(payload.requestId || ''));
@@ -178,13 +174,10 @@ export function createFrameBridge(frameManager, callbacks = {}) {
         callbacks.onSettingsOpened?.(app, payload);
         break;
       }
-      case 'app:navigation-complete':
-        callbacks.onNavigationComplete?.(app, payload);
-        break;
-      default:
-        break;
+      case 'app:navigation-complete': callbacks.onNavigationComplete?.(app, payload); break;
+      default: break;
     }
   });
 
-  return { navigateChat, setActive, requestAppearance, openSettings };
+  return { navigateChat, navigateChatRoute, setActive, requestAppearance, openSettings };
 }

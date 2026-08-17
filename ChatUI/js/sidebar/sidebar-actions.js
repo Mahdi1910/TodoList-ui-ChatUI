@@ -21,10 +21,6 @@ export function openChatOptionsMenu(event, chat, updateSidebarCallback = null) {
   if (!chat || !event?.currentTarget) return;
   openActionMenu(event.currentTarget, [
     {
-      label: 'Move to Project', icon: 'folder-plus',
-      onSelect: () => openAddToProjectModal(chat, updateSidebarCallback)
-    },
-    {
       label: chat.pinned ? 'Unpin Chat' : 'Pin Chat', icon: 'pin',
       onSelect: async () => {
         const previousPinned = chat.pinned;
@@ -39,6 +35,12 @@ export function openChatOptionsMenu(event, chat, updateSidebarCallback = null) {
         updateSidebarCallback?.();
       }
     },
+    { type: 'separator' },
+    {
+      label: 'Move to Project', icon: 'folder-plus',
+      onSelect: () => openAddToProjectModal(chat, updateSidebarCallback)
+    },
+    { type: 'separator' },
     {
       label: 'Delete Chat', icon: 'trash-2', danger: true,
       onSelect: () => deleteChat(chat.id, updateSidebarCallback)
@@ -58,10 +60,12 @@ export function openProjectOptionsMenu(event, project, updateSidebarCallback = n
       label: 'Manage Chats', icon: 'list-checks',
       onSelect: () => openManageProjectChatsModal(project, updateSidebarCallback)
     },
+    { type: 'separator' },
     {
       label: 'Rename', icon: 'edit-3',
       onSelect: () => openRenameProjectModal(project)
     },
+    { type: 'separator' },
     {
       label: 'Delete Project', icon: 'trash-2', danger: true,
       onSelect: () => deleteProject(project.id, updateSidebarCallback)

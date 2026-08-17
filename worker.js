@@ -1,4 +1,4 @@
-const SHELL_ROUTE = /^\/(?:$|todo-list-ui\/?$|chat-ui\/?$|chat-ui\/chat\/[^/]+\/?$)/;
+const SHELL_ROUTE = /^\/(?:$|todo-list-ui\/?$|chat-ui\/?$|chat-ui\/chat\/[^/]+\/?$|workspace(?:\/.*)?$)/;
 
 export default {
   async fetch(request, env) {

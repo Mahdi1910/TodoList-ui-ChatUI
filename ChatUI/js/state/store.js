@@ -24,6 +24,7 @@ export const state = {
   activeProjectId: null,
   currentModel: '3.7 Flash',
   thinkingLevel: 'medium',
+  customToolRoundLimit: 24,
   theme: 'dark',
   accentColor: '#3B82F6',
   tools: {

@@ -1,4 +1,6 @@
 import { initializeTodoBridgeClient } from '../todo/todo-bridge-client.js';
+import { isInternalAppUrl, isUnmodifiedPrimaryNavigation } from '../router/app-links.js';
+
 const SHELL_CHANNEL = 'mahdi-app-shell';
 const SHELL_VERSION = 1;
 const IS_EMBEDDED = new URLSearchParams(window.location.search).get('embedded') === '1';
@@ -43,7 +45,10 @@ function installExternalLinkPolicy() {
     try { url = new URL(anchor.href, window.location.href); }
     catch (_) { return; }
 
+    if (isInternalAppUrl(url)) return;
     if (!['http:', 'https:'].includes(url.protocol)) return;
+    if (!isUnmodifiedPrimaryNavigation(event)) return;
+
     event.preventDefault();
     const opened = window.open(url.href, '_blank', 'noopener,noreferrer');
     if (opened) opened.opener = null;
@@ -75,7 +80,7 @@ function isEmbeddedSafe() {
   return IS_EMBEDDED && window.parent !== window;
 }
 
-export function initChatEmbeddedBridge({ navigateChat, openSettings, getState }) {
+export function initChatEmbeddedBridge({ navigateChat, navigateWorkspace, openSettings, getState }) {
   if (!isEmbeddedSafe() || initialized) return false;
   initialized = true;
 
@@ -92,12 +97,28 @@ export function initChatEmbeddedBridge({ navigateChat, openSettings, getState })
     try {
       switch (message.type) {
         case 'shell:navigate-chat': {
-          const chatId = payload.chatId == null ? null : String(payload.chatId);
-          if (chatId && chatId.length > 512) throw new Error('Requested chat ID is too long.');
-          await navigateChat(chatId);
+          const surface = payload.surface === 'workspace' ? 'workspace' : 'chat';
+          let completedWorkspacePath = null;
+          let completedMessageId = null;
+          if (surface === 'workspace') {
+            const workspacePath = payload.invalidWorkspacePath ? null : (payload.workspacePath == null ? '/' : String(payload.workspacePath));
+            if (workspacePath && workspacePath.length > 4096) throw new Error('Requested Workspace path is too long.');
+            await navigateWorkspace(workspacePath, { invalid: Boolean(payload.invalidWorkspacePath) });
+            completedWorkspacePath = workspacePath;
+          } else {
+            const chatId = payload.chatId == null ? null : String(payload.chatId);
+            const messageId = payload.messageId == null ? null : String(payload.messageId);
+            if (chatId && chatId.length > 512) throw new Error('Requested chat ID is too long.');
+            if (messageId && messageId.length > 512) throw new Error('Requested message ID is too long.');
+            await navigateChat(chatId, messageId);
+            completedMessageId = messageId;
+          }
           postToShell('app:navigation-complete', {
             requestId: payload.requestId || null,
-            chatId: getState()?.activeChatId || null
+            surface,
+            chatId: surface === 'chat' ? (getState()?.activeChatId || null) : null,
+            messageId: surface === 'chat' ? completedMessageId : null,
+            workspacePath: surface === 'workspace' ? completedWorkspacePath : null
           });
           break;
         }
@@ -131,7 +152,7 @@ export function initChatEmbeddedBridge({ navigateChat, openSettings, getState })
     currentChatId: state?.activeChatId || null,
     title: document.title || 'ChatUI',
     appearance: getAppearance(state),
-    capabilities: ['navigate-chat', 'open-settings', 'appearance', 'persistent-media']
+    capabilities: ['navigate-chat', 'navigate-workspace', 'open-settings', 'appearance', 'persistent-media']
   });
   return true;
 }

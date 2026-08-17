@@ -1,67 +1,36 @@
 <!-- SETTINGS MODAL -->
-<!-- ========================================== -->
 <div class="modal-overlay hidden" id="settings-modal" role="dialog" aria-modal="true" aria-label="Settings">
   <div class="modal-card settings-card">
-    <button class="modal-close-btn settings-close-btn" id="close-settings-modal-btn" aria-label="Close settings">
-      <i data-lucide="x"></i>
-    </button>
+    <button class="modal-close-btn settings-close-btn" id="close-settings-modal-btn" aria-label="Close settings"><i data-lucide="x"></i></button>
 
     <div class="settings-home" id="settings-home">
       <h2 class="settings-home-title">Settings</h2>
-      <button class="settings-section-btn" data-settings-section="general" type="button">
-        <i data-lucide="settings"></i><span>General</span><i data-lucide="chevron-right" class="settings-section-arrow"></i>
-      </button>
-      <button class="settings-section-btn" data-settings-section="gemini" type="button">
-        <i data-lucide="sparkles"></i><span>Gemini</span><i data-lucide="chevron-right" class="settings-section-arrow"></i>
-      </button>
-      <button class="settings-section-btn" data-settings-section="audio-read" type="button">
-        <i data-lucide="audio-lines"></i><span>Audio Read</span><i data-lucide="chevron-right" class="settings-section-arrow"></i>
-      </button>
-      <button class="settings-section-btn" data-settings-section="backup-restore" type="button">
-        <i data-lucide="database-backup"></i><span>Backup &amp; Restore</span><i data-lucide="chevron-right" class="settings-section-arrow"></i>
-      </button>
+      <button class="settings-section-btn" data-settings-section="general" type="button"><i data-lucide="settings"></i><span>General</span><i data-lucide="chevron-right" class="settings-section-arrow"></i></button>
+      <button class="settings-section-btn" data-settings-section="gemini" type="button"><i data-lucide="sparkles"></i><span>Gemini</span><i data-lucide="chevron-right" class="settings-section-arrow"></i></button>
+      <button class="settings-section-btn" data-settings-section="audio-read" type="button"><i data-lucide="audio-lines"></i><span>Audio Read</span><i data-lucide="chevron-right" class="settings-section-arrow"></i></button>
+      <button class="settings-section-btn" data-settings-section="backup-restore" type="button"><i data-lucide="database-backup"></i><span>Backup &amp; Restore</span><i data-lucide="chevron-right" class="settings-section-arrow"></i></button>
       <!-- TEMP_PERF_DIAGNOSTICS -->
-      <button class="settings-section-btn" data-settings-section="performance-diagnostics" type="button">
-        <i data-lucide="gauge"></i><span>Performance Diagnostics</span><i data-lucide="chevron-right" class="settings-section-arrow"></i>
-      </button>
+      <button class="settings-section-btn" data-settings-section="performance-diagnostics" type="button"><i data-lucide="gauge"></i><span>Performance Diagnostics</span><i data-lucide="chevron-right" class="settings-section-arrow"></i></button>
     </div>
 
     <div class="settings-content hidden" id="settings-content">
-      <button class="settings-back-btn" id="settings-back-btn" type="button" aria-label="Back to settings">
-        <i data-lucide="arrow-left"></i><span>Settings</span>
-      </button>
+      <button class="settings-back-btn" id="settings-back-btn" type="button" aria-label="Back to settings"><i data-lucide="arrow-left"></i><span>Settings</span></button>
 
       <div class="tab-pane" id="tab-general" role="tabpanel" aria-labelledby="tab-general-title">
         <h2 class="settings-pane-title" id="tab-general-title">General</h2>
-        <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Appearance</div></div>
-          <label class="visually-hidden" for="appearance-select">Appearance</label>
-          <select class="select-dropdown" id="appearance-select"><option value="dark">Dark</option><option value="light">Light</option></select>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info"><div class="setting-label">Accent color</div></div>
-          <label class="visually-hidden" for="accent-color-select">Accent color</label>
-          <select class="select-dropdown" id="accent-color-select"><option value="blue">Blue</option><option value="green">Green</option><option value="purple">Purple</option></select>
-        </div>
-        <div class="setting-row destructive-setting-row">
-          <div class="setting-info"><div class="setting-label destructive-setting-label">Delete local data</div><div class="setting-desc destructive-setting-desc">Permanently clear all chats, projects, attachments, and settings.</div></div>
-          <button type="button" class="header-action-btn destructive-action-btn" id="remove-everything-btn">Remove Everything</button>
-        </div>
+        <div class="setting-row"><div class="setting-info"><div class="setting-label">Appearance</div></div><label class="visually-hidden" for="appearance-select">Appearance</label><select class="select-dropdown" id="appearance-select"><option value="dark">Dark</option><option value="light">Light</option></select></div>
+        <div class="setting-row"><div class="setting-info"><div class="setting-label">Accent color</div></div><label class="visually-hidden" for="accent-color-select">Accent color</label><select class="select-dropdown" id="accent-color-select"><option value="blue">Blue</option><option value="green">Green</option><option value="purple">Purple</option></select></div>
+        <div class="setting-row destructive-setting-row"><div class="setting-info"><div class="setting-label destructive-setting-label">Delete local data</div><div class="setting-desc destructive-setting-desc">Permanently clear all chats, projects, attachments, and settings.</div></div><button type="button" class="header-action-btn destructive-action-btn" id="remove-everything-btn">Remove Everything</button></div>
       </div>
 
       <div class="tab-pane" id="tab-gemini" role="tabpanel" aria-labelledby="tab-gemini-title">
         <h2 class="settings-pane-title" id="tab-gemini-title">Gemini</h2>
         <div class="api-settings-group">
           <h3 class="api-settings-title">Gemini API Configuration (Text Models)</h3>
-          <div class="form-group api-key-form-group">
-            <label class="form-label" for="text-api-key-input">Text API Key</label>
-            <div class="input-with-icon"><i data-lucide="key" class="api-input-icon"></i><input type="password" class="modal-input" id="text-api-key-input" placeholder="Enter Gemini Text API Key" /><button type="button" class="icon-btn-sm api-key-toggle" id="toggle-text-key-visibility" title="Toggle visibility"><i data-lucide="eye" class="api-input-icon"></i></button></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="text-base-url-input">Text Base URL (Leave empty for Google AI Studio default)</label>
-            <div class="input-with-icon"><i data-lucide="globe" class="api-input-icon"></i><input type="url" class="modal-input" id="text-base-url-input" placeholder="https://generativelanguage.googleapis.com" /></div>
-            <span class="api-default-hint">Default: https://generativelanguage.googleapis.com</span>
-          </div>
+          <div class="form-group api-key-form-group"><label class="form-label" for="text-api-key-input">Text API Key</label><div class="input-with-icon"><i data-lucide="key" class="api-input-icon"></i><input type="password" class="modal-input" id="text-api-key-input" placeholder="Enter Gemini Text API Key" /><button type="button" class="icon-btn-sm api-key-toggle" id="toggle-text-key-visibility" title="Toggle visibility"><i data-lucide="eye" class="api-input-icon"></i></button></div></div>
+          <div class="form-group"><label class="form-label" for="text-base-url-input">Text Base URL (Leave empty for Google AI Studio default)</label><div class="input-with-icon"><i data-lucide="globe" class="api-input-icon"></i><input type="url" class="modal-input" id="text-base-url-input" placeholder="https://generativelanguage.googleapis.com" /></div><span class="api-default-hint">Default: https://generativelanguage.googleapis.com</span></div>
+          <div class="setting-row custom-tool-limit-row"><div class="setting-info"><div class="setting-label">Custom tool round limit</div><div class="setting-desc">Maximum client-tool rounds per answer. Use -1 for unlimited. Changes apply to the next answer.</div></div><input type="number" class="modal-input custom-tool-limit-input" id="custom-tool-round-limit-input" min="-1" step="1" inputmode="numeric" aria-label="Custom tool round limit" /></div>
+          <div class="setting-validation-message hidden" id="custom-tool-round-limit-error" role="alert"></div>
         </div>
       </div>
 
@@ -69,15 +38,8 @@
         <h2 class="settings-pane-title" id="tab-audio-read-title">Audio Read</h2>
         <div class="api-settings-group">
           <h3 class="api-settings-title">Gemini Live Audio Configuration</h3>
-          <div class="form-group api-key-form-group">
-            <label class="form-label" for="voice-api-key-input">Audio API Key</label>
-            <div class="input-with-icon"><i data-lucide="key" class="api-input-icon"></i><input type="password" class="modal-input" id="voice-api-key-input" placeholder="Enter Gemini Audio API Key" /><button type="button" class="icon-btn-sm api-key-toggle" id="toggle-voice-key-visibility" title="Toggle visibility"><i data-lucide="eye" class="api-input-icon"></i></button></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="voice-base-url-input">Audio Base URL</label>
-            <div class="input-with-icon"><i data-lucide="globe" class="api-input-icon"></i><input type="url" class="modal-input" id="voice-base-url-input" placeholder="https://generativelanguage.googleapis.com" /></div>
-            <span class="api-default-hint">Leave empty to use https://generativelanguage.googleapis.com</span>
-          </div>
+          <div class="form-group api-key-form-group"><label class="form-label" for="voice-api-key-input">Audio API Key</label><div class="input-with-icon"><i data-lucide="key" class="api-input-icon"></i><input type="password" class="modal-input" id="voice-api-key-input" placeholder="Enter Gemini Audio API Key" /><button type="button" class="icon-btn-sm api-key-toggle" id="toggle-voice-key-visibility" title="Toggle visibility"><i data-lucide="eye" class="api-input-icon"></i></button></div></div>
+          <div class="form-group"><label class="form-label" for="voice-base-url-input">Audio Base URL</label><div class="input-with-icon"><i data-lucide="globe" class="api-input-icon"></i><input type="url" class="modal-input" id="voice-base-url-input" placeholder="https://generativelanguage.googleapis.com" /></div><span class="api-default-hint">Leave empty to use https://generativelanguage.googleapis.com</span></div>
           <div class="setting-row"><div class="setting-info"><div class="setting-label">Voice</div><div class="setting-desc">Voice used for newly generated Read Aloud audio.</div></div><select class="select-dropdown" id="audio-read-voice-select" aria-label="Read Aloud voice"></select></div>
           <div class="setting-row"><div class="setting-info"><div class="setting-label">Auto-remove saved audio after</div><div class="setting-desc">Number of days to keep cached speech. Use -1 to keep it indefinitely.</div></div><div class="audio-retention-field"><input type="number" class="modal-input audio-retention-input" id="audio-read-retention-input" min="-1" step="1" inputmode="numeric" aria-label="Audio retention days" /><span>days</span></div></div>
         </div>
@@ -86,19 +48,15 @@
       <div class="tab-pane" id="tab-backup-restore" role="tabpanel" aria-labelledby="tab-backup-restore-title">
         <h2 class="settings-pane-title" id="tab-backup-restore-title">Backup &amp; Restore</h2>
         <div class="backup-restore-panel">
-          <div class="backup-restore-section">
-            <div class="backup-restore-section-title">Full backup</div>
-            <p class="backup-restore-description">Save all local ChatUI conversations, projects, attachments, Workspace data, settings, API configuration, and cached Read Aloud audio in one portable file.</p>
-            <button type="button" class="header-action-btn backup-restore-action" id="create-full-backup-btn">Create Backup</button>
-          </div>
-          <div class="backup-restore-section">
-            <div class="backup-restore-section-title">Restore backup</div>
-            <p class="backup-restore-description">Validate a previous ChatUI backup, then replace this browser's current local ChatUI data after confirmation.</p>
-            <button type="button" class="header-action-btn backup-restore-action" id="restore-full-backup-btn">Restore Backup</button>
-            <input class="visually-hidden" type="file" id="restore-backup-file-input" accept=".json,.chatui.json,application/json" />
-          </div>
-          <div class="backup-restore-warning"><i data-lucide="triangle-alert"></i><span>Backup files contain private ChatUI data and may contain Gemini API keys. Keep backup files private and only restore files you trust.</span></div>
+          <div class="backup-restore-section"><div class="backup-restore-section-title">Full backup</div><p class="backup-restore-description">Save all local ChatUI conversations, projects, attachments, Workspace data, settings, API configuration, and cached Read Aloud audio in one portable file.</p><button type="button" class="header-action-btn backup-restore-action" id="create-full-backup-btn">Create Backup</button></div>
+          <div class="backup-restore-section"><div class="backup-restore-section-title">Restore full backup</div><p class="backup-restore-description">Validate a previous ChatUI backup, then replace this browser's current local ChatUI data after confirmation.</p><button type="button" class="header-action-btn backup-restore-action" id="restore-full-backup-btn">Restore Backup</button><input class="visually-hidden" type="file" id="restore-backup-file-input" accept=".json,.chatui.json,application/json" /></div>
           <div class="backup-restore-status" id="backup-restore-status" role="status" aria-live="polite"></div>
+
+          <div class="backup-restore-section workspace-backup-section"><div class="backup-restore-section-title">Workspace backup</div><p class="backup-restore-description">Create a Workspace-only ZIP with the real folder tree, empty folders, and readable Markdown files. Chats and settings are not included.</p><button type="button" class="header-action-btn backup-restore-action" id="create-workspace-backup-btn">Create Workspace Backup</button></div>
+          <div class="backup-restore-section workspace-backup-section"><div class="backup-restore-section-title">Restore Workspace</div><p class="backup-restore-description">Restore a validated ChatUI Workspace ZIP. Only Workspace data is replaced.</p><button type="button" class="header-action-btn backup-restore-action" id="restore-workspace-backup-btn">Restore Workspace Backup</button><input class="visually-hidden" type="file" id="restore-workspace-backup-file-input" accept=".zip,application/zip" /></div>
+          <div class="backup-restore-status" id="workspace-backup-status" role="status" aria-live="polite"></div>
+
+          <div class="backup-restore-warning"><i data-lucide="triangle-alert"></i><span>Full backup files contain private ChatUI data and may contain Gemini API keys. Workspace ZIP backups contain your Workspace Markdown content. Keep both private and only restore files you trust.</span></div>
         </div>
       </div>
 

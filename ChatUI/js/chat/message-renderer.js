@@ -63,11 +63,10 @@ export function renderMessageDOM(msgInput, chatRef = null, onRegenerateCallback 
     }
     if (msgObj.toolMetadata) appendToolMetadata(bubble, msgObj.toolMetadata, msgObj);
   } else if (content) {
-    const textSpan = document.createElement('div');
-    textSpan.className = 'message-text';
-    textSpan.setAttribute('dir', 'auto');
-    textSpan.textContent = content;
-    bubble.appendChild(textSpan);
+    const text = document.createElement('div');
+    text.className = 'message-text';
+    text.innerHTML = renderMarkdown(content);
+    bubble.appendChild(text);
   }
 
   row.appendChild(bubble);
