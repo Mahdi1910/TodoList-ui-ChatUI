@@ -15,6 +15,8 @@ jobs:
         run: node scripts/verify-integration.mjs
       - name: Verify Todo tool behavior
         run: node scripts/verify-todo-tools.mjs
+      - name: Verify Todo selection behavior
+        run: node scripts/verify-todo-selection.mjs
       - name: Verify File URI recovery behavior
         run: node scripts/verify-file-uri-recovery.mjs
       - name: Check integration JavaScript syntax
@@ -43,6 +45,10 @@ jobs:
           node --check ChatUI/js/tools/function-tool-registry.js
           node --check TodoList-ui/js/bootstrap.js
           node --check TodoList-ui/js/app-main.js
+          node --check TodoList-ui/js/components/task-sort-utils.js
+          node --check TodoList-ui/js/components/task-selection.js
+          node --check TodoList-ui/js/components/task-selection-actions.js
+          node --check TodoList-ui/js/components/task-selection-menus.js
           node --check TodoList-ui/js/embedded/shell-bridge.js
           node --check TodoList-ui/js/tools/todo-tool-registry.js
           node --check TodoList-ui/js/tools/todo-tool-normalizers.js
@@ -50,6 +56,7 @@ jobs:
           node --check TodoList-ui/js/tools/todo-tool-ui-guard.js
           node --check TodoList-ui/js/tools/todo-tool-ui-sync.js
           node --check TodoList-ui/js/tools/todo-tool-executor.js
+          node --check TodoList-ui/js/tools/todo-mutation-coordinator.js
           node --check worker.js
       - name: Build safe runtime bundle
         run: node scripts/build-static.mjs
