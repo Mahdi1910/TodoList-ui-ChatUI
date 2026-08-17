@@ -16,6 +16,7 @@ import { ScheduleComponent } from './components/schedule.js';
 import { SubtaskEditorComponent } from './components/subtask-editor.js';
 import { SettingsComponent } from './components/settings.js';
 import { TaskSelectionController } from './components/task-selection.js';
+import { installTaskSelectionRenderSync } from './components/task-selection-render-sync.js';
 import { installWorkspaceDueDateSort } from './components/task-sort-utils.js';
 import { TodoToolExecutor } from './tools/todo-tool-executor.js';
 import { installTodoToolMutationCoordination } from './tools/todo-mutation-coordinator.js';
@@ -66,6 +67,7 @@ export async function startApplication({ runStage, setStorageErrorReporter }) {
       workspace: WorkspaceControls,
       schedule: ScheduleComponent
     });
+    installTaskSelectionRenderSync(TaskSelectionController);
     TasksComponent.init();
     ScheduleComponent.init();
     ScheduleComponent.initRepeatEndUi();
