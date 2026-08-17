@@ -4,17 +4,23 @@
 
 **Plan only. Do not implement until explicitly approved.**
 
-Baseline inspected for this plan:
+Baseline inspected and review-validated against:
 
 ```text
 main @ 189c18b84b7afaa54001436cd027c185c5634609
 ```
 
+This revision incorporates the technically valid findings from:
+
+```text
+TodoList-ui/review.md
+```
+
 This plan is intentionally **To-Do-only**.
 
-Do not modify ChatUI, Shell routing/RPC, Gemini tools, ChatUI databases, or shared iframe architecture as part of this implementation.
+Do not modify ChatUI runtime code, Shell routing/RPC code, Gemini declarations, ChatUI databases, or the persistent iframe architecture as part of this implementation.
 
-The Todo AI integration may continue to call normal Todo rendering/service methods while this feature exists, but no ChatUI code is part of this plan.
+A small change to the existing **Todo-side** AI executor is now explicitly in scope only to coordinate Todo mutations safely with a manual multi-select batch. That remains a TodoList-ui change; it does not require ChatUI or Shell changes.
 
 ---
 
@@ -25,11 +31,11 @@ Implement two Todo improvements:
 1. Fix **Due Date sorting** so tasks on the same date are ordered by real clock time instead of lexicographic 12-hour text.
 2. Add a complete **multi-select mode** for tasks/subtasks in List and Kanban views.
 
-The multi-select mode must support:
+Multi-select must support:
 
-- entering Select mode from the top-right `•••` workspace menu;
+- entering Select mode from the top-right workspace `•••` menu;
 - selecting many individual tasks using the **existing circular task checkbox/control**;
-- using the task card itself as a convenient selection target while Select mode is active, without opening the editor;
+- clicking/tapping a task body to select it while Select mode is active;
 - one circular select-all control for every logical visible task container/lane;
 - replacing the blue `+` FAB with a selection-actions `•••` FAB while Select mode is active;
 - batch actions for:
@@ -49,61 +55,55 @@ No Pin action is added.
 
 These are requirements, not implementation-agent choices.
 
-## 2.1 Existing task circle becomes the selection control
+## 2.1 Reuse the existing round task control
 
 Do **not** add a second checkbox beside every task.
 
 Normal mode:
 
 ```text
-circle click
-→ toggle completed/active
+round task control
+→ completed/active
 ```
 
 Select mode:
 
 ```text
-same circle click
-→ select/unselect this task
+same round task control
+→ selected/unselected
 → no completion mutation
 ```
 
-The circle keeps the existing visual language.
+The shape stays the same.
 
-Its checked state means:
+To make temporary selection visually distinct from completion without changing that shape:
 
 ```text
-Normal mode → task completed
-Select mode → task selected
+normal checked/completed → existing success/green treatment
+Select-mode checked      → accent/blue treatment
 ```
 
-The task card's completed styling still shows whether the underlying task is completed.
+The task card itself still keeps its real completed strike-through/state.
 
 ## 2.2 Select mode entry
 
-Add a new action to the existing top-right workspace `•••` menu:
+Add to the existing top-right workspace menu:
 
 ```text
 Select
 ```
 
-When Select mode is active, the same menu action can become:
+While active, the item becomes:
 
 ```text
 Cancel Selection
 ```
 
-or equivalent clear wording.
+Do not enter Select mode while Task, Subtask, Schedule, Settings, or another blocking Todo modal is active.
 
-`Escape` should also exit Select mode when no higher-priority modal/menu owns Escape.
+## 2.3 Batch action layout
 
-## 2.3 Selection-actions layout
-
-While Select mode is active, replace the blue `+` FAB's behavior/icon with a blue `•••` selection-actions FAB.
-
-Clicking it opens a compact panel above the FAB.
-
-Required layout:
+The selection action panel must use this layout:
 
 ```text
 ┌────────┬────────┬──────────┐
@@ -115,37 +115,43 @@ Required layout:
 [ Link Parent Task ]
 ```
 
-Use the existing Todo visual/icon language:
+Use existing Todo visual/icon language:
 
-- Done → clear check/done icon;
+- Done → check/done icon;
 - Date → existing calendar icon;
 - Priority → existing flag icon;
 - Tags → existing tag icon;
 - Project → existing folder/project icon;
-- Delete → trash icon;
-- Link Parent Task → text label is required because the action is less obvious; an icon is optional but text must remain visible.
+- Delete → trash icon with danger styling;
+- Link Parent Task → visible text is required.
 
-Do not add Pin.
+No Pin.
 
-## 2.4 Container select-all controls are circles, not text buttons
+## 2.4 Container controls are round selectors, not text buttons
 
-Do not add ugly `Select All` / `Deselect All` text buttons next to section names.
+Do not add `Select All` / `Deselect All` text buttons.
 
-Use a small circular checkbox/control matching the task-circle style.
+Each logical container gets a small circular checkbox/control matching the task-circle language.
 
-Click behavior:
+State:
 
 ```text
-not all tasks in this container selected
-→ select all task IDs belonging to this container
-
-all tasks in this container selected
-→ unselect all task IDs belonging to this container
+none selected → unchecked
+some selected → indeterminate
+all selected  → checked
 ```
 
-If only some tasks are selected, show a subtle indeterminate/partial visual state in the same circle.
+Click:
 
-## 2.5 Every logical visible container gets its own selector
+```text
+all selected
+→ unselect all IDs in that container
+
+none/some selected
+→ select all IDs in that container
+```
+
+## 2.5 Every visible logical lane has an independent selector
 
 Examples:
 
@@ -171,115 +177,149 @@ Examples:
 
 ```text
 High
-  ○ active lane
+  ○ Active
   ○ Completed
 
 Medium
-  ○ active lane
+  ○ Active
   ○ Completed
 ```
 
-`Completed` under `High` selects only completed tasks in the High column.
-It must not select completed tasks in Medium/Low/None.
+`High → Completed` selects only the completed family/cards rendered in the High completed lane.
 
-The same model applies to Date, Project and Tag grouping.
+## 2.6 Selection is runtime-only
 
-## 2.6 Selection is temporary UI state
+Do not persist:
 
-Do not persist selected task IDs to IndexedDB/localStorage.
+```text
+selectionMode
+selectedTaskIds
+selection panel state
+```
 
-No database schema change.
-
-Selection exists only in the live Todo iframe/runtime.
+No TodoListDB schema/version change.
 
 ---
 
-# 3. Current code findings
+# 3. Review claims validated against the real application
 
-## 3.1 Due-date sort bug is confirmed
+The implementation agent should treat this section as the result of the review audit.
 
-Current code:
+## Finding 1 — TRUE — FAB event ownership
 
-```text
-TodoList-ui/js/components/workspace-controls.js
-WorkspaceControls.sortTasks()
+Current `TasksCore.bindEvents()` permanently binds:
+
+```js
+this.openAddTaskBtn?.addEventListener('click', () => this.openModal());
 ```
 
-For `sortKey === 'dueDate'`, it currently compares:
+Therefore the implementation must **replace that ownership path**, not add a second independent click handler.
+
+Use one method:
 
 ```text
-`${dueDate}|${dueTime}`
+handlePrimaryFabClick()
 ```
 
-as text.
-
-Therefore on the same date:
+Behavior:
 
 ```text
-03:57 PM
-06:56 PM
-...
-12:18 PM
+Select mode OFF → open Add Task
+Select mode ON  → open/close selection action panel
 ```
 
-can be incorrectly ordered because `03` sorts before `12` even though 12:18 PM is earlier than 3:57 PM.
+The same owner updates icon, disabled state, `aria-label`, `aria-expanded`, and restoration after Select mode.
 
-## 3.2 Existing task control is already suitable
+## Finding 2 — TRUE — Escape event ownership
 
-`TaskRendererMethods.createTaskCard()` creates:
+WorkspaceControls, task actions, drag, Schedule and modal code already listen for Escape independently.
+
+The selection Escape handler must:
+
+```js
+if (event.key !== 'Escape') return;
+if (event.defaultPrevented) return;
+```
+
+and detect higher-priority active Todo layers before exiting Select mode.
+
+One Escape must close **one UI layer**, not two.
+
+## Finding 3 — TRUE — Bulk Date needs exact schedule invariants
+
+The normal Schedule UI assigns Today when a time exists without a date and validates Repeat end-date ordering. Raw `AppDataService.updateTask(id, { dueDate })` does not reproduce every UI-level invariant.
+
+The upgraded exact rules are defined in section 22.
+
+## Finding 4 — TRUE — One checkbox event path
+
+The existing task checkbox owns completion through one `change` listener. Do not add both `click` and `change` selection mutations.
+
+Branch inside the existing `change` flow.
+
+## Finding 5 — TRUE — Manual batch and Todo AI can otherwise interleave
+
+Todo AI has its own high-level executor queue, while manual UI writes and AI writes meet only at individual `AppDataService.enqueue()` calls. A multi-step manual batch can therefore interleave with a multi-step AI mutation.
+
+Add one Todo-local higher-level mutation coordinator as defined in section 19.
+
+## Finding 6 — TRUE — Due Date edge rules were underspecified
+
+Pin all no-date/no-time/invalid-time/descending behavior explicitly in section 6.
+
+## Finding 7 — TRUE — Display-unit counts can differ from concrete selected IDs
+
+A root display unit can render root + subtasks while existing headers count only the root row. In Select mode, selector counts must use concrete expanded task IDs.
+
+## Finding 8 — TRUE — Mixed completion family state is possible
+
+A root family can visibly contain child cards whose own `completed` state differs from the root. Container selection follows the **rendered family/container**, because the user asked to select everything in that visible container.
+
+## Finding 9 — TRUE — Task-body keyboard target needs selection state
+
+In Select mode the existing `.task-details` button-like target must expose `aria-pressed` and truthful Select/Unselect labels.
+
+## Finding 10 — TRUE AS UX IMPROVEMENT — distinguish selection from completion
+
+Keep the same round shape but use accent color for temporary selection.
+
+## Finding 11 — TRUE — predictable batch errors should be preflighted
+
+Validate all predictable target/value errors before the first durable write, then still re-read dynamic state before every item.
+
+## Finding 12 — TRUE — preserve/update collapse hooks deliberately
+
+`ensureCompletedSectionToggle()` currently finds:
 
 ```text
-input.task-checkbox
-+ SVG check icon
+:scope > .completed-section-toggle
 ```
 
-and currently binds completion directly to its `change` event.
+Refactoring the header into a wrapper will break that query unless the method is intentionally updated. Do not rely on old DOM shape accidentally surviving.
 
-This should be mode-aware rather than replaced.
+## Finding 13 — TRUE — empty container state needs a special case
 
-## 3.3 Current task rendering has several container shapes
-
-Relevant files:
+For zero concrete IDs:
 
 ```text
-TodoList-ui/js/components/task-renderer.js
-TodoList-ui/js/components/task-groups.js
-TodoList-ui/js/components/task-kanban.js
-TodoList-ui/js/components/task-hierarchy.js
+checked = false
+indeterminate = false
+disabled = true
 ```
 
-Selection membership must follow the same logical rows/families that these renderers create.
+Never use `every()` without first handling an empty list.
 
-## 3.4 Group headers cannot receive a nested checkbox as-is
+## Finding 14 — CONFIRMED — one pure sorter fix is correct
 
-Current active group header is itself a `<button>`.
-Current completed section header is itself a `<button>`.
-Current Kanban completed header is itself a `<button>`.
+Keep the time parser/comparator in `WorkspaceControls.sortTasks()` so List, Kanban, groups and subtasks reuse the same behavior.
 
-Do not place a checkbox/button inside those buttons.
-That would create invalid nested interactive controls and poor keyboard/accessibility behavior.
+## Finding 15 — ALREADY SATISFIED
 
-The implementation must refactor those headers into non-interactive wrappers containing two siblings:
-
-```text
-header row
-├── circular container selector
-└── existing collapse/expand button/content
-```
-
-## 3.5 Tag grouping overlaps
-
-A task with multiple Tags can appear in multiple Tag groups.
-
-Therefore one task ID can belong to more than one visible group selector.
-
-Container selectors must derive their state from the central selected-ID Set instead of storing separate Boolean selection state per group.
+The plan already requires a central `selectedTaskIds` Set and logical membership from AppState/render rows rather than arbitrary DOM scraping. Keep this unchanged.
 
 ---
 
 # 4. Recommended module structure
-
-Keep the feature modular and avoid turning `tasks.js` into another large responsibility bucket.
 
 Add:
 
@@ -287,10 +327,9 @@ Add:
 TodoList-ui/js/components/task-selection.js
 TodoList-ui/js/components/task-selection-actions.js
 TodoList-ui/js/components/task-selection-menus.js
+TodoList-ui/js/todo-mutation-coordinator.js
 TodoList-ui/css/components/task-selection.css
 ```
-
-Recommended responsibilities:
 
 ## `task-selection.js`
 
@@ -299,19 +338,23 @@ Owns:
 ```text
 selectionMode
 selectedTaskIds: Set
-enter/exit/toggle selection
-pruning stale IDs
+selectionBatchBusy
+enter/exit/toggle
+selection pruning
+container membership/state
 card selection state
-container select-all state
-FAB mode switch
-workspace-menu Select/Cancel Selection state
+FAB mode state
+workspace Select/Cancel state
+Escape ownership
 ```
 
 ## `task-selection-actions.js`
 
-Owns batch persistence coordination:
+Owns:
 
 ```text
+batch preflight
+batch execution
 Done
 Date
 Priority
@@ -319,15 +362,27 @@ Tags
 Project
 Delete
 Link Parent Task
+partial-success bookkeeping
+final reconciliation
 ```
 
-It should use existing `AppDataService` methods rather than writing AppState/IndexedDB directly.
+All durable changes go through existing `AppDataService` / hierarchy services.
 
 ## `task-selection-menus.js`
 
-Owns the selection-action panel and the temporary Date/Priority/Tag/Project pickers.
+Owns:
 
-Do not reuse the Task editor's mutable draft fields such as:
+```text
+batch action panel
+Priority picker
+Tags picker
+Project picker
+Date-only Schedule entry
+Link Parent candidate picker
+outside-click/focus behavior
+```
+
+Do not reuse mutable Task editor draft properties such as:
 
 ```text
 TasksComponent.selectedPriority
@@ -335,30 +390,48 @@ TasksComponent.selectedProject
 TasksComponent.selectedTags
 ```
 
-Those belong to the create/edit modal.
+## `todo-mutation-coordinator.js`
 
-Bulk selection controls need independent transient state so opening a bulk Tag/Project/Priority picker can never corrupt an open editor draft.
+A small Todo-only higher-level exclusive coordinator for multi-step mutations.
+
+Conceptually:
+
+```js
+runExclusive(owner, work)
+whenIdle()
+```
+
+It sits **above** `AppDataService.enqueue()`.
+
+It does not replace IndexedDB transactions and does not write data itself.
+
+Use it for:
+
+```text
+manual multi-select commit
+Todo AI mutating request
+```
+
+Do not modify ChatUI or Shell for this.
 
 ## `task-selection.css`
 
 Own only selection-specific styles:
 
 ```text
-selection-mode card state
-container selection circle
-indeterminate state
-selection action FAB
-2x3 action panel
-Link Parent Task text action
-bulk popovers
+selection card state
+accent checked circle in Select mode
+container circles + indeterminate state
+selection FAB
+2x3 panel
+bulk pickers
+busy state
 mobile positioning
 ```
 
-Import it from `TodoList-ui/index.html` with the other Todo component CSS files.
-
 ---
 
-# 5. Compose selection behavior into `TasksComponent`
+# 5. Compose selection into `TasksComponent`
 
 Modify:
 
@@ -366,27 +439,35 @@ Modify:
 TodoList-ui/js/components/tasks.js
 ```
 
-Import the selection method objects and compose them into `TasksComponent` like the current Task renderer/drag/group modules.
+Import and compose selection modules in the same style as renderer/drag/group modules.
 
-During `TasksCore.init()` initialize selection after required DOM references exist.
+During `init()`:
 
-Suggested order:
+1. cache existing FAB and task DOM references;
+2. initialize menus/actions/hierarchy/drag;
+3. initialize selection;
+4. bind normal editor events;
+5. render.
 
-```text
-render menus
-init task actions
-init hierarchy
-init drag
-init selection
-bind normal editor events
-render
+### Critical FAB correction
+
+Replace:
+
+```js
+this.openAddTaskBtn?.addEventListener('click', () => this.openModal());
 ```
 
-Selection methods must be available to renderers before the first user interaction.
+with one mode-aware binding:
+
+```js
+this.openAddTaskBtn?.addEventListener('click', () => this.handlePrimaryFabClick());
+```
+
+Do **not** add another click listener that competes with the existing one.
 
 ---
 
-# 6. Fix Due Date sorting correctly
+# 6. Fix Due Date sorting exactly
 
 Modify:
 
@@ -394,74 +475,100 @@ Modify:
 TodoList-ui/js/components/workspace-controls.js
 ```
 
-Do not compare `hh:mm AM/PM` as raw text.
-
-Add a small pure helper, conceptually:
+Current bug:
 
 ```text
+`${dueDate}|${dueTime}`
+```
+
+is compared as text.
+
+Add a pure defensive parser:
+
+```text
+parseDueTimeMinutes("12:00 AM") → 0
+parseDueTimeMinutes("01:00 AM") → 60
+parseDueTimeMinutes("11:59 AM") → 719
+parseDueTimeMinutes("12:00 PM") → 720
 parseDueTimeMinutes("12:18 PM") → 738
 parseDueTimeMinutes("03:57 PM") → 957
-parseDueTimeMinutes("12:00 AM") → 0
-parseDueTimeMinutes("12:00 PM") → 720
+parseDueTimeMinutes("11:59 PM") → 1439
+missing                     → null
+malformed legacy value      → null
 ```
 
-Algorithm:
+Parser must never throw during rendering.
+
+### Exact product ordering
+
+#### Scheduled vs No Date
+
+Preserve current behavior:
 
 ```text
-hour 12 → 0 before applying AM/PM
-PM      → +12 hours
-minutesSinceMidnight = hour * 60 + minute
+No Date is always after dated tasks
 ```
 
-For Due Date sorting:
+This remains true in **both Ascending and Descending**.
 
-1. tasks with a date remain ahead of unscheduled tasks in ascending order, preserving current product behavior;
-2. compare ISO `YYYY-MM-DD` first;
-3. when dates match:
-   - preserve current no-time behavior consistently;
-   - compare real numeric minutes for tasks that have times;
-4. preserve stable input order for equal date/time values;
-5. apply existing ascending/descending direction correctly.
+The scheduled-vs-unscheduled comparison stays outside the direction reversal.
 
-Do not mutate stored task values.
+#### Different dates
 
-### Required regression cases
+Compare ISO `YYYY-MM-DD`.
 
-Same day ascending:
+Direction applies to dated tasks:
 
 ```text
-12:18 PM
-03:57 PM
-06:56 PM
-07:46 PM
-08:01 PM
-08:11 PM
-08:15 PM
+Ascending  → earlier date first
+Descending → later date first
 ```
 
-Also verify:
+#### Same date, timed vs date-only/invalid time
+
+Preserve the current no-time behavior:
 
 ```text
+Ascending:
+date-only/invalid-time bucket first
+then valid timed tasks from earliest → latest
+
+Descending:
+valid timed tasks from latest → earliest
+then date-only/invalid-time bucket
+```
+
+If both tasks are date-only/invalid-time, keep stable input order.
+
+If both valid times are equal, keep stable input order.
+
+Do not mutate stored `dueTime` values as part of sorting.
+
+### Required pure regression cases
+
+```text
+12:18 PM < 03:57 PM
 12:00 AM < 01:00 AM
 11:59 AM < 12:00 PM
 12:59 PM < 01:00 PM
-11:59 PM is last timed value of the day
+11:59 PM = latest valid time
+No Date remains last in asc and desc
+malformed legacy time does not throw
 ```
-
-Different dates still sort by date before time.
 
 ---
 
 # 7. Central selection state
 
-Use one authoritative state:
+Use exactly one source of truth:
 
 ```js
 selectionMode: false
 selectedTaskIds: new Set()
+selectionBatchBusy: false
 ```
 
-Never maintain independent selection copies in List/Kanban/group components.
+Never maintain independent selected booleans in groups/columns.
 
 Required methods conceptually:
 
@@ -469,43 +576,50 @@ Required methods conceptually:
 isSelectionMode()
 enterSelectionMode()
 exitSelectionMode()
-isTaskSelected(taskId)
-toggleTaskSelection(taskId)
+isTaskSelected(id)
+setTaskSelected(id, selected)
+toggleTaskSelection(id)
 selectTaskIds(ids)
 unselectTaskIds(ids)
-setContainerSelection(ids)
 getSelectionCount()
 pruneSelection()
+getContainerSelectionState(ids)
 syncSelectionUi()
+handlePrimaryFabClick()
+handleSelectionEscape(event)
 ```
 
 ## Enter mode
 
-On entry:
+Before entering:
 
+- refuse if a blocking modal is active;
 - close workspace menu/settings submenu;
 - close task action/context menus;
-- cancel any pending task drag/touch-drag;
-- cancel an active drag safely before changing rendering;
-- set `selectionMode=true`;
-- start with an empty `selectedTaskIds` Set;
-- rerender/sync cards and container controls;
-- change FAB from `+` to `•••` selection-actions mode.
+- cancel pending pointer drag;
+- cancel pending touch drag;
+- cancel active task drag safely;
+- start with an empty Set;
+- set Select mode;
+- rerender/sync;
+- switch the existing FAB to selection-actions mode.
 
 ## Exit mode
 
-On exit:
+Do not exit while `selectionBatchBusy` is actively committing.
 
-- close all bulk menus/action panel;
+Otherwise:
+
+- close nested bulk picker/panel;
 - clear selected IDs;
-- restore normal checkbox completion state;
-- restore normal card click/edit behavior;
-- restore FAB `+` behavior/icon/ARIA;
+- restore checkbox completion meaning;
+- restore card Edit meaning;
+- restore FAB Add Task state;
 - rerender/sync once.
 
 ---
 
-# 8. Individual task selection
+# 8. Individual task selection — one checkbox event path
 
 Modify:
 
@@ -513,88 +627,130 @@ Modify:
 TodoList-ui/js/components/task-renderer.js
 ```
 
-Inside `createTaskCard()`:
+The existing checkbox `change` listener remains the **single mutation event path**.
 
-## Normal mode
+Conceptually:
 
-Preserve current behavior exactly:
+```js
+checkbox.addEventListener('change', async event => {
+  event.stopPropagation();
 
-```text
-checkbox.checked = task.completed
-change → AppDataService.toggleTaskStatus(task.id)
+  if (this.selectionMode) {
+    this.setTaskSelected(task.id, checkbox.checked);
+    return;
+  }
+
+  // existing completion path
+  await AppDataService.toggleTaskStatus(task.id);
+});
 ```
 
-## Select mode
+Do not add a separate checkbox `click` handler that also changes selection.
 
-Use:
+The wrapper may continue stopping propagation so task-body selection does not also fire.
 
-```text
-checkbox.checked = selectedTaskIds.has(task.id)
-change/click → toggle selection only
-```
+### Checkbox state
 
-Do not call `AppDataService` when merely selecting.
-
-Change ARIA text appropriately:
+Normal mode:
 
 ```text
-Select task: <title>
-Unselect task: <title>
+checked = task.completed
+label   = Mark ... completed/active
 ```
 
-The task card keeps `.completed` if the task itself is completed, even if the selection circle is unchecked.
+Select mode:
 
-## Card-body behavior in Select mode
+```text
+checked = selectedTaskIds.has(task.id)
+label   = Select task ... / Unselect task ...
+```
 
-While Select mode is active:
+### Task-body target
 
-- clicking/tapping the task details/card toggles selection instead of opening Edit;
-- Enter/Space on the task's task-details selection target toggles selection;
-- individual task `•••` action buttons should be hidden or non-interactive in Select mode;
-- subtask edit opening is suppressed in Select mode.
+Current `.task-details` is `role="button"` with keyboard Edit semantics.
 
-This makes multi-select practical on mobile without adding more controls.
+In Select mode:
+
+```text
+role="button"
+aria-pressed="true|false"
+aria-label="Select task: ..." or "Unselect task: ..."
+Enter/Space → toggle selection
+click/tap   → toggle selection
+```
+
+Outside Select mode:
+
+- remove `aria-pressed`;
+- restore Edit label/title;
+- Enter/Space/click opens Task/Subtask editor as today.
+
+Hide/disable each task `•••` action while Select mode is active.
 
 ---
 
-# 9. Disable drag/reparent gesture while Select mode is active
+# 9. Selection visual state
 
-Modify the task drag entry guards in:
+Keep the circle shape exactly as requested.
+
+Add selection-specific style only:
+
+```css
+.selection-mode .task-checkbox:checked {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+```
+
+Use the same accent treatment for container circles.
+
+This communicates:
+
+```text
+green checked circle → completed
+accent checked circle → temporarily selected
+```
+
+Do not remove completed strike-through from a selected completed task.
+
+---
+
+# 10. Disable drag while selecting
+
+Modify earliest task drag entry guards in:
 
 ```text
 TodoList-ui/js/components/task-drag.js
 TodoList-ui/js/components/task-drag-touch.js
 ```
 
-At the earliest drag-target/pointer/touch entry point:
+If `selectionMode`:
 
 ```text
-if TasksComponent.selectionMode
-→ do not begin drag
+do not create drag pending state
+do not start long-press drag
+do not commit hierarchy drag
 ```
 
-When entering Select mode:
+Entering Select mode must call the real existing cleanup methods:
 
 ```text
-cancel pending drag
-cancel active drag safely
+cancelPendingTaskDrag()
+cancelPendingTouchDrag()
+cancelTaskDrag()
 ```
 
-Reason:
-
-Selection tap/long-press and drag long-press cannot own the same gesture reliably.
-
-Do not remove drag functionality from normal mode.
+Normal drag behavior outside Select mode remains unchanged.
 
 ---
 
-# 10. Define logical container membership once
+# 11. Logical container membership
 
-Do not discover batch targets by scraping arbitrary DOM after rendering.
+Never scrape arbitrary rendered DOM to decide batch targets.
 
-Create helper(s) that expand the same data rows used by the renderer into concrete task IDs.
+Build logical membership from the same rows used by rendering.
 
-Conceptually:
+Helper concept:
 
 ```text
 expandRenderedTaskIds(rows)
@@ -602,53 +758,129 @@ expandRenderedTaskIds(rows)
 
 Rules:
 
-- root display unit includes its root card plus the child cards that `createTaskFamily()` renders;
-- standalone filtered subtask includes only that subtask;
-- deduplicate IDs inside one container;
-- collapsed subtasks still belong to the logical rendered family/container because collapse is presentation only;
-- selector state is based on task IDs, not DOM node count.
+1. root display unit → root ID + every child card that `createTaskFamily()` renders;
+2. standalone filtered subtask → only that subtask;
+3. deduplicate IDs;
+4. collapsed subtasks still belong because collapse is presentation-only;
+5. Tag groups may overlap and share IDs;
+6. missing/deleted IDs are pruned.
 
-This keeps selection correct after rerender, on mobile, and when group sections are collapsed.
+## Mixed completion rule — explicit
+
+Container membership follows the **rendered family**, not each child's independent completion field.
+
+Example:
+
+```text
+Active root
+└─ completed child
+```
+
+If that family is rendered in the Active container, Active Select-All selects both visible logical task records.
+
+Likewise a completed root family containing an active child still belongs to the Completed container if that is where the current renderer places the family.
+
+This matches the request: select everything in that visible container.
 
 ---
 
-# 11. List-view container selectors
+# 12. Selection-mode counts
 
-## Group=None — Active Tasks
+Current normal header/group counts are based on display rows such as `activeTasks.length` or `group.tasks.length`, which can count one root while the rendered family contains several concrete task cards.
 
-The Active Tasks section currently has a header that can be hidden in normal presentation.
+Preserve existing counts outside Select mode.
 
-In Select mode, ensure the Active Tasks header is visible and includes:
+In Select mode, use the expanded concrete ID list for the container's task count.
+
+Example:
 
 ```text
-○  Active Tasks                         N tasks
+2 root display rows
++ 4 rendered subtasks
+= 6 selectable task IDs
 ```
 
-The circle selects exactly the logical task IDs represented in the active section.
+The Select-mode container count should represent `6`, not `2`.
 
-When leaving Select mode, return the header to its existing normal visibility behavior.
+The action panel separately shows the global selection count such as:
+
+```text
+5 selected
+```
+
+Do not maintain a second selection state just to produce counts.
+
+---
+
+# 13. Container circle state including empty containers
+
+For a normalized deduplicated ID list `C`:
+
+```text
+if C.length === 0:
+  checked = false
+  indeterminate = false
+  disabled = true
+
+otherwise:
+  selectedCount = number of IDs in C present in selectedTaskIds
+```
+
+Then:
+
+```text
+0 selected          → unchecked
+0 < selected < all → indeterminate
+all selected        → checked
+```
+
+Never let `every([])` make an empty lane appear selected.
+
+---
+
+# 14. List headers and exact collapse-hook preservation
+
+## Active section
+
+When Select mode is active, reveal the Active section header and add its round selector.
+
+Outside Select mode, restore existing visibility.
 
 ## Completed section
 
-Refactor its current all-in-one collapse `<button>` into:
+Current `ensureCompletedSectionToggle()` caches:
 
 ```text
-completed header row
-├── selection circle (Select mode only)
-└── collapse button
-    ├── Completed
-    ├── count
-    └── chevron
+:scope > .completed-section-toggle
 ```
 
-Clicking the circle must **not** collapse/expand Completed.
-Clicking the normal completed header/collapse area must **not** change selection.
+Refactor static HTML to a non-interactive wrapper:
 
-The completed selector remains available even if the list is visually collapsed.
+```text
+.completed-section-header-row
+├── container selector
+└── button.completed-section-toggle
+```
+
+Then **update `ensureCompletedSectionToggle()` deliberately** to find/cache the collapse button in the new structure.
+
+Keep on the actual collapse button:
+
+```text
+.completed-section-toggle
+aria-controls="completed-task-list"
+aria-expanded
+collapse label
+chevron behavior
+```
+
+Do not leave the old `:scope >` assumption unchanged after introducing the wrapper.
+
+Selection click and collapse click must be independent.
 
 ---
 
-# 12. Grouped List selectors
+# 15. Grouped List selectors
 
 Modify:
 
@@ -657,15 +889,28 @@ TodoList-ui/js/components/task-groups.js
 TodoList-ui/css/components/task-groups.css
 ```
 
-Refactor every group header from one interactive button into a row with:
+Refactor each current all-in-one group `<button>` into:
 
 ```text
-○ | collapse/expand group label + count
+.task-group-header-row
+├── round container selector
+└── button.task-group-header
+    ├── chevron
+    ├── group label
+    └── count
 ```
 
-Selector selects only IDs represented in that group.
+Preserve:
 
-Required for:
+- collapse key;
+- `aria-expanded`;
+- chevron state;
+- list hidden state;
+- drag lane metadata on the list.
+
+In Select mode, count concrete expanded IDs.
+
+Required groups:
 
 ```text
 Priority
@@ -674,20 +919,11 @@ Project
 Tag
 ```
 
-Example:
-
-```text
-○ None      3
-○ Low       5
-○ Medium    4
-○ High      2
-```
-
-The global Completed list remains its own independent selector in List view because current List rendering does not place completed tasks inside each active group.
+Tag overlap must produce correct partial circles from the global Set.
 
 ---
 
-# 13. Kanban selectors
+# 16. Kanban selectors
 
 Modify:
 
@@ -696,554 +932,41 @@ TodoList-ui/js/components/task-kanban.js
 TodoList-ui/css/components/task-kanban.css
 ```
 
-Each Kanban column has two independent selectable lanes:
+Each column has two independent logical lanes:
 
 ```text
-active lane
-completed lane
+Active
+Completed
 ```
 
-For grouped Kanban, the column heading should expose the active-lane circle cleanly without changing the grouping label.
-
-Conceptually:
+For grouped Kanban:
 
 ```text
-○ High
-  [active cards]
+○ High/Active
+  active cards
 
-○ Completed  3   ▾
-  [completed cards]
+○ Completed
+  completed cards
 ```
 
-The Completed header must be refactored so selection and collapse are separate interactive siblings—never nested buttons.
-
-For Group=None, create a small unobtrusive `Active` lane header only in Select mode so there is a place for its container circle.
-
-### Exact required behavior
-
-If the High column contains five completed tasks:
+Refactor the current `button.kanban-completed-header` into a wrapper with sibling selector + collapse button while preserving:
 
 ```text
-click High → Completed circle
-→ select those five completed High tasks only
+aria-controls
+aria-expanded
+chevron
+collapse state key
+completed list ID
+drop lane enable/disable
 ```
 
-It must not select:
+For Group=None, show a small Active lane header only while Select mode is active.
 
-- High active tasks;
-- Medium completed tasks;
-- completed tasks in any other column.
+Zero-task active/completed lanes have disabled unchecked selectors.
 
 ---
 
-# 14. Container circle state
-
-Every container selector derives state from its task-ID list and the global `selectedTaskIds` Set.
-
-For container IDs `C`:
-
-```text
-selectedCount = count(id ∈ C where selectedTaskIds has id)
-```
-
-State:
-
-```text
-selectedCount === 0
-→ unchecked
-
-0 < selectedCount < C.length
-→ indeterminate/partial
-
-selectedCount === C.length
-→ checked
-```
-
-Click:
-
-```text
-checked/all selected
-→ remove every C ID from global selection
-
-unchecked or indeterminate
-→ add every C ID to global selection
-```
-
-This is especially important for Tag grouping because the same task may appear in multiple Tag groups.
-
-A Tag group circle becoming partial because one overlapping task was selected through another Tag group is correct behavior.
-
----
-
-# 15. FAB switching
-
-Reuse the existing:
-
-```text
-#btn-open-add-task
-```
-
-Do not create two floating buttons occupying the same place.
-
-Normal mode:
-
-```text
-+ icon
-aria-label="Add Task"
-click → open Task creation modal
-```
-
-Select mode:
-
-```text
-••• icon/text
-aria-label="Selected task actions"
-click → open batch action panel
-```
-
-When selection count is zero:
-
-- keep the button visible so the mode is understandable;
-- it may be disabled/dimmed until at least one task is selected;
-- it must never open the normal Add Task modal while Select mode is active.
-
-When at least one task is selected, the action panel should show the count in a compact label such as:
-
-```text
-5 selected
-```
-
-without changing the requested action-grid layout.
-
----
-
-# 16. Batch action panel
-
-Add one Todo-owned panel near the FAB in `TodoList-ui/index.html`.
-
-Recommended semantics:
-
-```text
-role="dialog" or menu-like popover
-```
-
-Use a dialog/popover role if nested Priority/Tag/Project controls are interactive rather than pretending the whole surface is one flat ARIA menu.
-
-Required visual structure:
-
-```text
-5 selected
-
-[✓ Done] [📅 Date] [⚑ Priority]
-[Tag]    [Folder Project] [Trash Delete]
-
-[ Link Parent Task ]
-```
-
-The first six actions are compact equal-width action cells.
-
-`Link Parent Task` is a separate text action across the width below the grid.
-
-Panel should:
-
-- open upward/left from FAB as needed;
-- remain within Todo iframe viewport;
-- work above the shared mobile bottom nav;
-- close on outside click and Escape;
-- return focus to FAB when keyboard-opened/closed;
-- never open the Add Task modal.
-
----
-
-# 17. Batch execution rules
-
-All mutations go through existing Todo services.
-
-Do not write directly to `AppState` or IndexedDB from selection modules.
-
-Snapshot selected IDs at action start:
-
-```text
-const targetIds = [...selectedTaskIds]
-```
-
-Then re-read each task from `AppState` before mutating because another Todo operation/AI tool may have changed data since the task was selected.
-
-Use one action-level busy state:
-
-- temporarily disable action controls while applying;
-- prevent a second batch action from starting concurrently;
-- reconcile/rerender once at the end whenever practical;
-- if a mid-batch storage error occurs, report accurately and preserve remaining selection so the user can see/retry intentionally.
-
-Do not silently claim all selected tasks changed when only some succeeded.
-
----
-
-# 18. Done action
-
-Meaning:
-
-```text
-make selected tasks Done/completed
-```
-
-It is **not** a generic toggle.
-
-For every selected ID:
-
-```text
-if task no longer exists → prune/skip
-if already completed     → no-op
-if active                → AppDataService.toggleTaskStatus(id)
-```
-
-### Parent + selected child
-
-Todo completion semantics already complete a root family together.
-
-Therefore process selected root tasks before selected subtasks, and always re-read each later selected task before toggling.
-
-Example:
-
-```text
-Root A selected
-Child A1 selected
-
-complete Root A
-→ Child A1 becomes completed through family semantics
-
-later process Child A1
-→ already completed
-→ skip
-```
-
-Never toggle it back to active.
-
-### Repeat
-
-Preserve existing Repeat behavior:
-
-```text
-completing repeating occurrence
-→ old occurrence completed
-→ next occurrence may be created with a new ID
-```
-
-The new occurrence is not automatically added to the current selection.
-
----
-
-# 19. Date action
-
-The requested action is **Date**, not a hidden full replacement of every task's Schedule fields.
-
-Reuse the existing Calendar/Schedule visual system, but add a safe bulk date-only entry point.
-
-Recommended change in:
-
-```text
-TodoList-ui/js/components/schedule.js
-```
-
-Add an additive wrapper/mode such as:
-
-```text
-openDateOnly(initialDate, onApply, focusPolicy)
-```
-
-or equivalent.
-
-In bulk Date mode:
-
-- show the Date calendar/quick actions;
-- do not let a bulk Date action silently replace dueTime, reminders, or Repeat rules;
-- callback returns only the chosen `dueDate`/clear intent.
-
-Initial date:
-
-```text
-all selected tasks share same dueDate → show that date
-mixed dueDate values                 → no selected date/mixed state
-```
-
-Apply chosen date to every selected task with:
-
-```text
-AppDataService.updateTask(id, { dueDate: chosenDate })
-```
-
-### Clear-date invariant
-
-Preserve current Todo scheduling semantics.
-
-If user chooses Clear on a task that still has:
-
-```text
-active Repeat
-or dueTime
-```
-
-resolve the final date safely so Todo does not end with an invalid/strange time/repeat-only state.
-
-Match the normal Schedule behavior:
-
-```text
-Repeat requires a date → Today
-Time requires a date   → Today
-```
-
-Do not change each task's existing time/reminders/repeat just because a date was applied.
-
----
-
-# 20. Priority action
-
-Open a compact Priority picker using the existing Todo priority names/styles:
-
-```text
-None
-Low
-Medium
-High
-```
-
-One click applies the desired final priority to every selected task through:
-
-```text
-AppDataService.updateTask(id, { priority })
-```
-
-Works for root tasks and subtasks.
-
-Do not reuse `TasksComponent.selectedPriority` editor state.
-
----
-
-# 21. Tags action
-
-Tags are multi-valued and selected tasks can start with different Tag sets.
-
-Do not implement bulk Tags as “replace every selected task with the first task's tags.”
-
-Use the existing `TaxonomyOrder` hierarchy and Tag menu visual language with independent bulk state.
-
-For each Tag, derive:
-
-```text
-none of selected tasks have tag
-some selected tasks have tag
-all selected tasks have tag
-```
-
-Use a tri-state/check presentation.
-
-Click behavior:
-
-```text
-all have Tag
-→ remove this Tag from all selected tasks
-
-none/some have Tag
-→ add this Tag to all selected tasks
-```
-
-Preserve every unrelated Tag on each task.
-
-For each affected task:
-
-```text
-AppDataService.updateTask(id, { tags: nextTagIds })
-```
-
-Use `TaxonomyOrder.getChildren()` / `flattenTree('tag')` ordering so the bulk picker matches the rest of Todo.
-
-Works for roots and subtasks.
-
----
-
-# 22. Project action
-
-Use existing Project hierarchy/order and Inbox option.
-
-Important Todo rule:
-
-```text
-Subtasks inherit their parent Project.
-```
-
-Therefore do not pretend a standalone subtask Project can be changed independently.
-
-Recommended safe rule:
-
-1. Selected root tasks are valid Project targets.
-2. If a selected subtask's root parent is also selected, the subtask is covered by the root Project update and does not need a separate write.
-3. If the selection contains a subtask whose root parent is **not** selected, disable Project for that selection and show a short reason:
-
-```text
-Subtasks inherit their parent Project.
-```
-
-This avoids unexpectedly changing a parent/sibling family merely because one subtask was selected.
-
-For each selected root:
-
-```text
-AppDataService.updateTask(rootId, { project })
-```
-
-Existing service behavior propagates the root Project to its children.
-
-Inbox means:
-
-```text
-project: ''
-```
-
----
-
-# 23. Delete action
-
-Use existing family deletion semantics.
-
-Normalize selected IDs before deletion:
-
-- if a selected root is being deleted, its selected child IDs do not require separate deletion calls;
-- root deletion removes its family using `AppDataService.deleteTaskFamily(rootId)`;
-- selected child without selected root can be deleted individually through the same service;
-- process/re-read each ID so descendants already removed by a root deletion are skipped instead of producing false errors.
-
-Because this is a destructive bulk UI action, show one concise confirmation before persistence.
-
-The confirmation should state the real consequence when selected roots have subtasks, for example:
-
-```text
-Delete the selected tasks?
-Parent tasks will also delete their subtasks.
-```
-
-Do not show one confirmation per task.
-
-After successful delete:
-
-- remove deleted IDs from selection;
-- prune missing descendants;
-- rerender once;
-- if no selected IDs remain, Select mode may remain active with zero selected until the user exits, but the action FAB becomes disabled.
-
----
-
-# 24. Link Parent Task action
-
-Use a clear text action:
-
-```text
-Link Parent Task
-```
-
-Do not use an icon-only control for this action.
-
-The v1 bulk action should mirror the existing normal `Link to Parent` rule rather than inventing arbitrary hierarchy transformations.
-
-### Selection eligibility
-
-Enable Link Parent Task only when every effective selected target is:
-
-```text
-root task
-AND has no subtasks
-```
-
-If selection includes:
-
-- an existing subtask;
-- a root that already owns subtasks;
-
-show/disable with a concise reason rather than partially linking only some selection.
-
-### Candidate parent picker
-
-Candidate parent tasks must be:
-
-```text
-root
-not completed
-not one of selected target IDs
-```
-
-Use the same ordering as `TasksComponent.getEligibleParentTasks()`.
-
-### Apply
-
-For each selected task, revalidate immediately before mutation then call:
-
-```text
-AppDataService.linkTaskToParent(taskId, chosenParentId)
-```
-
-Do not add bulk Unlink in this plan; it was not requested.
-
----
-
-# 25. Selection lifecycle across renders and external Todo changes
-
-The Todo iframe remains alive and other Todo operations, including the existing AI Todo tool, may cause `TasksComponent.render()` while Select mode is active.
-
-The selection feature must survive harmless rerenders.
-
-After every render in Select mode:
-
-1. derive the currently selectable/rendered logical task IDs for the current Todo view;
-2. remove selected IDs that no longer exist or are no longer represented in the current filter/view;
-3. rebuild card checked state;
-4. rebuild every container selector state;
-5. update the selected count/FAB enabled state.
-
-Do not modify ChatUI to accomplish this.
-
-## Navigation/filter changes
-
-When the user navigates to another Inbox/Today/Completed/Project/Tag target through the Todo sidebar, exit Select mode and clear selection before rendering the new target.
-
-This prevents invisible selected tasks from one filter being edited from another filter.
-
-## Sort / Group / List / Kanban changes
-
-These change presentation of the same current Todo target.
-
-Selection may remain active and selected IDs may remain selected, provided they are still represented after rerender.
-
-Recompute all container-circle state after the change.
-
-## Shared app switch
-
-Do not exit Select mode merely because the Shell hides the Todo iframe and shows ChatUI.
-
-Both iframes are persistent; when the user returns to Todo, selection may still be present unless Todo data changes pruned it.
-
----
-
-# 26. Collapse/expand behavior
-
-Selection and collapse are independent.
-
-- Clicking a group/container select circle must not expand/collapse it.
-- Clicking the group's chevron/header collapse button must not change selection.
-- A collapsed group's logical tasks can still be selected by its group circle.
-- If a group is fully selected then collapsed, the circle remains checked.
-- If external data removes tasks, recompute state.
-
-This applies to:
-
-```text
-List Completed
-List grouped sections
-Kanban Completed per column
-```
-
----
-
-# 27. Workspace menu changes
+# 17. Workspace menu + Escape ownership
 
 Modify:
 
@@ -1253,220 +976,619 @@ TodoList-ui/js/components/workspace-controls.js
 TodoList-ui/css/components/workspace-menu.css
 ```
 
-Add one standard menu action under the existing View / Sort & Group controls.
-
-Conceptually:
+Menu:
 
 ```text
 View
-[ List ] [ Kanban ] [ Timeline ]
+[List] [Kanban] [Timeline]
 ────────────
-Sort & Group   ›
+Sort & Group ›
 ────────────
-Select
+Select / Cancel Selection
 ```
 
-While active:
+WorkspaceControls delegates state changes to `TasksComponent`.
+
+## Escape hierarchy
+
+Selection adds one explicit:
 
 ```text
-Cancel Selection
+handleSelectionEscape(event)
 ```
 
-`WorkspaceControls` should delegate to `TasksComponent.enterSelectionMode()` / `exitSelectionMode()` rather than owning selected IDs itself.
+Rules:
 
-Keep selection state in Tasks/selection component because it is task UI state, not a persistent workspace setting.
+1. ignore non-Escape;
+2. if `event.defaultPrevented`, do nothing;
+3. if a blocking Task/Subtask/Schedule/Settings modal is active, do not exit Select mode;
+4. if an inner bulk picker is open, close only it and `preventDefault()`;
+5. else if the selection action panel is open, close only it and `preventDefault()`;
+6. else exit Select mode and `preventDefault()`.
 
----
+Because WorkspaceControls is already an Escape owner for its own menu/panel, the selection handler must not perform another close after that event was handled.
 
-# 28. Avoid editor/action conflicts
-
-Before entering Select mode:
-
-- do not force-close an unsaved Task/Subtask edit modal unexpectedly;
-- if a task editor modal is active, either disable the workspace Select command until the modal closes or close only transient menus and refuse entry.
-
-Recommended: **do not enter Select mode while a Task/Subtask/Schedule modal is active**.
-
-While Select mode is active:
-
-- Add Task modal cannot open from FAB;
-- task detail click cannot open edit;
-- task task-action `•••` is unavailable;
-- drag is unavailable;
-- Schedule opens only when the user chooses the bulk Date action.
-
-Project/Tag sidebar editing remains separate, but changing the current filter should exit Select mode as section 25 specifies.
+One key press = one layer.
 
 ---
 
-# 29. UI synchronization after a batch action
+# 18. FAB — exactly one owner
 
-Avoid rendering after every single selected task when possible.
-
-Existing AppDataService methods update AppState after each durable write.
-
-At action level:
+Reuse only:
 
 ```text
-perform sequential writes
-→ one final TasksComponent.render()/refreshAfterTaskMutation()
-→ SidebarComponent.updateCounts()
-→ prune selection
-→ sync action count/container selectors
+#btn-open-add-task
 ```
 
-For Project changes, Tag changes, Date, Priority and Done, use one final Todo task UI reconciliation.
+Do not add a second floating button.
 
-If a selected action can affect the current filter so tasks disappear (for example Done while viewing active Inbox/Today), the final render/prune must remove those now-hidden IDs from selection.
+Do not add a second competing primary click handler.
 
-Do not keep hidden stale selections.
+`handlePrimaryFabClick()` owns:
 
----
-
-# 30. Error/partial-success behavior
-
-Bulk UI actions are multiple durable service calls; there is no global IndexedDB transaction across all selected tasks today.
-
-Therefore be truthful on failure.
-
-Pattern:
+### Normal mode
 
 ```text
-succeeded IDs
-failed ID + error
-unattempted IDs
++ icon
+aria-label="Add Task"
+aria-expanded="false"
+disabled=false
+click → open Add Task
 ```
 
-User-facing error can remain concise, but internal result/state must know what happened.
+### Select mode, zero selected
 
-On failure:
+```text
+•••
+aria-label="Selected task actions"
+disabled=true
+```
 
-- never roll AppState backward manually;
-- rerender from authoritative AppState;
-- leave uncompleted/unmodified remaining tasks selected so user can retry intentionally;
-- remove IDs that were deleted/disappeared;
-- report error through existing `AppPersistence.reportError()`.
+### Select mode, one or more selected
 
-Do not execute a failed batch again automatically.
+```text
+•••
+disabled=false
+click → toggle batch action panel
+aria-expanded mirrors panel
+```
+
+Exit Select mode restores the Add Task state.
 
 ---
 
-# 31. Accessibility
+# 19. Todo-local mutation coordination
 
-Selection mode must remain keyboard-usable.
+This correction is required because a manual multi-step batch and a Todo AI multi-step mutation can otherwise interleave between individual `AppDataService` writes.
+
+Add:
+
+```text
+TodoList-ui/js/todo-mutation-coordinator.js
+```
+
+Conceptual API:
+
+```text
+runExclusive(owner, work)
+whenIdle()
+isBusy()
+```
+
+Use a small FIFO promise chain/lease above `AppDataService`.
+
+## Manual selection batch
+
+When the user commits a batch action:
+
+```text
+TodoMutationCoordinator.runExclusive('manual-selection', async () => {
+  preflight current batch
+  perform sequential AppDataService writes
+  reconcile
+})
+```
+
+`selectionBatchBusy=true` from lease start through final reconciliation.
+
+## Todo AI executor
+
+Modify only the Todo-side files:
+
+```text
+TodoList-ui/js/tools/todo-tool-executor.js
+TodoList-ui/js/tools/todo-tool-registry.js (reuse existing isTodoMutationToolName)
+```
+
+Do not change tool declarations in ChatUI.
+
+For a mutating Todo AI function:
+
+```text
+TodoMutationCoordinator.runExclusive('todo-ai', execute mutation request)
+```
+
+Acquire the coordinator **before** the executor's `AppDataService.whenIdle()`/dispatch phase so the full high-level mutation is protected.
+
+For a read-only Todo tool:
+
+```text
+await TodoMutationCoordinator.whenIdle()
+await AppDataService.whenIdle()
+read AppState
+```
+
+This prevents AI reads from observing the middle of a manual batch.
+
+## Cancellation
+
+If an AI request is cancelled while waiting for the coordinator, the existing request cancellation flag must be checked again after the lease is acquired and before any mutation starts.
+
+## No direct DB workaround
+
+Do not bypass:
+
+```text
+AppDataService.enqueue()
+IndexedDB service transactions
+```
+
+The coordinator only protects **high-level multi-step ownership**.
+
+---
+
+# 20. Batch execution contract — preflight first, then revalidate
+
+For every action:
+
+1. snapshot selected IDs;
+2. normalize requested action/value;
+3. acquire `TodoMutationCoordinator` lease;
+4. re-resolve all current target tasks under the lease;
+5. perform **whole-batch predictable preflight** before the first durable write;
+6. if preflight fails, write nothing;
+7. then execute sequential durable service calls;
+8. immediately before each call, re-read/revalidate the specific entity;
+9. if storage/runtime failure occurs mid-batch, report truthful partial success;
+10. one final authoritative render/reconciliation.
+
+Preflight predictable errors such as:
+
+```text
+chosen Project missing
+selected subtask makes Project action illegal
+chosen parent invalid
+selected target already has children for Link Parent
+Repeat end date before proposed bulk date
+chosen Tag missing
+invalid priority
+Delete family normalization/confirmation consequence
+```
+
+Preflight cannot eliminate real mid-write failures, so partial-success handling remains required.
+
+---
+
+# 21. Done action
+
+Meaning:
+
+```text
+make selected tasks completed
+```
+
+Never blind-toggle.
+
+Preflight needs no special value validation, but normalize existing target IDs.
+
+Execution order:
+
+1. selected roots first;
+2. selected subtasks second;
+3. re-read every task immediately before acting.
+
+For each:
+
+```text
+missing           → prune/skip
+already completed → no-op
+active            → AppDataService.toggleTaskStatus(id)
+```
+
+Root completion may complete children.
+
+Therefore a selected child that was completed by its selected parent is re-read and skipped, never toggled back active.
+
+Repeat behavior remains existing service behavior. A newly generated next occurrence is not auto-selected.
+
+---
+
+# 22. Date action — exact date-only behavior
+
+Reuse the current Calendar/Schedule visual language through a dedicated bulk date-only mode such as:
+
+```text
+ScheduleComponent.openDateOnly(...)
+```
+
+Do not expose Time, Reminder, or Repeat controls in this mode if their edits will not be applied.
+
+The bulk Date UI should visibly be **Date-only**.
+
+Callback returns only:
+
+```text
+chosen dueDate
+or explicit Clear intent
+```
+
+Do not reuse Task editor schedule draft state.
+
+## Initial date
+
+```text
+all selected share dueDate → show that date
+mixed values                → no single selected date / mixed state
+```
+
+## Exact final-date normalization per task
+
+If user selects a date:
+
+```text
+finalDate = chosen date
+```
+
+If user chooses Clear:
+
+```text
+existing dueTime exists
+→ finalDate = Today
+
+active Repeat exists
+→ finalDate = Today
+
+neither dueTime nor active Repeat
+→ finalDate = null
+```
+
+Do **not** clear dueTime, reminders, or Repeat as a side effect.
+
+## Repeat end-date preflight
+
+Before the first write, for every selected task:
+
+```text
+if repeat.end.type === 'date'
+and finalDate exists
+and repeat.end.date < finalDate
+→ reject the batch before any durable mutation
+```
+
+Explain concisely that the chosen date is after one selected task's Repeat end date.
+
+Then execution uses:
+
+```text
+AppDataService.updateTask(id, { dueDate: finalDate })
+```
+
+with per-item re-read under the coordinator.
+
+This deliberately matches the normal Schedule invariant that Time/active Repeat cannot remain date-less.
+
+---
+
+# 23. Priority action
+
+Picker:
+
+```text
+None
+Low
+Medium
+High
+```
+
+Preflight:
+
+- chosen value must be one of the allowed service values.
+
+Apply to roots/subtasks:
+
+```text
+AppDataService.updateTask(id, { priority })
+```
+
+Do not reuse Task editor `selectedPriority`.
+
+---
+
+# 24. Tags action
+
+Use `TaxonomyOrder` hierarchy/order and independent batch state.
+
+For each Tag compute across current target tasks:
+
+```text
+none have it
+some have it
+all have it
+```
+
+Click behavior:
+
+```text
+all have Tag
+→ remove from all selected tasks
+
+none/some have Tag
+→ add to all selected tasks
+```
+
+Preserve unrelated Tags per task.
+
+Preflight chosen Tag still exists before any write.
+
+Per task:
+
+```text
+AppDataService.updateTask(id, { tags: nextTagIds })
+```
+
+---
+
+# 25. Project action
+
+Subtasks inherit the parent Project.
+
+Safe rule:
+
+1. roots are valid Project targets;
+2. selected child whose selected root is also a target is covered by the root write;
+3. selected child whose root is not selected makes the Project action unavailable for that selection.
+
+Reason text:
+
+```text
+Subtasks inherit their parent Project.
+```
+
+Preflight:
+
+- chosen Project exists, or Inbox `''`;
+- every effective target remains a root;
+- no illegal lone-subtask target remains.
+
+Apply each effective root:
+
+```text
+AppDataService.updateTask(rootId, { project })
+```
+
+Existing service propagation updates children.
+
+---
+
+# 26. Delete action
+
+Normalize families before mutation.
+
+If selected root is included:
+
+```text
+root deletion owns root + descendants
+selected child IDs under that root are not separate delete calls
+```
+
+A selected child without selected root may be deleted individually through `deleteTaskFamily(childId)`.
+
+Before coordinator commit, show **one** concise confirmation describing the real family consequence.
+
+Inside coordinator, preflight target existence/family normalization again before the first write.
+
+After mutation:
+
+- remove deleted/missing IDs from selection;
+- retain unattempted IDs on partial failure;
+- final render from AppState.
+
+---
+
+# 27. Link Parent Task
+
+Visible text action:
+
+```text
+Link Parent Task
+```
+
+Enable only if every selected effective target is currently:
+
+```text
+root
+AND has no subtasks
+```
+
+Candidate parent must be:
+
+```text
+root
+active/not completed
+not one of selected target IDs
+```
+
+Use existing eligible-parent ordering.
+
+Before first write under the coordinator, preflight all targets and chosen parent again.
+
+Then before each individual link, re-read target + parent and revalidate.
+
+Apply:
+
+```text
+AppDataService.linkTaskToParent(taskId, chosenParentId)
+```
+
+No bulk Unlink in this plan.
+
+---
+
+# 28. Action-level busy state
+
+During durable batch execution:
+
+```text
+selectionBatchBusy = true
+```
+
+Until final reconciliation:
+
+- batch action cells disabled;
+- batch pickers cannot open another action;
+- FAB cannot start another action;
+- Cancel Selection does not destroy in-flight state;
+- task selection toggles are temporarily ignored/disabled;
+- sidebar filter navigation should not exit Select mode in the middle of a commit;
+- Sort/Group/View changes should wait until the commit settles.
+
+Scrolling remains allowed.
+
+After success/failure:
+
+```text
+selectionBatchBusy = false
+```
+
+and UI state is rebuilt from authoritative AppState.
+
+---
+
+# 29. Error and partial-success bookkeeping
+
+There is no one IndexedDB transaction covering every selected task.
+
+Track internally:
+
+```text
+succeededIds
+failedId + error
+unattemptedIds
+```
+
+On predictable preflight failure:
+
+```text
+0 durable writes
+selection remains
+show concise error
+```
+
+On storage/runtime failure after some writes:
+
+- never manually roll AppState backward;
+- rerender authoritative AppState;
+- preserve unattempted/failed targets in selection when still visible;
+- prune deleted/hidden IDs;
+- report with `AppPersistence.reportError()`;
+- never automatically rerun the failed batch.
+
+---
+
+# 30. Selection lifecycle across renders
+
+The Todo iframe can rerender because of normal user operations or Todo AI operations.
+
+After every render while Select mode is active:
+
+1. derive current logical selectable IDs for the current filter/view;
+2. prune selected IDs that no longer exist or are no longer represented;
+3. render checkbox selection state;
+4. render task-body `aria-pressed` state;
+5. recompute every container selector;
+6. recompute Select-mode concrete counts;
+7. update global selected count/FAB state.
+
+## Sidebar filter/navigation
+
+When not batch-busy, changing Inbox/Today/Completed/Project/Tag exits Select mode before rendering the new target.
+
+## Sort/Group/List/Kanban
+
+Presentation changes may keep Select mode active.
+
+Recompute membership and prune selection after rerender.
+
+## Shell app switch
+
+Todo → Chat → Todo does not exit Select mode. The iframe is persistent.
+
+---
+
+# 31. Collapse behavior
+
+Selection and collapse remain separate.
+
+- selector click never toggles collapse;
+- collapse click never changes selection;
+- collapsed logical cards remain part of that container's select-all membership;
+- selector state remains correct while collapsed;
+- external changes recompute it.
+
+Applies to:
+
+```text
+List Completed
+List groups
+Kanban Completed per column
+```
+
+---
+
+# 32. Accessibility
 
 Requirements:
 
-- existing task circle remains a real checkbox;
-- its label changes from completion to selection meaning in Select mode;
-- container circles are real checkbox controls with meaningful labels such as:
-  - `Select all active tasks`
-  - `Unselect all Medium tasks`
-  - `Select completed tasks in High`
-- set `.indeterminate = true` for partial groups and expose mixed state where appropriate;
-- do not nest interactive controls inside buttons;
-- action FAB has correct `aria-expanded` when panel is open;
-- action panel nested pickers receive sensible focus;
-- Escape closes inner picker → batch panel → selection mode in that order;
-- focus returns to a sensible connected control after rerender.
+- task circle remains native checkbox;
+- task checkbox label reflects completion in normal mode and selection in Select mode;
+- task-body selection target uses `aria-pressed` in Select mode;
+- container controls are native checkbox controls;
+- set `indeterminate=true` for partial containers;
+- zero-ID selectors are disabled and unchecked;
+- no interactive control nested inside another button;
+- collapse button keeps correct `aria-controls`/`aria-expanded`;
+- action FAB has correct `aria-expanded`;
+- nested pickers get keyboard focus and return it sensibly;
+- one Escape closes one layer;
+- existing focus-visible styles remain.
 
-Do not remove existing focus-visible styles.
+Examples:
+
+```text
+Select all active tasks
+Unselect all Medium tasks
+Select completed tasks in High
+```
 
 ---
 
-# 32. Mobile behavior
-
-The feature must be designed for the embedded Todo iframe on phone.
+# 33. Mobile behavior
 
 Required:
 
-- selection action FAB remains above the mobile bottom nav/safe area exactly like current Add FAB;
-- action panel must open upward and stay inside viewport;
-- three equal columns must fit narrow screens;
-- Link Parent Task text row stays readable;
-- tapping a task card in Select mode should be an easy target;
-- no long-press drag can accidentally begin while selecting;
-- container selector circles must have at least a practical touch hit area even if the visible circle stays 22px;
-- Kanban horizontal scrolling still works while Select mode is active;
-- selecting a task must not accidentally trigger card edit or checkbox completion.
+- selection FAB stays above mobile bottom nav/safe area;
+- panel opens upward and remains in iframe viewport;
+- 3-column grid fits narrow screens;
+- Link Parent text stays readable;
+- visible circle may remain 22px but hit area is touch-friendly;
+- task-body tap selects without Edit;
+- long-press drag cannot start;
+- Kanban horizontal scrolling still works;
+- selection never toggles completion accidentally.
 
 ---
 
-# 33. CSS details
-
-Reuse current variables:
-
-```text
---accent-color
---bg-secondary
---bg-hover
---border-color
---border-subtle
---text-primary
---text-secondary
---text-muted
---danger-color
---success-color
-```
-
-Do not introduce a separate visual theme.
-
-Recommended selection card state:
-
-- subtle accent border/ring/background only;
-- do not overpower priority/date badges;
-- completed task strike-through remains visible;
-- selected state must be visible in both dark and light themes.
-
-Container selection circle should visually match `.task-checkbox` rather than a new square checkbox style.
-
-Delete action uses danger styling.
-
----
-
-# 34. No persistence/schema changes
-
-Do not change:
-
-```text
-TodoListDB version/schema
-ChatUI_DB
-Todo task record shape
-Project/Tag record shape
-Shell messages
-ChatUI Todo tool declarations
-```
-
-Selected IDs and Select mode are runtime-only UI state.
-
----
-
-# 35. Interaction with Todo AI implementation
-
-No ChatUI code changes are in scope.
-
-However current Todo AI mutations can invoke Todo UI reconciliation while the iframe is hidden or visible.
-
-The new Todo selection renderer must therefore be defensive:
-
-```text
-AI updates selected task
-→ task remains selected if still represented in current Todo view
-
-AI deletes selected task
-→ selected ID is pruned
-
-AI changes task so it leaves current filter
-→ selected ID is pruned after render
-```
-
-Do not make Todo AI executor aware of Select mode unless a concrete runtime conflict is discovered during implementation.
-
-Selection state should simply reconcile from authoritative AppState after existing renders.
-
----
-
-# 36. Files expected to change
+# 34. Files expected to change
 
 Primary:
 
@@ -1481,10 +1603,12 @@ TodoList-ui/js/components/task-drag-touch.js
 TodoList-ui/js/components/workspace-controls.js
 TodoList-ui/js/components/sidebar.js
 TodoList-ui/js/components/schedule.js
+TodoList-ui/js/tools/todo-tool-executor.js
 TodoList-ui/css/layout/workspace-layout.css
 TodoList-ui/css/components/workspace-menu.css
 TodoList-ui/css/components/task-groups.css
 TodoList-ui/css/components/task-kanban.css
+TodoList-ui/css/components/task-cards.css
 ```
 
 New:
@@ -1493,278 +1617,356 @@ New:
 TodoList-ui/js/components/task-selection.js
 TodoList-ui/js/components/task-selection-actions.js
 TodoList-ui/js/components/task-selection-menus.js
+TodoList-ui/js/todo-mutation-coordinator.js
 TodoList-ui/css/components/task-selection.css
 ```
 
-Potentially adjust:
+Potential verification changes:
 
 ```text
-TodoList-ui/css/components/task-cards.css
-scripts/verify-integration.mjs or a new Todo pure-JS verification script
+scripts/verify-integration.mjs
+new Todo pure-JS verification script
 .github/workflows/iframe-integration-check.yml
 ```
 
-Only adjust the verification workflow if new modules need syntax/static checks.
+No ChatUI/Shell runtime file should change.
 
 ---
 
-# 37. Implementation phases
+# 35. Implementation phases
 
-## Phase 1 — Due Date sorting fix
+## Phase 1 — Due Date comparator
 
-1. Add pure 12-hour-time → minutes helper.
-2. Replace text-time comparison in `sortTasks()`.
-3. Verify AM/PM/no-time/different-date/direction cases.
-4. Do not touch persistence.
+1. Add defensive 12-hour parser.
+2. Replace raw time-text comparison.
+3. Pin No Date always last.
+4. Preserve date-only behavior across asc/desc.
+5. Add pure edge-case tests.
 
-## Phase 2 — Selection state foundation
+## Phase 2 — Todo mutation coordinator
 
-1. Add `task-selection.js`.
-2. Add runtime Set and mode lifecycle.
-3. Add workspace `Select` entry.
-4. Make existing card checkbox mode-aware.
-5. Change card click behavior in Select mode.
-6. Disable/cancel drag while selecting.
+1. Add Todo-local coordinator.
+2. Wrap Todo AI mutating dispatch with coordinator.
+3. Make Todo AI reads wait for coordinator idle + AppDataService idle.
+4. Preserve request cancellation checks.
+5. No ChatUI/Shell changes.
 
-## Phase 3 — List container selectors
+## Phase 3 — Selection state foundation
 
-1. Active section selector.
-2. Refactor Completed header into separate selector + collapse control.
-3. Refactor grouped active headers.
-4. Implement partial/full selector state.
+1. Add selection modules.
+2. Add Set/mode/busy lifecycle.
+3. Add workspace Select entry.
+4. Replace FAB click ownership with `handlePrimaryFabClick()`.
+5. Add Escape ownership.
+6. Cancel/disable drag.
 
-## Phase 4 — Kanban selectors
+## Phase 4 — Individual task selection
+
+1. Branch inside existing checkbox `change` handler.
+2. Add task-body click/keyboard selection.
+3. Add `aria-pressed` state.
+4. Add accent selection styling.
+5. Suppress per-task action/Edit behavior.
+
+## Phase 5 — Membership + List selectors
+
+1. Implement family-aware `expandRenderedTaskIds()`.
+2. Add empty-container state.
+3. Add Select-mode concrete counts.
+4. Add Active selector.
+5. Refactor Completed header and update `ensureCompletedSectionToggle()`.
+6. Refactor grouped headers.
+7. Test Tag overlap and mixed-status families.
+
+## Phase 6 — Kanban selectors
 
 1. Add active-lane selector per column.
-2. Refactor each completed header.
-3. Add Group=None Active label only in Select mode.
-4. Verify column-local Completed selection.
+2. Refactor completed header into selector + collapse siblings.
+3. Preserve exact collapse/drop-lane hooks.
+4. Add Group=None Active header in Select mode.
+5. Test zero-ID lanes.
 
-## Phase 5 — Selection FAB/action panel
+## Phase 7 — FAB/action panel + pickers
 
-1. Reuse existing FAB.
-2. Implement mode/icon/ARIA switching.
-3. Add 2x3 panel.
-4. Add Link Parent Task text action.
-5. Add selected count and focus/outside-click behavior.
+1. Add exact 2x3 layout.
+2. Add Link Parent text row.
+3. Add global selected count.
+4. Add Priority picker.
+5. Add Tags tri-state picker.
+6. Add Project picker.
+7. Add Date-only Schedule mode.
+8. Add Link Parent candidate picker.
 
-## Phase 6 — Bulk Priority/Tags/Project/Date pickers
+## Phase 8 — Batch preflight + persistence
 
-1. Priority single-choice picker.
-2. Tags tri-state add/remove picker.
-3. Project hierarchy picker with Inbox and subtask eligibility logic.
-4. Add Schedule date-only mode.
+For each action:
 
-## Phase 7 — Batch persistence actions
+1. snapshot targets;
+2. acquire coordinator;
+3. whole-batch preflight;
+4. per-item re-read/revalidation;
+5. sequential service writes;
+6. truthful partial bookkeeping;
+7. one final reconciliation.
 
-1. Done desired-state logic.
-2. Date updates.
-3. Priority updates.
-4. Tag updates.
-5. Project root-family updates.
-6. Delete normalization + one confirmation.
-7. Link Parent validation + service calls.
-8. One final render/count reconciliation.
+Implement Done, Date, Priority, Tags, Project, Delete, Link Parent.
 
-## Phase 8 — Lifecycle and cross-render hardening
+## Phase 9 — Lifecycle hardening
 
-1. Sidebar filter change exits selection.
-2. Sort/group/view rerender preserves valid selections.
-3. External/AI Todo render prunes invalid/hidden selection IDs.
-4. Escape/focus cleanup.
-5. Mobile safe-area positioning.
+1. filter navigation exits selection when safe;
+2. Sort/Group/View retains valid selection;
+3. Todo AI rerender prunes stale IDs;
+4. batch-busy blocks conflicting local UI transitions;
+5. app switch preserves selection;
+6. keyboard/focus/Escape cleanup;
+7. mobile safe-area behavior.
 
-## Phase 9 — Verification
+## Phase 10 — Verification
 
-Run static/syntax/pure-JS verification only.
+Static/syntax/pure-JS verification only.
 
 No headless Chrome requirement.
 
-The user performs browser interaction testing.
+The user performs real browser interaction testing.
 
 ---
 
-# 38. Manual verification matrix
+# 36. Verification matrix
 
-## Due Date sorting
+## Due Date
 
-- same day: 12:18 PM before 03:57 PM;
-- 12:00 AM before 01:00 AM;
-- 11:59 AM before 12:00 PM;
-- 12:59 PM before 01:00 PM;
-- ascending and descending;
-- different dates;
-- date-only tasks;
-- unscheduled tasks.
-
-## Enter/exit Select mode
-
-- open top-right `•••` → Select;
-- normal completion circle becomes selection circle behavior;
-- task completion data does not change when selecting;
-- task body toggles selection instead of editing;
-- task action `•••` unavailable;
-- FAB changes `+` → `•••`;
-- Cancel Selection/Escape restores everything.
-
-## List, no grouping
-
-- select one Active task;
-- Active circle becomes partial;
-- Active circle selects all active tasks;
-- click again unselects all active tasks;
-- Completed selector affects completed only;
-- collapsed Completed selector still works.
-
-## List grouping
-
-Test each:
+Test:
 
 ```text
-Priority
-Date
-Project
-Tag
+12:18 PM before 03:57 PM ascending
+03:57 PM after 12:18 PM descending according to real time
+12:00 AM
+01:00 AM
+11:59 AM
+12:00 PM
+12:59 PM
+01:00 PM
+11:59 PM
+No Date always last asc
+No Date always last desc
+date-only same-date asc/desc
+malformed legacy time does not crash
+same values preserve stable order
 ```
 
-For every group:
+## FAB ownership
 
-- its circle selects only that group's logical cards;
-- partial state works;
-- collapse remains independent;
-- Tag overlap does not corrupt global selection.
+- normal click opens only Add Task;
+- Select-mode click opens only selection panel;
+- no double listener effect;
+- zero selected disables action FAB;
+- exit restores Add Task.
+
+## Escape ownership
+
+Test one Escape at each layer:
+
+```text
+Workspace Sort/Group panel
+Workspace menu
+bulk inner picker
+batch panel
+Select mode
+Task/Subtask/Schedule modal
+```
+
+One press closes one appropriate layer only.
+
+## Individual selection
+
+- circle changes selection once per click;
+- no click+change double toggle;
+- task completion data remains unchanged;
+- card-body click toggles once;
+- Enter/Space toggles once;
+- `aria-pressed` tracks state;
+- selected circle is accent-colored;
+- completed card keeps completed appearance.
+
+## Family/container membership
+
+Test:
+
+- root only;
+- root + one child;
+- root + several children;
+- collapsed children;
+- standalone filtered child;
+- active root + completed child;
+- completed root + active child;
+- Select-mode count equals concrete selected IDs.
+
+## List selectors
+
+- Active selector;
+- Completed selector collapsed/expanded;
+- Priority groups;
+- Date groups;
+- Project groups;
+- Tag groups with overlapping task;
+- empty section selector disabled;
+- collapse state unaffected by selection.
 
 ## Kanban
 
-- each column active selector is local;
-- each column Completed selector is local;
-- High Completed does not select Medium Completed;
-- Group=None has usable Active/Completed selectors;
-- horizontal scrolling still works.
+- each Active lane local;
+- each Completed lane local;
+- High Completed never selects Medium Completed;
+- Group=None Active selector;
+- empty lane selector disabled;
+- horizontal scroll works.
 
-## Subtasks
+## Date batch
 
-- select parent only;
-- select subtask only;
-- select parent + subtask;
-- collapsed subtask family and parent container selector;
-- standalone filtered subtask;
-- Done never reactivates a child already completed through parent completion.
+- common date;
+- mixed dates;
+- set date;
+- Clear plain date-only task → null;
+- Clear timed task → Today;
+- Clear repeating task → Today;
+- existing time preserved;
+- reminders preserved;
+- Repeat preserved;
+- chosen date after Repeat end date rejects entire predictable batch before first write.
+
+## Batch preflight
+
+Force predictable invalid later targets and verify **zero earlier writes** for:
+
+- missing Project;
+- invalid Link Parent target;
+- missing Tag;
+- Repeat end-date conflict.
+
+Then separately force a real storage failure mid-batch and verify truthful partial state.
+
+## Todo AI/manual coordination
+
+Test:
+
+```text
+manual selection batch active
+→ Todo AI mutation waits until batch completes
+
+Todo AI mutation active
+→ manual batch waits until AI mutation completes
+
+AI read during manual batch
+→ read waits until batch is settled
+
+cancelled AI mutation waiting on coordinator
+→ cancellation checked before mutation begins
+```
+
+No ChatUI code change should be needed.
 
 ## Done
 
-- one active task;
-- mixed active/completed selection;
-- parent family;
-- repeating task creates next occurrence without selecting it.
-
-## Date
-
-- all same date;
-- mixed dates;
-- apply date;
-- clear date;
-- task with existing time;
-- task with active Repeat;
-- other schedule fields are preserved.
-
-## Priority
-
-- None/Low/Medium/High;
-- roots and subtasks;
-- selected tasks can disappear/reorder under Priority sorting/grouping without stale selection.
+- mixed active/completed;
+- selected root + selected child;
+- root completion does not cause child to be toggled back active;
+- repeat next occurrence not auto-selected.
 
 ## Tags
 
-- tag on none/some/all selected tasks;
-- add tag to all;
-- remove tag from all;
-- unrelated tags preserved;
-- nested Tag hierarchy order.
+- none/some/all tri-state;
+- add to all;
+- remove from all;
+- unrelated Tags preserved;
+- nested ordering.
 
 ## Project
 
-- root tasks only;
+- roots only;
 - Inbox;
-- Project/subproject;
-- parent Project propagation to children;
-- lone selected subtask disables Project with clear reason;
-- selected parent + selected child does not duplicate writes.
+- nested Project;
+- selected root + child uses one effective root write;
+- lone child disables Project.
 
 ## Delete
 
-- selected root;
-- selected child;
-- root + its selected child;
-- multiple roots;
-- parent with unselected subtasks confirms family deletion once;
-- partial storage failure leaves authoritative UI.
+- child only;
+- root only;
+- root + selected child;
+- several roots;
+- one confirmation;
+- family consequence correct;
+- partial real storage failure remains truthful.
 
-## Link Parent Task
+## Link Parent
 
-- multiple eligible root tasks;
-- selected target cannot be chosen as parent;
+- multiple eligible roots;
+- target with children rejected before writes;
+- selected child rejected;
 - completed parent not offered;
-- selection containing subtask disabled;
-- selection containing root with children disabled;
-- successful links preserve normal hierarchy rules.
+- selected target cannot be candidate parent;
+- revalidation before every link.
 
-## Mode/lifecycle
+## Lifecycle/mobile
 
-- change List ↔ Kanban during Select mode;
-- change Sort during Select mode;
-- change Group during Select mode;
-- change sidebar filter exits Select mode;
-- switch Todo → Chat → Todo and selection remains live;
-- external Todo AI mutation causes render and stale IDs are pruned.
-
-## Mobile
-
-- task tap selection;
-- no accidental edit;
+- Sort/Group/View while selecting;
+- filter navigation exits selection;
+- Todo → Chat → Todo retains selection;
+- Todo AI deletion/update triggers prune;
+- batch busy prevents conflicting navigation;
+- mobile action panel fits;
+- mobile safe area;
 - no long-press drag;
-- FAB above bottom nav;
-- action grid fits screen;
-- Date/Tag/Project/Priority pickers stay onscreen;
-- Kanban scroll + selection.
+- Kanban scroll remains usable.
 
 ---
 
-# 39. Non-regression requirements
+# 37. Non-regression requirements
 
 Do not break:
 
-- normal single-task completion checkbox behavior outside Select mode;
+- normal single-task completion outside Select mode;
 - Repeat-aware completion;
-- parent completion family semantics;
-- Add Task FAB/modal outside Select mode;
+- parent family completion;
+- Add Task FAB/modal;
 - Task/Subtask editor keyboard continuity;
 - Task drag/drop outside Select mode;
 - Project/Tag taxonomy drag;
 - List/Kanban rendering;
 - Group By behavior;
-- Custom task ordering;
-- existing Project/Tag menu ordering;
-- embedded Todo iframe behavior;
-- standalone `TodoList-ui/index.html` behavior;
-- Todo AI tool integration;
-- `TodoListDB` persistence.
+- Custom ordering;
+- existing Project/Tag hierarchy menu ordering;
+- Completed/group/Kanban collapse behavior;
+- embedded Todo iframe;
+- standalone Todo page;
+- Todo AI tools;
+- TodoListDB persistence.
 
 ---
 
-# 40. Acceptance criteria
+# 38. Acceptance criteria
 
-Implementation is complete only when all of the following are true:
+Implementation is complete only when:
 
-1. Due Date sorting uses real clock time and fixes the demonstrated `12:18 PM` ordering error.
-2. Workspace `•••` contains Select.
-3. Existing task circle selects tasks instead of changing completion while Select mode is active.
-4. Multiple tasks/subtasks can be selected.
-5. Every requested List/Kanban logical container has its own circular select-all control.
-6. Container circle toggles all/none and supports partial state.
-7. Group-specific Completed selection in Kanban affects only that group.
-8. FAB changes from `+` to selection `•••` while selecting.
-9. Action panel is exactly based on:
+1. Due Date sorting uses real clock minutes.
+2. `12:18 PM` sorts before `03:57 PM` on the same date ascending.
+3. No Date is last in both sort directions.
+4. malformed legacy dueTime cannot crash sorting.
+5. workspace `•••` contains Select.
+6. the existing round task circle becomes the selection control in Select mode.
+7. selecting never mutates completion.
+8. checkbox selection uses one `change` path and cannot double-toggle.
+9. task body/keyboard can select with truthful `aria-pressed` state.
+10. multiple task/subtask IDs can be selected.
+11. each requested List/Kanban logical container has a round selector.
+12. empty containers are disabled/unselected.
+13. partial container state is correct, including overlapping Tag groups.
+14. mixed-status families follow rendered-container membership explicitly.
+15. Select-mode container counts use concrete expanded IDs.
+16. Completed/group/Kanban header refactors preserve collapse hooks and ARIA.
+17. exactly one FAB click owner exists.
+18. FAB changes `+` ↔ `•••` correctly.
+19. action panel is exactly based on:
 
 ```text
 Done | Date | Priority
@@ -1772,41 +1974,50 @@ Tags | Project | Delete
 Link Parent Task
 ```
 
-10. No Pin action exists.
-11. Priority/Tag/Project/Date UI reuses Todo's visual language without sharing Task editor draft state.
-12. Batch Done is desired-state completion, never blind toggling.
-13. Batch Tags preserve unrelated tags.
-14. Batch Project respects subtask Project inheritance.
-15. Delete handles root+child selection without duplicate deletion.
-16. Link Parent Task respects current one-level hierarchy rules.
-17. Selection is runtime-only; no DB schema change.
-18. Drag/edit/completion gestures do not conflict with Select mode.
-19. Selection remains correct after rerenders and prunes stale/invisible IDs.
-20. Normal Todo behavior is unchanged after leaving Select mode.
-21. No ChatUI or Shell runtime code is modified for this feature.
-22. No headless-browser test requirement is added.
+20. No Pin exists.
+21. Date mode is visibly date-only.
+22. clearing date on Time/Repeat tasks resolves to Today without clearing Time/Repeat/Reminder data.
+23. Repeat end-date conflicts are preflighted before writes.
+24. predictable batch validation errors happen before the first durable mutation.
+25. per-item dynamic state is still re-read before each mutation.
+26. Done is desired-state completion, never blind toggle.
+27. Tags preserve unrelated Tags.
+28. Project respects subtask inheritance.
+29. Delete normalizes root families.
+30. Link Parent respects current one-level hierarchy rules.
+31. Todo AI mutation and manual multi-select mutation cannot interleave at high level.
+32. AI reads do not observe a half-completed manual batch.
+33. selection is runtime-only; no schema change.
+34. one Escape closes only one UI layer.
+35. drag/edit/completion gestures do not conflict with Select mode.
+36. selection survives harmless rerenders and prunes stale/hidden IDs.
+37. normal Todo behavior is restored after leaving Select mode.
+38. no ChatUI or Shell runtime code is modified.
+39. no headless-browser test requirement is introduced.
 
 ---
 
-# 41. Recommended implementation order for the next agent
+# 39. Recommended implementation order
 
-Do not begin with the action panel.
-
-The safest order is:
+Use this order:
 
 ```text
 Due Date comparator
+→ Todo-local mutation coordinator
 → selection state
+→ single-owner FAB/Escape behavior
 → individual circle/card selection
 → drag/editor guards
-→ List container membership/selectors
-→ Kanban membership/selectors
-→ FAB/action panel
-→ Priority/Tags/Project/Date pickers
-→ batch mutations
-→ lifecycle pruning
-→ CSS/mobile/accessibility polish
+→ family membership + concrete counts
+→ List headers/selectors
+→ Kanban headers/selectors
+→ action panel
+→ Priority/Tags/Project/Date/Link Parent pickers
+→ whole-batch preflight
+→ batch persistence actions
+→ lifecycle/AI reconciliation
+→ accessibility/mobile polish
 → static/manual verification
 ```
 
-This order makes selection semantics correct before destructive batch actions are connected.
+Do not start with destructive batch actions before selection membership, event ownership, and mutation coordination are correct.
