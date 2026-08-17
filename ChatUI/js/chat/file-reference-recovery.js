@@ -1,9 +1,10 @@
 /**
  * file-reference-recovery.js — Robust pre-stream recovery for Gemini File access failures.
  *
- * When generation clearly fails because a remote Gemini File is inaccessible,
- * validate every remote attachment in the request, re-upload inaccessible ones
- * from the permanent local Blob, and persist the replacement File metadata.
+ * Once generation proves that a remote Gemini File is inaccessible, rebuild one
+ * coherent fresh set of File resources from the permanent local Blobs. This is
+ * safer with a multi-account proxy than mixing old account-owned File URIs with
+ * newly uploaded ones.
  */
 
 import { getApiSettings, getCleanBaseUrl } from '../api/api-config.js';
@@ -149,20 +150,12 @@ async function mapWithConcurrency(items, limit, worker) {
   return results;
 }
 
-async function validateOrRepairEntry(entry, context) {
+async function validateRemoteWithoutLocalBlob(entry, context) {
   const attachment = entry.attachment;
   const name = remoteFileName(attachment?.fileApiName) || remoteFileName(attachment?.fileUri);
-
-  // Some older records can retain a URI without a parseable File name. A clear
-  // generation-time File permission error is enough to rebuild it from Blob.
-  if (!name) {
-    if (!hasLocalBlob(attachment)) throw localBlobMissingError(attachment);
-    await replaceRemoteFile(attachment, context);
-    return { repaired: true, validated: false };
-  }
+  if (!name) throw localBlobMissingError(attachment);
 
   try {
-    const previousUri = attachment.fileUri || '';
     const remote = await getGeminiFile({
       fileApiName: name,
       apiSettings: context.apiSettings,
@@ -170,30 +163,42 @@ async function validateOrRepairEntry(entry, context) {
       signal: context.signal
     });
     await applyRemoteMetadata(attachment, remote, context.cleanBaseUrl);
-    return {
-      repaired: !!remote?.uri && remote.uri !== previousUri,
-      validated: true
-    };
+    return true;
   } catch (error) {
     if (isAbortError(error)) throw error;
-    if (!isRemoteFileLookupUnavailable(error)) throw error;
-    await replaceRemoteFile(attachment, context);
-    return { repaired: true, validated: false };
+    if (isRemoteFileLookupUnavailable(error)) throw localBlobMissingError(attachment);
+    throw error;
   }
 }
 
-async function forceRefreshAllLocalFiles(entries, context) {
+async function refreshCoherentLocalFileSet(entries, context) {
   const localEntries = entries.filter(entry => hasLocalBlob(entry.attachment));
+  const remoteOnlyEntries = entries.filter(entry => !hasLocalBlob(entry.attachment));
+
+  // A remote-only attachment can remain only if the current proxy identity can
+  // still read it. If it cannot, tell the user the true problem: no local copy.
+  await mapWithConcurrency(
+    remoteOnlyEntries,
+    FILE_RECOVERY_CONCURRENCY,
+    entry => validateRemoteWithoutLocalBlob(entry, context)
+  );
+
   if (localEntries.length === 0) {
-    const first = entries[0]?.attachment;
-    throw localBlobMissingError(first);
+    // The generation reported a File access failure but there is nothing local
+    // that can be rebuilt. Surface a clear local-source error instead of Google's
+    // misleading permission text.
+    throw localBlobMissingError(entries[0]?.attachment);
   }
 
+  // Re-upload every local-backed File together. This deliberately replaces even
+  // remote Files that files.get might still consider valid: with rotating proxy
+  // accounts, a mixed old/new set can otherwise fail again on the next request.
   await mapWithConcurrency(localEntries, FILE_RECOVERY_CONCURRENCY, async entry => {
     await replaceRemoteFile(entry.attachment, context);
     return true;
   });
-  return localEntries.length > 0;
+
+  return true;
 }
 
 export async function recoverGenerationFilePermissionFailure({
@@ -218,17 +223,5 @@ export async function recoverGenerationFilePermissionFailure({
     signal
   };
 
-  const results = await mapWithConcurrency(
-    entries,
-    FILE_RECOVERY_CONCURRENCY,
-    entry => validateOrRepairEntry(entry, context)
-  );
-
-  if (results.some(result => result?.repaired)) return true;
-
-  // A generation request proved that at least one File reference is unusable,
-  // but every files.get check succeeded. This can happen if the proxy changes
-  // Google account/context between requests. Refresh all local-backed remote
-  // Files together so the next generation has one coherent new set of URIs.
-  return forceRefreshAllLocalFiles(entries, context);
+  return refreshCoherentLocalFileSet(entries, context);
 }
