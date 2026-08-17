@@ -5,6 +5,7 @@
 import { state, runtime, setRuntime, updateChat } from '../state/store.js';
 import { persistSettings, persistChatMetadata } from '../storage/storage.js';
 import { loadChat } from '../chat/chat.js';
+import { buildChatHref, isUnmodifiedPrimaryNavigation } from '../router/app-links.js';
 import { createNewChatInProject } from './projects.js';
 import { openChatOptionsMenu, openProjectOptionsMenu } from './sidebar-actions.js';
 import { escapeHtml } from '../utils/dom.js';
@@ -26,11 +27,8 @@ export function renderSidebar() {
   if (pinnedChatList) {
     pinnedChatList.innerHTML = '';
     const pinnedChats = sortChatsNewestFirst(state.chats.filter(c => c.pinned));
-    if (pinnedChats.length === 0) {
-      pinnedChatList.innerHTML = '<li class="empty-section-text" id="empty-pinned-msg">No pinned chats</li>';
-    } else {
-      pinnedChats.forEach(chat => pinnedChatList.appendChild(createChatItemNode(chat)));
-    }
+    if (pinnedChats.length === 0) pinnedChatList.innerHTML = '<li class="empty-section-text" id="empty-pinned-msg">No pinned chats</li>';
+    else pinnedChats.forEach(chat => pinnedChatList.appendChild(createChatItemNode(chat)));
   }
 
   if (projectList) {
@@ -83,20 +81,17 @@ export function renderSidebar() {
           }
         });
 
-        const addBtn = projHeader.querySelector('.add-chat-to-proj-btn');
-        addBtn?.addEventListener('click', e => {
+        projHeader.querySelector('.add-chat-to-proj-btn')?.addEventListener('click', e => {
           e.stopPropagation();
           createNewChatInProject(project.id, renderSidebar);
         });
 
-        const projOptionsBtn = projHeader.querySelector('.proj-options-btn');
-        projOptionsBtn?.addEventListener('click', e => {
+        projHeader.querySelector('.proj-options-btn')?.addEventListener('click', e => {
           e.stopPropagation();
           openProjectOptionsMenu(e, project, renderSidebar);
         });
 
         li.appendChild(projHeader);
-
         const projectChats = sortChatsNewestFirst(state.chats.filter(c => c.projectId === project.id));
         if (projectChats.length > 0) {
           const nestedUl = document.createElement('ul');
@@ -104,7 +99,6 @@ export function renderSidebar() {
           projectChats.forEach(pChat => nestedUl.appendChild(createChatItemNode(pChat)));
           li.appendChild(nestedUl);
         }
-
         projectList.appendChild(li);
       });
     }
@@ -113,11 +107,8 @@ export function renderSidebar() {
   if (recentChatList) {
     recentChatList.innerHTML = '';
     const recentChats = sortChatsNewestFirst(state.chats.filter(c => !c.projectId && !c.pinned));
-    if (recentChats.length === 0) {
-      recentChatList.innerHTML = '<li class="empty-section-text" id="empty-chats-msg">Your chat history will appear here</li>';
-    } else {
-      recentChats.forEach(chat => recentChatList.appendChild(createChatItemNode(chat)));
-    }
+    if (recentChats.length === 0) recentChatList.innerHTML = '<li class="empty-section-text" id="empty-chats-msg">Your chat history will appear here</li>';
+    else recentChats.forEach(chat => recentChatList.appendChild(createChatItemNode(chat)));
   }
 
   if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
@@ -125,53 +116,61 @@ export function renderSidebar() {
 
 function createChatItemNode(chat) {
   const li = document.createElement('li');
-  li.className = `chat-item ${state.activeChatId === chat.id ? 'active' : ''}`;
+  const active = state.activeChatId === chat.id;
+  li.className = `chat-item ${active ? 'active' : ''}`;
   li.dataset.chatId = chat.id;
 
-  const isBackgroundGenerating = chat.isGenerating && state.activeChatId !== chat.id;
-  const generatingIndicator = isBackgroundGenerating ? `
-    <div class="sidebar-chat-generating" title="Generating response in background...">
-      <span class="sidebar-generating-dot"></span>
-      <span class="sidebar-generating-dot"></span>
-      <span class="sidebar-generating-dot"></span>
-    </div>` : '';
+  const link = document.createElement('a');
+  link.className = 'chat-item-link';
+  link.href = buildChatHref(chat.id);
+  if (active) link.setAttribute('aria-current', 'page');
 
-  li.innerHTML = `
-    <i data-lucide="message-square"></i>
-    <span class="chat-item-title">${escapeHtml(chat.title)}</span>
-    ${generatingIndicator}
-    <div class="chat-item-actions">
-      <button class="chat-action-btn pin-chat-btn" title="${chat.pinned ? 'Unpin chat' : 'Pin chat'}"><i data-lucide="pin"></i></button>
-      <button class="chat-action-btn chat-options-btn" title="Chat options"><i data-lucide="more-horizontal"></i></button>
-    </div>`;
+  const icon = document.createElement('i');
+  icon.setAttribute('data-lucide', 'message-square');
+  const title = document.createElement('span');
+  title.className = 'chat-item-title';
+  title.textContent = chat.title;
+  link.append(icon, title);
 
-  li.addEventListener('click', () => {
+  const isBackgroundGenerating = chat.isGenerating && !active;
+  if (isBackgroundGenerating) {
+    const indicator = document.createElement('span');
+    indicator.className = 'sidebar-chat-generating';
+    indicator.title = 'Generating response in background...';
+    indicator.innerHTML = '<span class="sidebar-generating-dot"></span><span class="sidebar-generating-dot"></span><span class="sidebar-generating-dot"></span>';
+    link.appendChild(indicator);
+  }
+
+  link.addEventListener('click', event => {
+    if (!isUnmodifiedPrimaryNavigation(event)) return;
+    event.preventDefault();
     void loadChat(chat.id, renderSidebar, { historyMode: 'push' });
   });
 
-  const pinBtn = li.querySelector('.pin-chat-btn');
-  if (pinBtn) {
-    pinBtn.addEventListener('click', async e => {
-      e.stopPropagation();
-      const previousPinned = chat.pinned;
-      const updatedChat = updateChat(chat.id, current => ({ ...current, pinned: !current.pinned, updatedAt: Date.now() }));
-      try {
-        await persistChatMetadata(updatedChat);
-      } catch (err) {
-        updateChat(chat.id, current => ({ ...current, pinned: previousPinned }));
-        console.error('Failed to save pin state:', err);
-        alert('Failed to save pin state: ' + err.message);
-        return;
-      }
-      renderSidebar();
-    });
-  }
+  const actions = document.createElement('div');
+  actions.className = 'chat-item-actions';
+  actions.innerHTML = `
+    <button class="chat-action-btn pin-chat-btn" title="${chat.pinned ? 'Unpin chat' : 'Pin chat'}" aria-label="${chat.pinned ? 'Unpin chat' : 'Pin chat'}"><i data-lucide="pin"></i></button>
+    <button class="chat-action-btn chat-options-btn" title="Chat options" aria-label="Chat options"><i data-lucide="more-horizontal"></i></button>`;
 
-  const optionsBtn = li.querySelector('.chat-options-btn');
-  optionsBtn?.addEventListener('click', e => {
-    e.stopPropagation();
+  actions.querySelector('.pin-chat-btn')?.addEventListener('click', async () => {
+    const previousPinned = chat.pinned;
+    const updatedChat = updateChat(chat.id, current => ({ ...current, pinned: !current.pinned, updatedAt: Date.now() }));
+    try {
+      await persistChatMetadata(updatedChat);
+    } catch (err) {
+      updateChat(chat.id, current => ({ ...current, pinned: previousPinned }));
+      console.error('Failed to save pin state:', err);
+      alert('Failed to save pin state: ' + err.message);
+      return;
+    }
+    renderSidebar();
+  });
+
+  actions.querySelector('.chat-options-btn')?.addEventListener('click', e => {
     openChatOptionsMenu(e, chat, renderSidebar);
   });
 
+  li.append(link, actions);
   return li;
 }
