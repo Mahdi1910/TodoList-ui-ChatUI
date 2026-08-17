@@ -98,10 +98,12 @@ export function initChatEmbeddedBridge({ navigateChat, navigateWorkspace, openSe
       switch (message.type) {
         case 'shell:navigate-chat': {
           const surface = payload.surface === 'workspace' ? 'workspace' : 'chat';
+          let completedWorkspacePath = null;
           if (surface === 'workspace') {
             const workspacePath = payload.invalidWorkspacePath ? null : (payload.workspacePath == null ? '/' : String(payload.workspacePath));
             if (workspacePath && workspacePath.length > 4096) throw new Error('Requested Workspace path is too long.');
             await navigateWorkspace(workspacePath, { invalid: Boolean(payload.invalidWorkspacePath) });
+            completedWorkspacePath = workspacePath;
           } else {
             const chatId = payload.chatId == null ? null : String(payload.chatId);
             if (chatId && chatId.length > 512) throw new Error('Requested chat ID is too long.');
@@ -111,7 +113,7 @@ export function initChatEmbeddedBridge({ navigateChat, navigateWorkspace, openSe
             requestId: payload.requestId || null,
             surface,
             chatId: surface === 'chat' ? (getState()?.activeChatId || null) : null,
-            workspacePath: surface === 'workspace' ? (workspacePath || null) : null
+            workspacePath: surface === 'workspace' ? completedWorkspacePath : null
           });
           break;
         }
