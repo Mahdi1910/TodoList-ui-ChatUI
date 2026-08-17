@@ -75,6 +75,14 @@ export function installTodoToolMutationCoordination(todoToolExecutor) {
       return originalExecuteRequest(payload);
     }
 
+    // Existing request IDs are replay/idempotency lookups, not new mutations.
+    // Always let the executor resolve them from its request registry even if a
+    // manual batch currently owns the mutation lease.
+    const requestId = typeof payload.requestId === 'string' ? payload.requestId.trim() : '';
+    if (requestId && todoToolExecutor._requests?.has(requestId)) {
+      return originalExecuteRequest(payload);
+    }
+
     const release = TodoMutationCoordinator.tryAcquireAi();
     if (!release) return Promise.resolve(busyResult());
 
