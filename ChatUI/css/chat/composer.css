@@ -11,6 +11,23 @@
   gap: 8px;
 }
 
+.composer-markdown-preview {
+  max-height: 32dvh;
+  overflow: auto;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.composer-markdown-preview .markdown-content > :first-child { margin-top: 0; }
+.composer-markdown-preview .markdown-content > :last-child { margin-bottom: 0; }
+.composer-markdown-preview pre,
+.composer-markdown-preview .code-block-wrapper,
+.composer-markdown-preview table { max-width: 100%; overflow-x: auto; }
+
 .composer-bar {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
@@ -22,9 +39,7 @@
   transition: border-color var(--transition-fast);
 }
 
-.composer-bar:focus-within {
-  border-color: rgba(255, 255, 255, 0.25);
-}
+.composer-bar:focus-within { border-color: rgba(255, 255, 255, 0.25); }
 
 .composer-textarea {
   flex: 1;
@@ -35,11 +50,11 @@
   resize: none;
   outline: none;
   max-height: 150px;
+  text-align: start;
+  unicode-bidi: plaintext;
 }
 
-.composer-textarea::placeholder {
-  color: var(--text-muted);
-}
+.composer-textarea::placeholder { color: var(--text-muted); }
 
 .composer-btn {
   width: 34px;
@@ -49,18 +64,13 @@
   flex-shrink: 0;
 }
 
-.composer-btn:hover {
-  background-color: var(--bg-hover);
-  color: var(--text-primary);
-}
+.composer-btn:hover { background-color: var(--bg-hover); color: var(--text-primary); }
 
 .send-btn, .stop-generating-btn, .voice-mode-btn {
   transition: opacity 160ms ease, transform 160ms ease, background-color var(--transition-fast);
 }
 
-.composer-bar .hidden {
-  display: none !important;
-}
+.composer-bar .hidden { display: none !important; }
 
 .send-btn, .send-btn.active {
   background-color: var(--text-primary);
@@ -89,14 +99,8 @@
   border-radius: 2px;
 }
 
-.voice-mode-btn {
-  background-color: var(--accent-blue);
-  color: #FFFFFF;
-}
-
-.voice-mode-btn:hover {
-  background-color: var(--accent-blue-hover);
-}
+.voice-mode-btn { background-color: var(--accent-blue); color: #FFFFFF; }
+.voice-mode-btn:hover { background-color: var(--accent-blue-hover); }
 
 .chat-disclaimer {
   font-size: 12px;
