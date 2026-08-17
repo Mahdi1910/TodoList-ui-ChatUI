@@ -18,13 +18,11 @@ function sanitizeHtml(html) {
         el.removeAttribute(attr.name);
         return;
       }
-      if ((name === 'href' || name === 'src' || name === 'xlink:href') &&
-          /^(?:javascript|vbscript|data|file):/i.test(value)) {
+      if ((name === 'href' || name === 'src' || name === 'xlink:href') && /^(?:javascript|vbscript|data|file):/i.test(value)) {
         el.removeAttribute(attr.name);
       }
     });
   });
-
   return template.innerHTML;
 }
 
@@ -34,22 +32,14 @@ export function initMarkdown() {
   if (typeof marked !== 'undefined') {
     const renderer = new marked.Renderer();
     renderer.code = function(codeToken, languageToken) {
-      // Marked v5+ passes a token object; older versions passed code + language.
-      const code = typeof codeToken === 'string'
-        ? codeToken
-        : (codeToken?.text ?? codeToken?.raw ?? '');
-      const language = typeof languageToken === 'string'
-        ? languageToken
-        : (codeToken?.lang ?? '');
+      const code = typeof codeToken === 'string' ? codeToken : (codeToken?.text ?? codeToken?.raw ?? '');
+      const language = typeof languageToken === 'string' ? languageToken : (codeToken?.lang ?? '');
       const validLang = language && typeof hljs !== 'undefined' && hljs.getLanguage(language) ? language : '';
       let highlighted = code;
 
       if (currentHighlightingEnabled && validLang && typeof hljs !== 'undefined') {
-        try {
-          highlighted = hljs.highlight(code, { language: validLang }).value;
-        } catch (e) {
-          highlighted = escapeHtml(code);
-        }
+        try { highlighted = hljs.highlight(code, { language: validLang }).value; }
+        catch (_) { highlighted = escapeHtml(code); }
       } else {
         highlighted = escapeHtml(code);
       }
@@ -65,13 +55,12 @@ export function initMarkdown() {
             </button>
           </div>
           <pre><code class="hljs ${validLang}">${highlighted}</code></pre>
-        </div>
-      `;
+        </div>`;
     };
     marked.setOptions({ renderer, breaks: true });
   }
 
-  document.addEventListener('click', async (e) => {
+  document.addEventListener('click', async e => {
     const btn = e.target.closest('.copy-code-btn');
     if (!btn) return;
 
@@ -102,7 +91,7 @@ export function renderMarkdown(text, options = {}) {
     const template = document.createElement('template');
     template.innerHTML = sanitized;
 
-    template.content.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, th, td, blockquote').forEach(el => {
+    template.content.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol, li, th, td, blockquote').forEach(el => {
       el.setAttribute('dir', 'auto');
     });
     template.content.querySelectorAll('.code-block-wrapper, pre, code').forEach(el => {
