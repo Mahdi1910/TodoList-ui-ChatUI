@@ -10,6 +10,17 @@ function cleanPath(pathname) {
   return path;
 }
 
+function parseMessageId(hash = '') {
+  const raw = String(hash || '').replace(/^#/, '');
+  if (!raw) return null;
+  try {
+    const value = new URLSearchParams(raw).get('message');
+    return value && value.length <= 512 ? value : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function decodeWorkspacePublicPath(path) {
   if (path === WORKSPACE_ROOT_PATH) return { workspacePath: '/', invalid: false };
   if (!path.startsWith(`${WORKSPACE_ROOT_PATH}/`)) return null;
@@ -24,8 +35,9 @@ function decodeWorkspacePublicPath(path) {
   }
 }
 
-export function buildChatPublicPath(chatId) {
-  return chatId ? `${CHAT_PREFIX}${encodeURIComponent(chatId)}` : CHAT_HOME_PATH;
+export function buildChatPublicPath(chatId, messageId = null) {
+  const base = chatId ? `${CHAT_PREFIX}${encodeURIComponent(chatId)}` : CHAT_HOME_PATH;
+  return chatId && messageId ? `${base}#message=${encodeURIComponent(messageId)}` : base;
 }
 
 export function buildWorkspacePublicPath(workspacePath = '/') {
@@ -35,16 +47,16 @@ export function buildWorkspacePublicPath(workspacePath = '/') {
   return `${WORKSPACE_ROOT_PATH}/${segments.map(segment => encodeURIComponent(segment)).join('/')}`;
 }
 
-export function parseShellRoute(pathname = window.location.pathname) {
+export function parseShellRoute(pathname = window.location.pathname, hash = window.location.hash) {
   const path = cleanPath(pathname);
   if (path === '/' || path === '') {
-    return { app: 'todo', surface: 'todo', path: TODO_PATH, chatId: null, workspacePath: null, needsReplace: true };
+    return { app: 'todo', surface: 'todo', path: TODO_PATH, chatId: null, messageId: null, workspacePath: null, needsReplace: true };
   }
   if (path === TODO_PATH) {
-    return { app: 'todo', surface: 'todo', path: TODO_PATH, chatId: null, workspacePath: null, needsReplace: false };
+    return { app: 'todo', surface: 'todo', path: TODO_PATH, chatId: null, messageId: null, workspacePath: null, needsReplace: false };
   }
   if (path === CHAT_HOME_PATH) {
-    return { app: 'chat', surface: 'chat', path: CHAT_HOME_PATH, chatId: null, workspacePath: null, needsReplace: false };
+    return { app: 'chat', surface: 'chat', path: CHAT_HOME_PATH, chatId: null, messageId: null, workspacePath: null, needsReplace: false };
   }
   if (path.startsWith(CHAT_PREFIX)) {
     const encoded = path.slice(CHAT_PREFIX.length);
@@ -52,8 +64,9 @@ export function parseShellRoute(pathname = window.location.pathname) {
       try {
         const chatId = decodeURIComponent(encoded);
         if (chatId) {
-          const canonical = buildChatPublicPath(chatId);
-          return { app: 'chat', surface: 'chat', path: canonical, chatId, workspacePath: null, needsReplace: canonical !== path };
+          const messageId = parseMessageId(hash);
+          const canonicalPath = buildChatPublicPath(chatId);
+          return { app: 'chat', surface: 'chat', path: canonicalPath, chatId, messageId, workspacePath: null, needsReplace: canonicalPath !== path };
         }
       } catch (_) {}
     }
@@ -67,20 +80,26 @@ export function parseShellRoute(pathname = window.location.pathname) {
       surface: 'workspace',
       path: canonical,
       chatId: null,
+      messageId: null,
       workspacePath: workspace.workspacePath,
       invalidWorkspacePath: workspace.invalid,
       needsReplace: !workspace.invalid && canonical !== path
     };
   }
 
-  return { app: 'todo', surface: 'todo', path: TODO_PATH, chatId: null, workspacePath: null, needsReplace: true };
+  return { app: 'todo', surface: 'todo', path: TODO_PATH, chatId: null, messageId: null, workspacePath: null, needsReplace: true };
+}
+
+function routeUrl(route) {
+  if (route?.surface === 'chat' && route.chatId && route.messageId) return buildChatPublicPath(route.chatId, route.messageId);
+  return route?.path || TODO_PATH;
 }
 
 function readStoredChatPath() {
   try {
     const stored = localStorage.getItem(LAST_CHAT_KEY);
     if (!stored) return null;
-    const route = parseShellRoute(stored);
+    const route = parseShellRoute(stored, '');
     return route.app === 'chat' && route.surface === 'chat' && !route.needsReplace ? route.path : null;
   } catch (_) {
     return null;
@@ -93,7 +112,7 @@ function persistLastChatPath(path) {
 }
 
 export function createShellRouter(onRoute) {
-  let currentRoute = parseShellRoute(window.location.pathname);
+  let currentRoute = parseShellRoute();
   let lastChatPath = readStoredChatPath();
 
   function rememberRouteIfConversation(route) {
@@ -109,47 +128,45 @@ export function createShellRouter(onRoute) {
   }
 
   function write(path, { replace = false, source = 'shell' } = {}) {
-    const route = parseShellRoute(path);
+    const url = new URL(path, window.location.origin);
+    const route = parseShellRoute(url.pathname, url.hash);
     const method = replace ? 'replaceState' : 'pushState';
-    const currentPath = window.location.pathname;
-    if (currentPath !== route.path) window.history[method]({ shellRoute: route.path }, '', route.path);
+    if (`${window.location.pathname}${window.location.hash}` !== routeUrl(route)) {
+      window.history[method]({ shellRoute: route.path }, '', routeUrl(route));
+    }
     emit(route, source);
     return route;
   }
 
   function start() {
-    const route = parseShellRoute(window.location.pathname);
-    if (route.needsReplace || window.location.pathname !== route.path) {
-      window.history.replaceState({ shellRoute: route.path }, '', route.path);
+    const route = parseShellRoute();
+    if (route.needsReplace || `${window.location.pathname}${window.location.hash}` !== routeUrl(route)) {
+      window.history.replaceState({ shellRoute: route.path }, '', routeUrl(route));
     }
     emit({ ...route, needsReplace: false }, 'startup');
   }
 
-  function goTodo() {
-    return write(TODO_PATH, { source: 'rail' });
-  }
-
-  function goChat() {
-    return write(lastChatPath || CHAT_HOME_PATH, { source: 'rail' });
-  }
+  function goTodo() { return write(TODO_PATH, { source: 'rail' }); }
+  function goChat() { return write(lastChatPath || CHAT_HOME_PATH, { source: 'rail' }); }
 
   function handleChatChildRoute(payload = {}) {
     const surface = payload.surface === 'workspace' ? 'workspace' : 'chat';
     const historyMode = payload.historyMode === 'replace' ? 'replace' : 'push';
-    const path = surface === 'workspace'
+    const url = surface === 'workspace'
       ? buildWorkspacePublicPath(payload.workspacePath || '/')
-      : buildChatPublicPath(typeof payload.chatId === 'string' && payload.chatId ? payload.chatId : null);
+      : buildChatPublicPath(typeof payload.chatId === 'string' && payload.chatId ? payload.chatId : null, payload.messageId || null);
 
+    const parsedUrl = new URL(url, window.location.origin);
+    const route = parseShellRoute(parsedUrl.pathname, parsedUrl.hash);
     if (surface === 'chat') {
-      lastChatPath = path;
-      persistLastChatPath(path);
+      lastChatPath = route.path;
+      persistLastChatPath(lastChatPath);
     }
 
-    const route = parseShellRoute(path);
     if (currentRoute.app !== 'chat') return route;
-    if (currentRoute.path === route.path && currentRoute.surface === route.surface) return currentRoute;
+    if (routeUrl(currentRoute) === routeUrl(route) && currentRoute.surface === route.surface) return currentRoute;
 
-    window.history[historyMode === 'replace' ? 'replaceState' : 'pushState']({ shellRoute: route.path }, '', route.path);
+    window.history[historyMode === 'replace' ? 'replaceState' : 'pushState']({ shellRoute: route.path }, '', routeUrl(route));
     emit(route, 'child');
     return route;
   }
@@ -161,15 +178,11 @@ export function createShellRouter(onRoute) {
     return lastChatPath;
   }
 
-  function getLastChatRoute() {
-    return parseShellRoute(lastChatPath || CHAT_HOME_PATH);
-  }
+  function getLastChatRoute() { return parseShellRoute(lastChatPath || CHAT_HOME_PATH, ''); }
 
   window.addEventListener('popstate', () => {
-    const route = parseShellRoute(window.location.pathname);
-    if (route.needsReplace) {
-      window.history.replaceState({ shellRoute: route.path }, '', route.path);
-    }
+    const route = parseShellRoute();
+    if (route.needsReplace) window.history.replaceState({ shellRoute: route.path }, '', routeUrl(route));
     emit({ ...route, needsReplace: false }, 'popstate');
   });
 
