@@ -4,11 +4,13 @@
 
 import { loadState } from './storage/storage.js';
 import { initMarkdown } from './chat/markdown.js';
+import { focusMessageTarget } from './chat/message-navigation.js';
 import { initSidebarUI, renderSidebar } from './sidebar/sidebar.js';
 import { initComposerListeners, updateComposerButtons } from './composer/composer.js';
 import { initAttachmentListeners } from './composer/attachments.js';
 import { initRecorderListeners } from './composer/recorder.js';
 import { initSettingsUI, openSettingsModal } from './settings/settings.js';
+import { initWorkspaceBackupUI } from './settings/workspace-backup-ui.js';
 import { initVoiceUI } from './voice/voice-ui.js';
 import { initReadAloud } from './voice/read-aloud.js';
 import { initActionMenu } from './ui/action-menu.js';
@@ -123,7 +125,10 @@ async function handleRoute(route) {
       startNewChat(renderSidebar, null, { historyMode: 'replace' });
       return;
     }
-    await loadChat(route.chatId, renderSidebar, { historyMode: 'none' });
+    const loaded = await loadChat(route.chatId, renderSidebar, { historyMode: 'none' });
+    if (loaded && route.messageId) {
+      requestAnimationFrame(() => focusMessageTarget(route.messageId, { smooth: false }));
+    }
     return;
   }
 
@@ -139,9 +144,9 @@ async function handleRoute(route) {
 async function initializeEmbeddedBridge() {
   const { initChatEmbeddedBridge } = await import('./embedded/shell-bridge.js');
   initChatEmbeddedBridge({
-    navigateChat: async chatId => {
-      if (chatId) await handleRoute({ type: 'chat', chatId });
-      else await handleRoute({ type: 'home', chatId: null });
+    navigateChat: async (chatId, messageId = null) => {
+      if (chatId) await handleRoute({ type: 'chat', chatId, messageId });
+      else await handleRoute({ type: 'home', chatId: null, messageId: null });
     },
     navigateWorkspace: async (workspacePath, options = {}) => {
       await openWorkspacePath(workspacePath, { historyMode: 'none', invalid: Boolean(options.invalid) });
@@ -176,7 +181,10 @@ async function bootstrapApp() {
 
   const recordAudioBtn = document.getElementById('record-audio-btn');
   await runBootstrapStep('Recorder initialization', () => initRecorderListeners(recordAudioBtn));
-  await runBootstrapStep('Settings initialization', () => initSettingsUI());
+  await runBootstrapStep('Settings initialization', () => {
+    initSettingsUI();
+    initWorkspaceBackupUI();
+  });
   await runBootstrapStep('Read Aloud initialization', () => initReadAloud());
   await runBootstrapStep('Voice UI initialization', () => initVoiceUI(renderSidebar));
   await runBootstrapStep('Model/menu initialization', () => initModelDropdownUI());
