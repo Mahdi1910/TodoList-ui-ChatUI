@@ -40,10 +40,11 @@ const dates = [
 assert.deepEqual(sortTasksByDueDate(dates, 'asc').map(task => task.id), ['early', 'late', 'none']);
 assert.deepEqual(sortTasksByDueDate(dates, 'desc').map(task => task.id), ['late', 'early', 'none']);
 
-const [selection, actions, menus, coordinator, appMain, css] = await Promise.all([
+const [selection, actions, menus, renderSync, coordinator, appMain, css] = await Promise.all([
   readFile('TodoList-ui/js/components/task-selection.js', 'utf8'),
   readFile('TodoList-ui/js/components/task-selection-actions.js', 'utf8'),
   readFile('TodoList-ui/js/components/task-selection-menus.js', 'utf8'),
+  readFile('TodoList-ui/js/components/task-selection-render-sync.js', 'utf8'),
   readFile('TodoList-ui/js/tools/todo-mutation-coordinator.js', 'utf8'),
   readFile('TodoList-ui/js/app-main.js', 'utf8'),
   readFile('TodoList-ui/css/components/task-selection.css', 'utf8')
@@ -61,8 +62,11 @@ assert(menus.includes("'Done'") && menus.includes("'Date'") && menus.includes("'
 assert(menus.includes("'Tags'") && menus.includes("'Project'") && menus.includes("'Delete'"), 'Second action row is incomplete.');
 assert(menus.includes('Link Parent Task'), 'Link Parent Task text action is missing.');
 assert(!menus.includes('Pin'), 'Pin must not be added.');
+assert(renderSync.includes('selection-kanban-column-header') && renderSync.includes('syncContainerSelectors'), 'Grouped Kanban selector refresh hardening is missing.');
+assert(renderSync.includes('if (this.batchBusy)') && renderSync.includes('this.syncContainerSelectors()'), 'Batch-end container state must be rebuilt from logical membership.');
 assert(coordinator.includes('TODO_BUSY') && coordinator.includes('tryAcquireAi'), 'Todo AI/manual mutation coordination is missing.');
 assert(appMain.includes('TaskSelectionController.install') && appMain.includes('installTodoToolMutationCoordination'), 'Todo startup wiring is incomplete.');
+assert(appMain.includes('installTaskSelectionRenderSync(TaskSelectionController)'), 'Todo selection render-sync helper must be installed before first interaction.');
 assert(css.includes('.task-selection-mode .task-checkbox:checked') && css.includes('var(--accent-color)'), 'Select-mode circle must keep the same shape with accent selection styling.');
 assert(css.includes('.bulk-date-only #tab-sched-time'), 'Bulk Date must hide non-date scheduling controls.');
 
