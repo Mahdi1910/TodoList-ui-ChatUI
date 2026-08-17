@@ -32,7 +32,6 @@ export function initRightSidebarUI(updateSidebarCallback = null) {
 
   const finalizeClosedState = sequence => {
     if (sequence !== closeSequence || !rightSidebar.classList.contains('collapsed')) return;
-
     cancelCloseTransition();
     appContainer?.classList.remove('right-sidebar-open');
 
@@ -46,13 +45,12 @@ export function initRightSidebarUI(updateSidebarCallback = null) {
   const waitForCloseTransition = sequence => {
     const finish = event => {
       if (event.target !== rightSidebar) return;
-      if (event.type === 'transitionend' && !['margin-right', 'transform'].includes(event.propertyName)) return;
+      if (event.type === 'transitionend' && event.propertyName !== 'transform') return;
       finalizeClosedState(sequence);
     };
 
     rightSidebar.addEventListener('transitionend', finish);
     rightSidebar.addEventListener('transitioncancel', finish);
-
     const fallbackId = window.setTimeout(() => finalizeClosedState(sequence), 400);
     clearCloseTransition = () => {
       window.clearTimeout(fallbackId);
@@ -63,15 +61,12 @@ export function initRightSidebarUI(updateSidebarCallback = null) {
 
   const closeRightSidebar = () => {
     if (rightSidebar.classList.contains('collapsed')) return;
-
     closeSequence += 1;
     const sequence = closeSequence;
     cancelCloseTransition();
-
     rightSidebar.classList.add('collapsed');
     toggleBtn?.setAttribute('aria-expanded', 'false');
     toggleBtn?.classList.remove('active');
-
     waitForCloseTransition(sequence);
   };
 
@@ -84,7 +79,6 @@ export function initRightSidebarUI(updateSidebarCallback = null) {
     closeSequence += 1;
     cancelCloseTransition();
     closeActionMenu();
-
     rightSidebar.removeAttribute('inert');
     rightSidebar.setAttribute('aria-hidden', 'false');
     appContainer?.classList.add('right-sidebar-open');
@@ -103,8 +97,14 @@ export function initRightSidebarUI(updateSidebarCallback = null) {
   toggleBtn?.addEventListener('click', toggleRightSidebar);
   closeBtn?.addEventListener('click', closeRightSidebar);
 
-  const currentChat = () => state.chats.find(chat => chat.id === state.activeChatId) || null;
+  document.addEventListener('click', event => {
+    if (!window.matchMedia('(max-width: 767px)').matches) return;
+    if (rightSidebar.classList.contains('collapsed')) return;
+    if (rightSidebar.contains(event.target) || toggleBtn?.contains(event.target)) return;
+    closeRightSidebar();
+  });
 
+  const currentChat = () => state.chats.find(chat => chat.id === state.activeChatId) || null;
   const handleClear = () => clearActiveChatMessages(updateSidebarCallback);
   const handleExport = () => exportActiveChat();
   const handleRename = () => {
@@ -123,10 +123,7 @@ export function initRightSidebarUI(updateSidebarCallback = null) {
     }
   };
 
-  optionsBtn?.addEventListener('pointerdown', () => {
-    captureSelectedReadText();
-  });
-
+  optionsBtn?.addEventListener('pointerdown', () => captureSelectedReadText());
   optionsBtn?.addEventListener('click', event => {
     event.stopPropagation();
     captureSelectedReadText();
