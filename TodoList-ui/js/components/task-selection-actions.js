@@ -7,6 +7,12 @@ function unique(values = []) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function sameIdSet(a = [], b = []) {
+  const left = unique(a).sort();
+  const right = unique(b).sort();
+  return left.length === right.length && left.every((id, index) => id === right[index]);
+}
+
 function activeRepeat(task) {
   return Boolean(task?.repeat && task.repeat.mode !== 'none');
 }
@@ -143,7 +149,6 @@ export class TaskSelectionActions {
 
   async setDate(chosenDate) {
     const normalizedChoice = chosenDate || null;
-    const finalDates = new Map();
     return this.runBatch({
       label: 'Date',
       preflight: async ids => {
@@ -152,7 +157,6 @@ export class TaskSelectionActions {
           if (!task) continue;
           const finalDate = this.resolveBulkDate(task, normalizedChoice);
           this.validateRepeatEnd(task, finalDate);
-          finalDates.set(id, finalDate);
         }
       },
       mutate: async (task, id) => {
@@ -219,6 +223,10 @@ export class TaskSelectionActions {
       ids: eligibility.rootIds,
       preflight: async ids => {
         if (projectId && !AppState.getProject(projectId)) throw new Error('The selected Project no longer exists.');
+        const refreshedEligibility = this.getProjectEligibility();
+        if (!refreshedEligibility.valid || !sameIdSet(refreshedEligibility.rootIds, ids)) {
+          throw new Error('The selected task hierarchy changed before the Project update started. Please review the selection and try again.');
+        }
         for (const id of ids) {
           const task = AppState.getTask(id);
           if (!task || task.parentTaskId) throw new Error('Only root tasks can receive a Project change.');
@@ -259,6 +267,10 @@ export class TaskSelectionActions {
       label: 'Delete',
       ids: targets,
       preflight: async ids => {
+        const refreshedTargets = this.normalizedDeleteTargets();
+        if (!sameIdSet(refreshedTargets, ids)) {
+          throw new Error('The selected task hierarchy changed before deletion started. Please review the selection and try again.');
+        }
         ids.forEach(id => {
           if (!AppState.getTask(id)) throw new Error('A selected task no longer exists.');
         });
