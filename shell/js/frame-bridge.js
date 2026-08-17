@@ -51,6 +51,7 @@ export function createFrameBridge(frameManager, callbacks = {}) {
       requestId,
       surface,
       chatId: surface === 'chat' ? (route.chatId || null) : null,
+      messageId: surface === 'chat' ? (route.messageId || null) : null,
       workspacePath: surface === 'workspace' ? (route.workspacePath || '/') : null,
       invalidWorkspacePath: Boolean(route.invalidWorkspacePath),
       source
@@ -148,32 +149,18 @@ export function createFrameBridge(frameManager, callbacks = {}) {
       case 'app:ready':
         frameManager.markReady(app, payload);
         callbacks.onReady?.(app, payload);
-        if (app === 'chat') {
-          sendNow('chat', 'shell:todo-rpc-capabilities', { supported: true, version: 'todo-rpc-v1' });
-        }
+        if (app === 'chat') sendNow('chat', 'shell:todo-rpc-capabilities', { supported: true, version: 'todo-rpc-v1' });
         break;
       case 'app:error':
         frameManager.markFailed(app, String(payload.message || payload.stage || 'Application startup failed.'));
         callbacks.onError?.(app, payload);
         break;
-      case 'app:command-error':
-        callbacks.onCommandError?.(app, payload);
-        break;
-      case 'app:appearance':
-        callbacks.onAppearance?.(app, payload);
-        break;
-      case 'app:title':
-        callbacks.onTitle?.(app, payload);
-        break;
-      case 'chatui:route-change':
-        if (app === 'chat') callbacks.onChatRouteChange?.(payload);
-        break;
-      case 'chatui:todo-tool-request':
-        if (app === 'chat') void handleTodoRequest(payload);
-        break;
-      case 'chatui:todo-tool-cancel':
-        if (app === 'chat') handleTodoCancel(payload);
-        break;
+      case 'app:command-error': callbacks.onCommandError?.(app, payload); break;
+      case 'app:appearance': callbacks.onAppearance?.(app, payload); break;
+      case 'app:title': callbacks.onTitle?.(app, payload); break;
+      case 'chatui:route-change': if (app === 'chat') callbacks.onChatRouteChange?.(payload); break;
+      case 'chatui:todo-tool-request': if (app === 'chat') void handleTodoRequest(payload); break;
+      case 'chatui:todo-tool-cancel': if (app === 'chat') handleTodoCancel(payload); break;
       case 'todo:tool-response':
         if (app === 'todo') {
           cancelledTodoRequests.delete(String(payload.requestId || ''));
@@ -187,11 +174,8 @@ export function createFrameBridge(frameManager, callbacks = {}) {
         callbacks.onSettingsOpened?.(app, payload);
         break;
       }
-      case 'app:navigation-complete':
-        callbacks.onNavigationComplete?.(app, payload);
-        break;
-      default:
-        break;
+      case 'app:navigation-complete': callbacks.onNavigationComplete?.(app, payload); break;
+      default: break;
     }
   });
 
