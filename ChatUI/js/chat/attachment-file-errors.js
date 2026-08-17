@@ -1,19 +1,23 @@
 /**
- * attachment-file-errors.js — Narrow classifiers for stale/inaccessible Gemini File references.
+ * attachment-file-errors.js — Classifiers for stale/inaccessible Gemini File references.
  *
- * Keep generic authentication/permission failures fatal. Only a 403 that names
- * one of the exact remote File resources present in the request is considered a
- * recoverable generation-time File reference failure.
+ * Generic authentication/permission failures remain fatal. A 403 is recoverable
+ * only when Google/proxy text clearly describes an inaccessible File resource and
+ * the request contains at least one remote Gemini File reference.
  */
 
 function normalizedBaseUrl(value = '') {
   return String(value || '').trim().replace(/\/+$/, '');
 }
 
-function remoteFileId(value = '') {
+export function remoteFileName(value = '') {
   const text = String(value || '').trim();
   const match = text.match(/(?:^|\/)files\/([A-Za-z0-9-]+)(?:$|[/?#])/i);
-  return match?.[1] || '';
+  return match?.[1] ? `files/${match[1]}` : '';
+}
+
+function remoteFileId(value = '') {
+  return remoteFileName(value).replace(/^files\//i, '');
 }
 
 function errorText(error) {
@@ -31,6 +35,26 @@ function isPermissionDenied403(error) {
   return true;
 }
 
+function hasRemoteFileReference(messages = [], cleanBaseUrl = '') {
+  const currentBase = normalizedBaseUrl(cleanBaseUrl);
+  return (messages || []).some(message => {
+    if (message?.role !== 'user') return false;
+    return (message.attachments || []).some(attachment => {
+      if (!attachment?.fileUri && !attachment?.fileApiName) return false;
+      const savedBase = normalizedBaseUrl(attachment?.fileApiBaseUrl);
+      // Legacy records may not have fileApiBaseUrl. They are still recoverable
+      // because the local Blob is the permanent source of truth.
+      return !currentBase || !savedBase || savedBase === currentBase;
+    });
+  });
+}
+
+function isExplicitFileAccessPermissionText(text = '') {
+  const value = String(text || '');
+  return /permission\s+to\s+access\s+the\s+File\b/i.test(value) ||
+    /File\s+(?:files\/)?[A-Za-z0-9-]+\s+or\s+it\s+may\s+not\s+exist/i.test(value);
+}
+
 export function isRemoteFileLookupUnavailable(error) {
   const status = Number(error?.httpStatus);
   if (status === 404) return true;
@@ -39,22 +63,22 @@ export function isRemoteFileLookupUnavailable(error) {
 
 export function isFileSpecificPermissionDeniedError(error, messages = [], cleanBaseUrl = '') {
   if (!isPermissionDenied403(error)) return false;
+  if (!hasRemoteFileReference(messages, cleanBaseUrl)) return false;
 
-  const currentBase = normalizedBaseUrl(cleanBaseUrl);
+  const text = errorText(error);
+  if (!isExplicitFileAccessPermissionText(text)) return false;
+
+  // Prefer an exact ID match when the proxy exposes the File ID. Do not require
+  // it, though: older attachment records can have incomplete remote metadata,
+  // while Google's error still unambiguously says that a File resource failed.
   const requestFileIds = new Set();
   for (const message of messages || []) {
     if (message?.role !== 'user') continue;
     for (const attachment of message.attachments || []) {
-      if (!attachment?.fileUri || !attachment?.fileApiName) continue;
-      if (currentBase && normalizedBaseUrl(attachment.fileApiBaseUrl) !== currentBase) continue;
-      const id = remoteFileId(attachment.fileApiName) || remoteFileId(attachment.fileUri);
+      const id = remoteFileId(attachment?.fileApiName) || remoteFileId(attachment?.fileUri);
       if (id) requestFileIds.add(id);
     }
   }
-  if (requestFileIds.size === 0) return false;
-
-  const text = errorText(error);
-  if (!text) return false;
 
   const referencedIds = new Set();
   for (const match of text.matchAll(/\bFile\s+(?:files\/)?([A-Za-z0-9-]+)\b/gi)) {
@@ -64,5 +88,6 @@ export function isFileSpecificPermissionDeniedError(error, messages = [], cleanB
     referencedIds.add(match[1]);
   }
 
-  return [...referencedIds].some(id => requestFileIds.has(id));
+  if ([...referencedIds].some(id => requestFileIds.has(id))) return true;
+  return true;
 }

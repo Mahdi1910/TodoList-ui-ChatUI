@@ -11,10 +11,10 @@ import {
   waitForGeminiFileActive
 } from '../api/gemini-files.js';
 import { persistAttachmentRemoteMetadata } from '../storage/storage.js';
-import { isRemoteFileLookupUnavailable } from './attachment-file-errors.js';
+import { isRemoteFileLookupUnavailable, remoteFileName } from './attachment-file-errors.js';
 
 export const FILE_API_EXPIRATION_LEEWAY_MS = 5 * 60 * 1000;
-export const MAX_CONCURRENT_FILE_OPERATIONS = 3;
+export const MAX_CONCURRENT_FILE_OPERATIONS = 7;
 
 const uploadCapabilityCache = new Map();
 const modelCapabilityCache = new Map();
@@ -208,7 +208,7 @@ function isAuthenticationOrPermissionError(error) {
 async function uploadAndActivateAttachment(attachment, context) {
   const blob = attachment?.blob instanceof Blob ? attachment.blob : null;
   if (!blob) {
-    throw new Error(`Attachment “${attachment?.name || 'Attachment'}” cannot be re-uploaded because its local Blob is missing.`);
+    throw new Error(`The local copy of “${attachment?.name || 'Attachment'}” no longer exists, so its Gemini File cannot be uploaded again.`);
   }
   const mimeType = mimeTypeForAttachment(attachment);
   const uploaded = await uploadGeminiFile({
@@ -282,7 +282,7 @@ async function prepareAutoAttachment(attachment, context) {
   }
 
   if (!(attachment?.blob instanceof Blob)) {
-    throw new Error(`Attachment “${attachment?.name || 'Attachment'}” has neither a reusable Gemini File nor a local Blob.`);
+    throw new Error(`The local copy of “${attachment?.name || 'Attachment'}” no longer exists, and there is no reusable Gemini File available.`);
   }
 
   try {
@@ -317,7 +317,7 @@ export async function prepareGeminiAttachmentPart(attachment, context) {
 export async function prepareAttachmentsForHistory(entries, context, maxConcurrency = MAX_CONCURRENT_FILE_OPERATIONS) {
   const list = Array.isArray(entries) ? entries : [];
   const results = new Map();
-  const concurrency = Math.max(1, Math.min(8, Number(maxConcurrency) || MAX_CONCURRENT_FILE_OPERATIONS));
+  const concurrency = Math.max(1, Math.min(MAX_CONCURRENT_FILE_OPERATIONS, Number(maxConcurrency) || MAX_CONCURRENT_FILE_OPERATIONS));
   let cursor = 0;
 
   async function worker() {
@@ -358,42 +358,73 @@ export function attachmentEntryKey(message, attachment, messageIndex, attachment
     : `anon:${message?.id || messageIndex}:${attachmentIndex}`;
 }
 
+async function mapEntriesWithConcurrency(entries, worker) {
+  const list = Array.isArray(entries) ? entries : [];
+  if (list.length === 0) return [];
+  const results = new Array(list.length);
+  let cursor = 0;
+
+  async function runWorker() {
+    while (true) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= list.length) return;
+      results[index] = await worker(list[index], index);
+    }
+  }
+
+  await Promise.all(Array.from(
+    { length: Math.min(MAX_CONCURRENT_FILE_OPERATIONS, list.length) },
+    () => runWorker()
+  ));
+  return results;
+}
+
 export async function recoverMissingRemoteAttachments(messages, context) {
   const entries = collectUniqueMessageAttachments(messages).filter(entry => {
     const attachment = entry.attachment;
-    return !!attachment?.fileUri && !!attachment?.fileApiName && metadataMatchesCurrentBase(attachment, context);
+    const savedBase = normalizedBaseUrl(attachment?.fileApiBaseUrl);
+    const currentBase = normalizedBaseUrl(context.cleanBaseUrl);
+    return (!!attachment?.fileUri || !!attachment?.fileApiName) &&
+      (!savedBase || !currentBase || savedBase === currentBase);
   });
   if (entries.length === 0) return false;
 
-  let recoveredAny = false;
-  for (const entry of entries) {
+  const results = await mapEntriesWithConcurrency(entries, async entry => {
     const attachment = entry.attachment;
+    const name = remoteFileName(attachment?.fileApiName) || remoteFileName(attachment?.fileUri);
+
+    if (!name) {
+      if (!(attachment?.blob instanceof Blob)) {
+        throw new Error(`The local copy of “${attachment?.name || 'Attachment'}” no longer exists, so its Gemini File cannot be uploaded again.`);
+      }
+      await invalidateAttachmentRemoteMetadata(attachment);
+      await uploadAndActivateAttachment(attachment, context);
+      return true;
+    }
+
     try {
       const previousUri = attachment.fileUri;
       const remote = await getGeminiFile({
-        fileApiName: attachment.fileApiName,
+        fileApiName: name,
         apiSettings: context.apiSettings,
         cleanBaseUrl: context.cleanBaseUrl,
         signal: context.signal
       });
       await applyRemoteMetadata(attachment, remote, context);
-      if (remote?.uri && remote.uri !== previousUri) recoveredAny = true;
+      return !!remote?.uri && remote.uri !== previousUri;
     } catch (error) {
       if (isAbortError(error)) throw error;
-      if (!isRemoteFileLookupUnavailable(error)) continue;
+      if (!isRemoteFileLookupUnavailable(error)) return false;
       if (!(attachment?.blob instanceof Blob)) {
-        throw new Error(
-          `Attachment “${attachment?.name || 'Attachment'}” cannot recover its inaccessible Gemini File because the local Blob is missing.`
-        );
+        throw new Error(`The local copy of “${attachment?.name || 'Attachment'}” no longer exists, so its Gemini File cannot be uploaded again.`);
       }
 
-      // files.get returning 404 proves this File is gone. A files.get 403
-      // PERMISSION_DENIED proves the current upstream identity cannot access
-      // this exact File. In both cases, the local Blob is the source of truth.
       await invalidateAttachmentRemoteMetadata(attachment);
       await uploadAndActivateAttachment(attachment, context);
-      recoveredAny = true;
+      return true;
     }
-  }
-  return recoveredAny;
+  });
+
+  return results.some(Boolean);
 }
