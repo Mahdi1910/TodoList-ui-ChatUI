@@ -5,7 +5,8 @@
 
 export { openDatabase } from './database.js';
 export { base64ToBlob } from './blob-utils.js';
-export { loadState, loadChatContent, searchMessageChatIds } from './load.js';
+export { loadState, loadChatContent } from './load.js';
+export { searchConversationMatches } from './search.js';
 export { saveState } from './save.js';
 export {
   persistSettings,
