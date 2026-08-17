@@ -17,7 +17,7 @@ import { initModelDropdownUI, initRightSidebarUI } from './ui/menus.js';
 import { initSmartScrollControls, loadChat, startNewChat } from './chat/chat.js';
 import { state } from './state/store.js';
 import { initChatRouter, parseChatRoute, isEmbeddedChatRouter } from './router/chat-router.js';
-import { initWorkspaceUI } from './workspace/workspace-ui.js';
+import { initWorkspaceUI, openWorkspacePath, closeWorkspaceView } from './workspace/workspace-ui.js';
 import './workspace/workspace-navigation-bridge.js';
 
 const IS_EMBEDDED = isEmbeddedChatRouter();
@@ -105,7 +105,17 @@ async function runBootstrapStep(name, fn, { asyncStartup = false } = {}) {
   }
 }
 
-async function handleRoute(route, { startup = false } = {}) {
+async function handleRoute(route) {
+  if (route.type === 'workspace') {
+    await openWorkspacePath(route.workspacePath, {
+      historyMode: 'none',
+      invalid: Boolean(route.invalidWorkspacePath)
+    });
+    return;
+  }
+
+  closeWorkspaceView();
+
   if (route.type === 'chat') {
     const exists = state.chats.some(chat => chat.id === route.chatId);
     if (!exists) {
@@ -118,11 +128,7 @@ async function handleRoute(route, { startup = false } = {}) {
   }
 
   if (route.type === 'home') {
-    if (startup && state.activeChatId && state.chats.some(chat => chat.id === state.activeChatId)) {
-      const restored = await loadChat(state.activeChatId, renderSidebar, { historyMode: 'replace' });
-      if (restored) return;
-    }
-    startNewChat(renderSidebar, startup ? state.activeProjectId : null, { historyMode: 'none' });
+    startNewChat(renderSidebar, null, { historyMode: 'none' });
     return;
   }
 
@@ -134,8 +140,11 @@ async function initializeEmbeddedBridge() {
   const { initChatEmbeddedBridge } = await import('./embedded/shell-bridge.js');
   initChatEmbeddedBridge({
     navigateChat: async chatId => {
-      if (chatId) await handleRoute({ type: 'chat', chatId }, { startup: false });
-      else await handleRoute({ type: 'home', chatId: null }, { startup: false });
+      if (chatId) await handleRoute({ type: 'chat', chatId });
+      else await handleRoute({ type: 'home', chatId: null });
+    },
+    navigateWorkspace: async (workspacePath, options = {}) => {
+      await openWorkspacePath(workspacePath, { historyMode: 'none', invalid: Boolean(options.invalid) });
     },
     openSettings: openSettingsModal,
     getState: () => state
@@ -153,10 +162,10 @@ async function bootstrapApp() {
   if (!IS_EMBEDDED) {
     await runBootstrapStep('Chat router initialization', () => {
       initChatRouter(route => {
-        void handleRoute(route, { startup: false });
+        void handleRoute(route);
       });
     });
-    await runBootstrapStep('Route restoration', () => handleRoute(parseChatRoute(), { startup: true }));
+    await runBootstrapStep('Route restoration', () => handleRoute(parseChatRoute()));
   }
 
   await runBootstrapStep('Composer initialization', () => initComposerListeners(renderSidebar));
