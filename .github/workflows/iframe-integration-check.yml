@@ -29,6 +29,7 @@ jobs:
           node --check ChatUI/js/app.js
           node --check ChatUI/js/embedded/shell-bridge.js
           node --check ChatUI/js/api/gemini-files.js
+          node --check ChatUI/js/api/gemini-file-recovery-wrapper.js
           node --check ChatUI/js/chat/attachment-file-errors.js
           node --check ChatUI/js/chat/attachment-transport.js
           node --check ChatUI/js/chat/file-reference-recovery.js
