@@ -7,6 +7,7 @@ import {
   restoreWorkspaceBackup,
   workspaceBackupFilename
 } from '../workspace/workspace-backup.js';
+import { openWorkspacePath } from '../workspace/workspace-ui.js';
 
 function setStatus(message, type = '') {
   const status = document.getElementById('workspace-backup-status');
@@ -33,6 +34,33 @@ function downloadBytes(bytes, filename) {
   anchor.click();
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function currentPublicWorkspacePath() {
+  let pathname = '';
+  try {
+    const targetWindow = window.parent !== window ? window.parent : window;
+    pathname = targetWindow.location.pathname || '';
+  } catch (_) {
+    pathname = window.location.pathname || '';
+  }
+
+  if (pathname === '/workspace' || pathname === '/workspace/') return '/';
+  if (!pathname.startsWith('/workspace/')) return null;
+  const encoded = pathname.slice('/workspace/'.length).split('/');
+  if (encoded.some(segment => !segment)) return null;
+  try {
+    return `/${encoded.map(segment => decodeURIComponent(segment)).join('/')}`;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function reconcileWorkspaceRouteAfterRestore() {
+  const routedPath = currentPublicWorkspacePath();
+  if (routedPath == null) return;
+  const reopened = await openWorkspacePath(routedPath, { historyMode: 'replace' });
+  if (!reopened) await openWorkspacePath('/', { historyMode: 'replace' });
 }
 
 async function createBackup() {
@@ -62,6 +90,7 @@ async function restoreBackup(file) {
   setStatus('Validating Workspace backup…');
   try {
     const result = await restoreWorkspaceBackup(file);
+    await reconcileWorkspaceRouteAfterRestore();
     setStatus(`Workspace restored: ${result.fileCount} Markdown file${result.fileCount === 1 ? '' : 's'} and ${result.nodeCount} total item${result.nodeCount === 1 ? '' : 's'}.`, 'success');
   } catch (error) {
     console.error('Workspace restore failed:', error);
