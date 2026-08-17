@@ -109,7 +109,7 @@ function recordDiagnosticHistoryShape(messages = []) {
     if (message.role !== 'user') return;
     (message.attachments || []).forEach(attachment => {
       attachmentCount += 1;
-      attachmentBytes += Math.max(0, Number(attachment?.size ?? attachment?.blob?.size) || 0, 0);
+      attachmentBytes += Math.max(0, Number(attachment?.size ?? attachment?.blob?.size) || 0);
     });
   });
   recordHistoryStats({
@@ -182,106 +182,108 @@ export async function streamAssistantResponse({
     }
   };
 
-  const runGeminiStream = () => streamChat({
-    model,
-    messages,
-    activeTools,
-    signal,
-    onActivityEvent: event => {
-      // TEMP_PERF_DIAGNOSTICS
-      markFirstActivity(diagnosticActivityType(event?.type));
-      const eventType = String(event?.type || '');
-      const callId = String(event?.callId || event?.id || '');
-      if (eventType === 'custom_tool.running' && callId && !toolStarts.has(callId)) {
-        toolStarts.set(callId, { startedAt: performance.now(), name: String(event?.name || 'tool') });
-      }
-      if ((eventType === 'custom_tool.completed' || eventType === 'custom_tool.failed') && callId) {
-        const start = toolStarts.get(callId);
-        if (start) {
-          recordToolExecution({
-            name: start.name,
-            durationMs: performance.now() - start.startedAt,
-            success: eventType === 'custom_tool.completed'
-          });
-          toolStarts.delete(callId);
-        }
-      }
-      applyActivityEvent(session, event);
-      syncLiveMessage(assistantMessage, session);
-      renderFrames.schedule(() => renderCurrent(false));
-    },
-    onThoughtChunk: (_chunk, fullThinkingText) => {
-      if (fullThinkingText !== session.thinking && fullThinkingText.startsWith(session.thinking)) {
-        const missing = fullThinkingText.slice(session.thinking.length);
-        if (missing) {
-          // TEMP_PERF_DIAGNOSTICS
-          markFirstActivity('thinking');
-          applyActivityEvent(session, { type: 'thinking.delta', delta: missing });
-        }
-      }
-    },
-    onChunk: (_chunk, fullText) => {
-      if (fullText !== session.content && fullText.startsWith(session.content)) {
-        const missing = fullText.slice(session.content.length);
-        if (missing) {
-          // TEMP_PERF_DIAGNOSTICS
-          markFirstActivity('text');
-          applyActivityEvent(session, { type: 'text.delta', delta: missing });
-        }
-      }
-      syncLiveMessage(assistantMessage, session);
-      if (isCurrentGeneration(generationId)) safeNotify(onTextUpdate, session.content);
-      renderFrames.schedule(() => renderCurrent(false));
-    },
-    onComplete: (fullText, fullThinkingText, thoughtSignature, modelResponseParts, toolMetadata) => {
-      // TEMP_PERF_DIAGNOSTICS
-      markPerformanceEvent('stream_complete');
-      if (diagnosticRoundId) finishNetworkRound(diagnosticRoundId, { status: 'completed' });
-      if (!session.content && fullText) applyActivityEvent(session, { type: 'text.delta', delta: fullText });
-      else if (fullText.startsWith(session.content) && fullText.length > session.content.length) {
-        applyActivityEvent(session, { type: 'text.delta', delta: fullText.slice(session.content.length) });
-      }
-      if (fullThinkingText.startsWith(session.thinking) && fullThinkingText.length > session.thinking.length) {
-        applyActivityEvent(session, { type: 'thinking.delta', delta: fullThinkingText.slice(session.thinking.length) });
-      }
-      finalizeActivitySession(session, 'completed');
-      const snapshot = snapshotActivitySession(session);
-      if (assistantMessage) {
-        assistantMessage.content = snapshot.content;
-        assistantMessage.thinking = snapshot.thinking;
-        assistantMessage.activityTimeline = snapshot.activityTimeline;
-      }
-      renderFrames.flush();
-      renderCurrent(true);
-      onComplete?.(
-        snapshot.content,
-        snapshot.thinking,
-        thoughtSignature,
-        modelResponseParts,
-        toolMetadata,
-        snapshot.activityTimeline
-      );
-    }
-  });
-
+  let fileRecoveryAttempted = false;
   try {
-    try {
-      await runGeminiStream();
-    } catch (error) {
-      const generationAlreadyStarted = session.timeline.length > 0 || !!session.content || !!session.thinking;
-      if (generationAlreadyStarted || error?.name === 'AbortError') throw error;
+    while (true) {
+      try {
+        await streamChat({
+          model,
+          messages,
+          activeTools,
+          signal,
+          onActivityEvent: event => {
+            // TEMP_PERF_DIAGNOSTICS
+            markFirstActivity(diagnosticActivityType(event?.type));
+            const eventType = String(event?.type || '');
+            const callId = String(event?.callId || event?.id || '');
+            if (eventType === 'custom_tool.running' && callId && !toolStarts.has(callId)) {
+              toolStarts.set(callId, { startedAt: performance.now(), name: String(event?.name || 'tool') });
+            }
+            if ((eventType === 'custom_tool.completed' || eventType === 'custom_tool.failed') && callId) {
+              const start = toolStarts.get(callId);
+              if (start) {
+                recordToolExecution({
+                  name: start.name,
+                  durationMs: performance.now() - start.startedAt,
+                  success: eventType === 'custom_tool.completed'
+                });
+                toolStarts.delete(callId);
+              }
+            }
+            applyActivityEvent(session, event);
+            syncLiveMessage(assistantMessage, session);
+            renderFrames.schedule(() => renderCurrent(false));
+          },
+          onThoughtChunk: (_chunk, fullThinkingText) => {
+            if (fullThinkingText !== session.thinking && fullThinkingText.startsWith(session.thinking)) {
+              const missing = fullThinkingText.slice(session.thinking.length);
+              if (missing) {
+                // TEMP_PERF_DIAGNOSTICS
+                markFirstActivity('thinking');
+                applyActivityEvent(session, { type: 'thinking.delta', delta: missing });
+              }
+            }
+          },
+          onChunk: (_chunk, fullText) => {
+            if (fullText !== session.content && fullText.startsWith(session.content)) {
+              const missing = fullText.slice(session.content.length);
+              if (missing) {
+                // TEMP_PERF_DIAGNOSTICS
+                markFirstActivity('text');
+                applyActivityEvent(session, { type: 'text.delta', delta: missing });
+              }
+            }
+            syncLiveMessage(assistantMessage, session);
+            if (isCurrentGeneration(generationId)) safeNotify(onTextUpdate, session.content);
+            renderFrames.schedule(() => renderCurrent(false));
+          },
+          onComplete: (fullText, fullThinkingText, thoughtSignature, modelResponseParts, toolMetadata) => {
+            // TEMP_PERF_DIAGNOSTICS
+            markPerformanceEvent('stream_complete');
+            if (diagnosticRoundId) finishNetworkRound(diagnosticRoundId, { status: 'completed' });
+            if (!session.content && fullText) applyActivityEvent(session, { type: 'text.delta', delta: fullText });
+            else if (fullText.startsWith(session.content) && fullText.length > session.content.length) {
+              applyActivityEvent(session, { type: 'text.delta', delta: fullText.slice(session.content.length) });
+            }
+            if (fullThinkingText.startsWith(session.thinking) && fullThinkingText.length > session.thinking.length) {
+              applyActivityEvent(session, { type: 'thinking.delta', delta: fullThinkingText.slice(session.thinking.length) });
+            }
+            finalizeActivitySession(session, 'completed');
+            const snapshot = snapshotActivitySession(session);
+            if (assistantMessage) {
+              assistantMessage.content = snapshot.content;
+              assistantMessage.thinking = snapshot.thinking;
+              assistantMessage.activityTimeline = snapshot.activityTimeline;
+            }
+            renderFrames.flush();
+            renderCurrent(true);
+            onComplete?.(
+              snapshot.content,
+              snapshot.thinking,
+              thoughtSignature,
+              modelResponseParts,
+              toolMetadata,
+              snapshot.activityTimeline
+            );
+          }
+        });
+        break;
+      } catch (error) {
+        const generationAlreadyStarted = session.timeline.length > 0 || !!session.content || !!session.thinking;
+        if (fileRecoveryAttempted || generationAlreadyStarted || error?.name === 'AbortError') throw error;
 
-      // A rotating proxy can make an otherwise fresh File URI inaccessible to
-      // the next upstream account. Repair only a 403 that names one of this
-      // request's exact File resources, then retry the generation once.
-      const recovered = await recoverGenerationFilePermissionFailure({
-        error,
-        messages,
-        model,
-        signal
-      });
-      if (!recovered) throw error;
-      await runGeminiStream();
+        // A rotating proxy can make an otherwise fresh File URI inaccessible to
+        // the next upstream account. Repair only a 403 that names one of this
+        // request's exact File resources, then retry the generation once.
+        const recovered = await recoverGenerationFilePermissionFailure({
+          error,
+          messages,
+          model,
+          signal
+        });
+        if (!recovered) throw error;
+        fileRecoveryAttempted = true;
+      }
     }
   } catch (error) {
     if (diagnosticRoundId) {
