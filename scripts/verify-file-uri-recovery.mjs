@@ -5,6 +5,10 @@ import {
   isRemoteFileLookupUnavailable,
   remoteFileName
 } from '../ChatUI/js/chat/attachment-file-errors.js';
+import {
+  createFileRecoveryMessages,
+  hasPreservedRemoteFileData
+} from '../ChatUI/js/chat/file-history-sanitizer.js';
 import { MAX_CONCURRENT_FILE_OPERATIONS } from '../ChatUI/js/chat/attachment-transport.js';
 import { FILE_RECOVERY_CONCURRENCY } from '../ChatUI/js/chat/file-reference-recovery.js';
 
@@ -35,22 +39,11 @@ const exactFile403 = Object.assign(new Error(
   })
 });
 assert.equal(
-  isFileSpecificPermissionDeniedError(exactFile403, messages, baseUrl),
+  isFileSpecificPermissionDeniedError(exactFile403),
   true,
-  'The exact observed proxy File 403 must be recoverable.'
+  'The exact observed proxy File 403 must always enter File recovery.'
 );
 
-// Regression for the real failure: the File ID in Google's error does not have
-// to match complete saved metadata. Older records can have only fileUri and no
-// fileApiName/fileApiBaseUrl, while the error still clearly identifies a File.
-const legacyMessages = [{
-  id: 'user-legacy',
-  role: 'user',
-  attachments: [{
-    id: 'att-legacy',
-    fileUri: 'https://generativelanguage.googleapis.com/v1beta/files/old-local-metadata-id'
-  }]
-}];
 const differentFile403 = Object.assign(new Error(
   'Proxy browser error: Google API returned error: 403 PERMISSION_DENIED {"error":{"code":403,"message":"You do not have permission to access the File 06b573e6f6104e7b3df4857feabe32de59d91e9a or it may not exist.","status":"PERMISSION_DENIED"}}'
 ), {
@@ -58,9 +51,9 @@ const differentFile403 = Object.assign(new Error(
   apiStatus: 'PERMISSION_DENIED'
 });
 assert.equal(
-  isFileSpecificPermissionDeniedError(differentFile403, legacyMessages, baseUrl),
+  isFileSpecificPermissionDeniedError(differentFile403),
   true,
-  'A clear Google File-access 403 must recover even when legacy metadata cannot provide an exact ID match.'
+  'A clear Google File-access 403 must not depend on attachment metadata matching the failing ID.'
 );
 
 const generic403 = Object.assign(new Error('API Error 403: Permission denied for this API.'), {
@@ -68,14 +61,14 @@ const generic403 = Object.assign(new Error('API Error 403: Permission denied for
   apiStatus: 'PERMISSION_DENIED'
 });
 assert.equal(
-  isFileSpecificPermissionDeniedError(generic403, messages, baseUrl),
+  isFileSpecificPermissionDeniedError(generic403),
   false,
   'A generic 403 must not be mistaken for a stale File reference.'
 );
 assert.equal(
   isFileSpecificPermissionDeniedError(exactFile403, [{ role: 'user', attachments: [] }], baseUrl),
-  false,
-  'A File-looking 403 without any remote attachments must not start File recovery.'
+  true,
+  'An explicit File 403 must still recover when the stale URI comes from preserved assistant history instead of message.attachments.'
 );
 
 assert.equal(remoteFileName(`files/${fileId}`), `files/${fileId}`);
@@ -90,6 +83,51 @@ assert.equal(isRemoteFileLookupUnavailable({ httpStatus: 403, apiStatus: 'PERMIS
 assert.equal(isRemoteFileLookupUnavailable({ httpStatus: 403, apiStatus: 'OTHER_REASON' }), false);
 assert.equal(isRemoteFileLookupUnavailable({ httpStatus: 401, apiStatus: 'UNAUTHENTICATED' }), false);
 
+const staleAssistantUri = 'https://generativelanguage.googleapis.com/v1beta/files/06b573e6f6104e7b3df4857feabe32de59d91e9a';
+const retainedAttachment = { id: 'att-local', fileUri: 'https://example.invalid/new-file-uri' };
+const regenerationHistory = [
+  {
+    id: 'user-old',
+    role: 'user',
+    content: 'Read the attachment',
+    attachments: [retainedAttachment]
+  },
+  {
+    id: 'assistant-old',
+    role: 'assistant',
+    content: 'Previous response',
+    modelResponseParts: [
+      { text: 'Previous response' },
+      { fileData: { mimeType: 'application/pdf', fileUri: staleAssistantUri } },
+      { file_data: { mime_type: 'text/plain', file_uri: 'https://generativelanguage.googleapis.com/v1beta/files/another-stale-id' } },
+      { inlineData: { mimeType: 'text/plain', data: 'c2FmZQ==' } },
+      { functionCall: { id: 'call-1', name: 'workspace_read_file', args: { path: '/notes.md' } } }
+    ]
+  },
+  {
+    id: 'user-regenerate',
+    role: 'user',
+    content: 'Try again',
+    attachments: []
+  }
+];
+
+assert.equal(
+  hasPreservedRemoteFileData(regenerationHistory),
+  true,
+  'The recovery layer must detect remote File URIs preserved in assistant modelResponseParts.'
+);
+
+const cleanHistory = createFileRecoveryMessages(regenerationHistory);
+assert.notEqual(cleanHistory, regenerationHistory, 'Recovery must create a retry-only message view.');
+assert.equal(cleanHistory[0], regenerationHistory[0], 'Unchanged user messages should be reused, not copied unnecessarily.');
+assert.equal(cleanHistory[0].attachments[0], retainedAttachment, 'Fresh attachment objects must remain shared so newly uploaded File metadata is used by the retry.');
+assert.equal(cleanHistory[1].modelResponseParts.some(part => part?.fileData?.fileUri || part?.file_data?.file_uri), false, 'Retry history must contain no stale assistant remote fileData URI.');
+assert.equal(cleanHistory[1].modelResponseParts.some(part => part?.text === 'Previous response'), true, 'Assistant text history must be preserved.');
+assert.equal(cleanHistory[1].modelResponseParts.some(part => part?.inlineData?.data === 'c2FmZQ=='), true, 'Non-remote inlineData history must be preserved.');
+assert.equal(cleanHistory[1].modelResponseParts.some(part => part?.functionCall?.id === 'call-1'), true, 'Function-call history must be preserved.');
+assert.equal(regenerationHistory[1].modelResponseParts.some(part => part?.fileData?.fileUri === staleAssistantUri), true, 'Sanitizing a retry must not mutate the persisted/original chat history.');
+
 assert.equal(MAX_CONCURRENT_FILE_OPERATIONS, 7, 'Normal Gemini File preparation must allow seven concurrent operations.');
 assert.equal(FILE_RECOVERY_CONCURRENCY, 7, 'Stale Gemini File repair must allow seven concurrent operations.');
 
@@ -97,6 +135,7 @@ const transportSource = await readFile(new URL('../ChatUI/js/chat/attachment-tra
 const streamingSource = await readFile(new URL('../ChatUI/js/chat/streaming.js', import.meta.url), 'utf8');
 const recoverySource = await readFile(new URL('../ChatUI/js/chat/file-reference-recovery.js', import.meta.url), 'utf8');
 const wrapperSource = await readFile(new URL('../ChatUI/js/api/gemini-file-recovery-wrapper.js', import.meta.url), 'utf8');
+const sanitizerSource = await readFile(new URL('../ChatUI/js/chat/file-history-sanitizer.js', import.meta.url), 'utf8');
 
 assert(
   transportSource.includes('MAX_CONCURRENT_FILE_OPERATIONS = 7') &&
@@ -121,6 +160,12 @@ assert(
   'Normal send and Regenerate must both use the File-recovery wrapper through the shared streaming path.'
 );
 assert(
+  wrapperSource.includes('createFileRecoveryMessages') &&
+  wrapperSource.includes('recoveryAttempts > 0') &&
+  wrapperSource.includes('messages: attemptMessages'),
+  'After a File 403, the next streamChat attempt must use sanitized retry-only history.'
+);
+assert(
   wrapperSource.includes('MAX_FILE_RECOVERY_RETRIES = 3') &&
   wrapperSource.includes('while (true)') &&
   wrapperSource.includes('generationStarted') &&
@@ -128,11 +173,14 @@ assert(
   'Pre-stream File recovery must be bounded, repeatable, and stop once generation activity begins.'
 );
 assert(
-  recoverySource.includes('refreshCoherentLocalFileSet') &&
-  recoverySource.includes('FILE_RECOVERY_CONCURRENCY') &&
-  recoverySource.includes('mapWithConcurrency') &&
-  recoverySource.includes('Re-upload every local-backed File together'),
-  'A clear File-access failure must rebuild one coherent local-backed attachment set in parallel for the current proxy account.'
+  recoverySource.includes('hasPreservedRemoteFileData') &&
+  recoverySource.includes('entries.length === 0') &&
+  recoverySource.includes('refreshCoherentLocalFileSet'),
+  'Recovery must handle both normal attachment File URIs and stale URIs preserved only in old assistant history.'
+);
+assert(
+  sanitizerSource.includes('fileData') && sanitizerSource.includes('file_data') && sanitizerSource.includes('modelResponseParts'),
+  'The sanitizer must cover both Gemini field-name variants without dropping the rest of assistant history.'
 );
 
 console.log('File URI recovery verification passed.');
