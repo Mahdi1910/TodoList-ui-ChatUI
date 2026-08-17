@@ -128,10 +128,11 @@ assert(
   'Pre-stream File recovery must be bounded, repeatable, and stop once generation activity begins.'
 );
 assert(
-  recoverySource.includes('forceRefreshAllLocalFiles') &&
+  recoverySource.includes('refreshCoherentLocalFileSet') &&
   recoverySource.includes('FILE_RECOVERY_CONCURRENCY') &&
-  recoverySource.includes('mapWithConcurrency'),
-  'A clear File-access failure must validate/repair the whole attachment set in parallel and force-refresh it when proxy account routing races files.get.'
+  recoverySource.includes('mapWithConcurrency') &&
+  recoverySource.includes('Re-upload every local-backed File together'),
+  'A clear File-access failure must rebuild one coherent local-backed attachment set in parallel for the current proxy account.'
 );
 
 console.log('File URI recovery verification passed.');
