@@ -4,6 +4,7 @@
 
 import { setState, setRuntime, normalizeProjectId } from '../state/store.js';
 import { getModelConfig } from '../models/models.js';
+import { normalizeCustomToolRoundLimit, DEFAULT_CUSTOM_TOOL_ROUND_LIMIT } from '../tools/custom-tool-limits.js';
 import { sanitizeActivityTimeline } from '../chat/activity-timeline.js';
 import { openDatabase, getRequestPromise, waitForTransaction } from './database.js';
 import { migrateLegacyLocalStorage } from './migration.js';
@@ -196,6 +197,10 @@ export async function loadState(options = {}) {
     const thinkingLevel = modelConfig.thinkingLevels.includes(savedThinkingLevel)
       ? savedThinkingLevel
       : modelConfig.defaultThinkingLevel;
+    const customToolRoundLimit = normalizeCustomToolRoundLimit(settings.customToolRoundLimit);
+    const customToolLimitWasCorrected = settings.customToolRoundLimit === undefined
+      ? false
+      : customToolRoundLimit !== settings.customToolRoundLimit;
     let repairedProjectReferences = false;
     const repairedChatIds = new Set();
 
@@ -240,6 +245,9 @@ export async function loadState(options = {}) {
       activeProjectId,
       currentModel: modelConfig.name,
       thinkingLevel,
+      customToolRoundLimit: settings.customToolRoundLimit === undefined
+        ? DEFAULT_CUSTOM_TOOL_ROUND_LIMIT
+        : customToolRoundLimit,
       theme: settings.theme || 'dark',
       accentColor: settings.accentColor || '#2563EB',
       tools: {
@@ -278,7 +286,7 @@ export async function loadState(options = {}) {
     }
     setRuntime({ collapsedProjectIds: new Set(filteredCollapsed) });
 
-    if (modelWasCorrected || savedThinkingLevel !== thinkingLevel || repairedProjectReferences) {
+    if (modelWasCorrected || savedThinkingLevel !== thinkingLevel || customToolLimitWasCorrected || repairedProjectReferences) {
       const repairedChats = formattedChats.filter(chat => repairedChatIds.has(chat.id));
       await persistMetadataChanges({ chats: repairedChats, settings: true });
     }
