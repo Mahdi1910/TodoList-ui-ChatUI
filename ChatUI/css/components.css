@@ -9,6 +9,7 @@
 @import url("components/message-attachments.css");
 @import url("components/thinking-menu.css");
 @import url("components/workspace.css");
+@import url("components/workspace-routing.css");
 @import url("components/workspace-responsive.css");
 /* TEMP_PERF_DIAGNOSTICS */
 @import url("components/performance-diagnostics.css");
