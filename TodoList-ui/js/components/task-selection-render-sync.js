@@ -39,9 +39,15 @@ export function installTaskSelectionRenderSync(controller) {
   controller.setBatchBusy = function setBatchBusy(value) {
     originalSetBatchBusy(value);
     if (!this.selectionMode) return;
-    document.querySelectorAll('.selection-container-checkbox').forEach(checkbox => {
-      const hasTargets = !checkbox.closest('.selection-container-selector')?.classList.contains('is-empty');
-      checkbox.disabled = this.batchBusy || !hasTargets;
-    });
+
+    if (this.batchBusy) {
+      document.querySelectorAll('.selection-container-checkbox')
+        .forEach(checkbox => { checkbox.disabled = true; });
+      return;
+    }
+
+    // Rebuild from logical membership after the batch so empty containers stay
+    // disabled and full/partial state reflects any tasks that moved or disappeared.
+    this.syncContainerSelectors();
   };
 }
