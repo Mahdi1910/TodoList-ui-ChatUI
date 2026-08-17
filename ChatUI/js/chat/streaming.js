@@ -2,7 +2,7 @@
  * streaming.js — Ordered streaming response lifecycle and frame-throttled activity rendering.
  */
 
-import { streamChat } from '../api/gemini.js';
+import { streamChatWithFileRecovery as streamChat } from '../api/gemini-file-recovery-wrapper.js';
 import {
   applyActivityEvent,
   createActivitySession,
