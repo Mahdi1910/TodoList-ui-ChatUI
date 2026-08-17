@@ -49,6 +49,7 @@ jobs:
           node --check TodoList-ui/js/components/task-selection.js
           node --check TodoList-ui/js/components/task-selection-actions.js
           node --check TodoList-ui/js/components/task-selection-menus.js
+          node --check TodoList-ui/js/components/task-selection-render-sync.js
           node --check TodoList-ui/js/embedded/shell-bridge.js
           node --check TodoList-ui/js/tools/todo-tool-registry.js
           node --check TodoList-ui/js/tools/todo-tool-normalizers.js
