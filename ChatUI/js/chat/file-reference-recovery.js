@@ -4,7 +4,8 @@
  * Once generation proves that a remote Gemini File is inaccessible, rebuild one
  * coherent fresh set of File resources from the permanent local Blobs. This is
  * safer with a multi-account proxy than mixing old account-owned File URIs with
- * newly uploaded ones.
+ * newly uploaded ones. If the stale URI lives only in preserved assistant
+ * modelResponseParts, the retry is still allowed so the wrapper can sanitize it.
  */
 
 import { getApiSettings, getCleanBaseUrl } from '../api/api-config.js';
@@ -20,6 +21,7 @@ import {
   isRemoteFileLookupUnavailable,
   remoteFileName
 } from './attachment-file-errors.js';
+import { hasPreservedRemoteFileData } from './file-history-sanitizer.js';
 
 export const FILE_RECOVERY_CONCURRENCY = 7;
 
@@ -184,9 +186,6 @@ async function refreshCoherentLocalFileSet(entries, context) {
   );
 
   if (localEntries.length === 0) {
-    // The generation reported a File access failure but there is nothing local
-    // that can be rebuilt. Surface a clear local-source error instead of Google's
-    // misleading permission text.
     throw localBlobMissingError(entries[0]?.attachment);
   }
 
@@ -207,21 +206,26 @@ export async function recoverGenerationFilePermissionFailure({
   signal
 }) {
   if (isAbortError(error)) return false;
+  if (!isFileSpecificPermissionDeniedError(error)) return false;
 
-  const apiSettings = getApiSettings();
-  const cleanBaseUrl = getCleanBaseUrl(apiSettings.textBaseUrl);
-  if (!isFileSpecificPermissionDeniedError(error, messages, cleanBaseUrl)) return false;
-
+  const preservedHistoryHasRemoteFile = hasPreservedRemoteFileData(messages);
   const entries = collectUniqueMessageAttachments(messages).filter(entry =>
     !!entry.attachment?.fileUri || !!entry.attachment?.fileApiName
   );
-  if (entries.length === 0) return false;
 
+  // This is the Regenerate failure mode that the earlier implementation missed:
+  // a dead File URI can live only inside saved assistant modelResponseParts. The
+  // wrapper will remove that remote pointer from its retry-only message view.
+  if (entries.length === 0) return preservedHistoryHasRemoteFile;
+
+  const apiSettings = getApiSettings();
+  const cleanBaseUrl = getCleanBaseUrl(apiSettings.textBaseUrl);
   const context = {
     apiSettings,
     cleanBaseUrl: normalizedBaseUrl(cleanBaseUrl),
     signal
   };
 
-  return refreshCoherentLocalFileSet(entries, context);
+  await refreshCoherentLocalFileSet(entries, context);
+  return true;
 }
