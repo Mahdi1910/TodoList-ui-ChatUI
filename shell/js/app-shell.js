@@ -74,10 +74,11 @@ const bridge = createFrameBridge(frameManager, {
 
     if (app === 'chat') {
       const current = router.getCurrentRoute();
-      if (current.app !== 'chat') {
+      if (current.app === 'chat') {
+        bridge.navigateChatRoute(current, 'ready-sync');
+      } else {
         const lastPath = router.rememberChatFromReady(payload.currentChatId || null);
-        const lastRoute = parseShellRoute(lastPath);
-        bridge.navigateChat(lastRoute.chatId, 'ready-sync');
+        bridge.navigateChatRoute(parseShellRoute(lastPath), 'ready-sync');
       }
     }
 
@@ -97,9 +98,7 @@ const bridge = createFrameBridge(frameManager, {
     showToast(`${app === 'chat' ? 'ChatUI' : 'To-Do'} did not respond to ${command}.`);
   },
   onChatRouteChange(payload) {
-    const chatId = typeof payload.chatId === 'string' ? payload.chatId : null;
-    const historyMode = payload.historyMode === 'replace' ? 'replace' : 'push';
-    router.handleChatChildRoute(chatId, historyMode);
+    router.handleChatChildRoute(payload);
   },
   onAppearance(app, payload) {
     appearances.set(app, payload);
@@ -136,7 +135,7 @@ function activateRoute(route, meta = {}) {
   updateTitle();
 
   if (route.app === 'chat' && meta.source !== 'child') {
-    bridge.navigateChat(route.chatId || null, meta.source || 'shell');
+    bridge.navigateChatRoute(route, meta.source || 'shell');
   }
 }
 
