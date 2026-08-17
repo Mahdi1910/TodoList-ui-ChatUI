@@ -11,6 +11,7 @@ import {
   waitForGeminiFileActive
 } from '../api/gemini-files.js';
 import { persistAttachmentRemoteMetadata } from '../storage/storage.js';
+import { isRemoteFileLookupUnavailable } from './attachment-file-errors.js';
 
 export const FILE_API_EXPIRATION_LEEWAY_MS = 5 * 60 * 1000;
 export const MAX_CONCURRENT_FILE_OPERATIONS = 3;
@@ -269,8 +270,11 @@ async function prepareAutoAttachment(attachment, context) {
       if (refreshed?.state === 'ACTIVE' && isFreshActiveRemote(attachment, context)) return fileDataPart(attachment);
     } catch (error) {
       if (isAbortError(error)) throw error;
-      // A 404 here proves this specific File resource is gone; re-upload below.
-      if (Number(error?.httpStatus) !== 404) {
+      if (isRemoteFileLookupUnavailable(error)) {
+        // This exact remote File is missing or inaccessible to the current
+        // upstream identity. Clear it so the local Blob becomes authoritative.
+        await invalidateAttachmentRemoteMetadata(attachment);
+      } else {
         if (isAuthenticationOrPermissionError(error)) throw error;
         console.warn(`Could not validate Gemini File metadata for “${attachment?.name || 'Attachment'}”; using local recovery path.`, error);
       }
@@ -286,6 +290,8 @@ async function prepareAutoAttachment(attachment, context) {
     return fileDataPart(attachment);
   } catch (error) {
     if (isAbortError(error)) throw error;
+    // A 401/403 from upload itself is a real credential/permission problem.
+    // Do not hide it behind inlineData or another retry.
     if (isAuthenticationOrPermissionError(error)) throw error;
     if (isMachineUnsupportedFileError(error)) markUploadMimeUnsupported(context, mimeType);
     console.warn(`Gemini Files API could not prepare “${attachment?.name || 'Attachment'}”; using inlineData for this request.`, error);
@@ -363,6 +369,7 @@ export async function recoverMissingRemoteAttachments(messages, context) {
   for (const entry of entries) {
     const attachment = entry.attachment;
     try {
+      const previousUri = attachment.fileUri;
       const remote = await getGeminiFile({
         fileApiName: attachment.fileApiName,
         apiSettings: context.apiSettings,
@@ -370,13 +377,19 @@ export async function recoverMissingRemoteAttachments(messages, context) {
         signal: context.signal
       });
       await applyRemoteMetadata(attachment, remote, context);
+      if (remote?.uri && remote.uri !== previousUri) recoveredAny = true;
     } catch (error) {
       if (isAbortError(error)) throw error;
-      if (Number(error?.httpStatus) !== 404) continue;
-      if (!(attachment?.blob instanceof Blob)) continue;
+      if (!isRemoteFileLookupUnavailable(error)) continue;
+      if (!(attachment?.blob instanceof Blob)) {
+        throw new Error(
+          `Attachment “${attachment?.name || 'Attachment'}” cannot recover its inaccessible Gemini File because the local Blob is missing.`
+        );
+      }
 
-      // files.get returning 404 is the authoritative proof that this exact File
-      // resource is gone. Only now clear its metadata and re-upload the local Blob.
+      // files.get returning 404 proves this File is gone. A files.get 403
+      // PERMISSION_DENIED proves the current upstream identity cannot access
+      // this exact File. In both cases, the local Blob is the source of truth.
       await invalidateAttachmentRemoteMetadata(attachment);
       await uploadAndActivateAttachment(attachment, context);
       recoveredAny = true;
