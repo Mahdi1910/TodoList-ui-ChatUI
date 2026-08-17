@@ -50,8 +50,6 @@ export async function listWorkspaceChildren(parentId) {
   const tx = db.transaction(WORKSPACE_NODE_STORE, 'readonly');
   const done = waitForTransaction(tx);
   const store = tx.objectStore(WORKSPACE_NODE_STORE);
-
-  // IndexedDB does not index null keys, so top-level nodes are filtered from getAll().
   const result = parentId == null
     ? (await getRequestPromise(store.getAll())).filter(node => node.parentId == null)
     : await getRequestPromise(store.index('parentId').getAll(parentId));
@@ -131,4 +129,19 @@ export async function deleteWorkspaceSubtree(nodeIds, fileNodeIds) {
   nodeIds.forEach(nodeId => nodeStore.delete(nodeId));
   fileNodeIds.forEach(nodeId => fileStore.delete(nodeId));
   await done;
+}
+
+export async function replaceWorkspaceSnapshot(nodes, files) {
+  if (!Array.isArray(nodes) || !Array.isArray(files)) throw new TypeError('Workspace replacement requires node and file arrays.');
+  const db = await openDatabase();
+  const tx = db.transaction([WORKSPACE_NODE_STORE, WORKSPACE_FILE_STORE], 'readwrite');
+  const done = waitForTransaction(tx);
+  const nodeStore = tx.objectStore(WORKSPACE_NODE_STORE);
+  const fileStore = tx.objectStore(WORKSPACE_FILE_STORE);
+  nodeStore.clear();
+  fileStore.clear();
+  nodes.forEach(node => nodeStore.add(node));
+  files.forEach(file => fileStore.add(file));
+  await done;
+  return { nodeCount: nodes.length, fileCount: files.length };
 }
