@@ -80,6 +80,7 @@ const [
   rightSidebarHtml,
   rightSidebarCss,
   markdown,
+  messageRenderer,
   composer,
   messagesCss,
   searchStorage,
@@ -105,6 +106,7 @@ const [
   read('ChatUI/html/right-sidebar.html'),
   read('ChatUI/css/components/right-sidebar.css'),
   read('ChatUI/js/chat/markdown.js'),
+  read('ChatUI/js/chat/message-renderer.js'),
   read('ChatUI/js/composer/composer.js'),
   read('ChatUI/css/chat/messages.css'),
   read('ChatUI/js/storage/search.js'),
@@ -140,7 +142,8 @@ assert(fileRecovery.includes('FILE_RECOVERY_CONCURRENCY = 7'), 'Gemini File reco
 assert(!rightSidebarHtml.includes('tool-desc'), 'Right sidebar tool descriptions must be removed.');
 assert(rightSidebarCss.includes('position: absolute') && rightSidebarCss.includes('transform: translateX(100%)'), 'Right sidebar must be transform-based overlay geometry.');
 assert(markdown.includes("'p, h1, h2, h3, h4, h5, h6, ul, ol, li"), 'Markdown renderer must assign direction to list containers.');
-assert(composer.includes('composer-markdown-preview') && composer.includes('renderMarkdown'), 'Live Markdown composer preview is missing.');
+assert(messageRenderer.includes('text.innerHTML = renderMarkdown(content)'), 'Sent user messages must continue to render stored Markdown.');
+assert(!composer.includes('composer-markdown-preview') && !composer.includes("../chat/markdown.js"), 'Plan 6 must supersede the old mirrored composer preview without changing sent-message Markdown rendering.');
 assert(messagesCss.includes('padding-inline-start') && !messagesCss.includes('.markdown-content[dir="rtl"] ul'), 'Markdown list indentation must use logical CSS instead of wrapper RTL special cases.');
 
 assert(searchStorage.includes('openCursor()') && searchStorage.includes('messageId') && searchStorage.includes('matchRanges'), 'Contextual search must use cursor scanning and return message excerpts/ranges.');

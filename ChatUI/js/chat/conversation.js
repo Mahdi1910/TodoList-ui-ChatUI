@@ -14,6 +14,7 @@ import { abortActiveGeneration } from './generation.js';
 import { sendRegenerateRequest } from './generation.js';
 import { messageDeleteHandler, messageEditHandler } from './message-actions.js';
 import { getChatDOMElements, scrollToBottom } from './ui.js';
+import { clearComposer } from '../composer/markdown-editor.js';
 import { updateComposerButtons } from '../composer/composer.js';
 import { invalidateReadAudioForChat, stopActiveReadForChat } from '../voice/read-aloud.js';
 import { clearSelectedReadText } from '../voice/read-selection.js';
@@ -141,17 +142,14 @@ export function startNewChat(updateSidebarCallback = null, projectId = null, opt
   document.title = 'ChatUI';
   persistSettings().catch(err => console.error('Failed to persist new-chat state:', err));
 
-  const { emptyState, conversationThread, composerTextarea } = getChatDOMElements();
+  const { emptyState, conversationThread } = getChatDOMElements();
   setLandingMessage('What can I help with?');
   if (emptyState && conversationThread) {
     emptyState.classList.remove('hidden');
     conversationThread.classList.add('hidden');
     conversationThread.innerHTML = '';
   }
-  if (composerTextarea) {
-    composerTextarea.value = '';
-    composerTextarea.style.height = 'auto';
-  }
+  clearComposer();
   updateComposerButtons();
   updateSidebarCallback?.();
 }

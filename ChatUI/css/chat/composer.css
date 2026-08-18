@@ -11,50 +11,18 @@
   gap: 8px;
 }
 
-.composer-markdown-preview {
-  max-height: 32dvh;
-  overflow: auto;
-  padding: 10px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.composer-markdown-preview .markdown-content > :first-child { margin-top: 0; }
-.composer-markdown-preview .markdown-content > :last-child { margin-bottom: 0; }
-.composer-markdown-preview pre,
-.composer-markdown-preview .code-block-wrapper,
-.composer-markdown-preview table { max-width: 100%; overflow-x: auto; }
-
 .composer-bar {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: 24px;
   padding: 8px 12px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   transition: border-color var(--transition-fast);
 }
 
 .composer-bar:focus-within { border-color: rgba(255, 255, 255, 0.25); }
-
-.composer-textarea {
-  flex: 1;
-  background: none;
-  border: none;
-  color: var(--text-primary);
-  font-size: 15px;
-  resize: none;
-  outline: none;
-  max-height: 150px;
-  text-align: start;
-  unicode-bidi: plaintext;
-}
-
-.composer-textarea::placeholder { color: var(--text-muted); }
 
 .composer-btn {
   width: 34px;

@@ -16,6 +16,7 @@ import { persistNewUserTurn } from '../storage/storage.js';
 import { renderMessageDOM } from './messages.js';
 import { updateFilePreviewsUI, validateAttachmentSet } from '../composer/attachments.js';
 import { stopAudioRecording } from '../composer/recorder.js';
+import { getComposerMarkdown, clearComposer, isComposerReady } from '../composer/markdown-editor.js';
 import { getChatDOMElements, scrollToBottom } from './ui.js';
 import { messageDeleteHandler, messageEditHandler } from './message-actions.js';
 import { sendGenerationForChat } from './generation-runner.js';
@@ -85,10 +86,11 @@ function updateDiagnosticRequestMetadata(text, files, chat, { newChat = false, c
 }
 
 export async function sendMessage(updateSidebarCallback = null, options = {}) {
-  const { emptyState, conversationThread, composerTextarea } = getChatDOMElements();
-  if (!composerTextarea || runtime.isGenerating) return false;
+  const { emptyState, conversationThread } = getChatDOMElements();
+  if (!isComposerReady() || runtime.isGenerating) return false;
 
-  const initialText = composerTextarea.value.trim();
+  const initialMarkdown = getComposerMarkdown();
+  const initialText = initialMarkdown.trim();
   const hasPotentialRequest = !!initialText || runtime.attachedFiles.length > 0 || runtime.isRecordingAudio;
   if (!hasPotentialRequest) return false;
 
@@ -99,7 +101,7 @@ export async function sendMessage(updateSidebarCallback = null, options = {}) {
   // TEMP_PERF_DIAGNOSTICS
   beginPerformanceRun({
     requestKind: 'pending',
-    textChars: initialText.length,
+    textChars: initialMarkdown.length,
     currentAttachmentCount: runtime.attachedFiles.length,
     currentAttachmentBytes: initialAttachments.bytes,
     attachmentTypeCounts: initialAttachments.typeCounts,
@@ -123,8 +125,12 @@ export async function sendMessage(updateSidebarCallback = null, options = {}) {
     }
   }
 
-  const text = composerTextarea.value.trim();
-  if (!text && runtime.attachedFiles.length === 0) {
+  // Read Markdown again after async recorder finalization so text typed during
+  // that short interval is included. Trimming is only an emptiness test; the
+  // persisted prompt remains the editor's Markdown serialization.
+  const rawMarkdown = getComposerMarkdown();
+  const hasText = rawMarkdown.trim().length > 0;
+  if (!hasText && runtime.attachedFiles.length === 0) {
     finishPerformanceRun('rejected_empty');
     return false;
   }
@@ -163,9 +169,10 @@ export async function sendMessage(updateSidebarCallback = null, options = {}) {
     const now = Date.now();
     const projectId = normalizeProjectId(state.activeProjectId);
     if (projectId !== state.activeProjectId) setState({ activeProjectId: projectId });
+    const titleText = rawMarkdown.trim();
     currentChat = {
       id: createEntityId('chat'),
-      title: (text || 'Multimodal Chat').slice(0, 24) + ((text || '').length > 24 ? '...' : ''),
+      title: (titleText || 'Multimodal Chat').slice(0, 24) + ((titleText || '').length > 24 ? '...' : ''),
       projectId,
       pinned: false,
       createdAt: now,
@@ -179,7 +186,7 @@ export async function sendMessage(updateSidebarCallback = null, options = {}) {
   }
 
   // TEMP_PERF_DIAGNOSTICS
-  updateDiagnosticRequestMetadata(text, filesToSend, currentChat, {
+  updateDiagnosticRequestMetadata(rawMarkdown, filesToSend, currentChat, {
     newChat: createdNewChat,
     chatWasAlreadyLoaded
   });
@@ -202,7 +209,7 @@ export async function sendMessage(updateSidebarCallback = null, options = {}) {
   const userMsgObj = {
     id: createEntityId('msg_user'),
     role: 'user',
-    content: text || (attachmentObjects.length ? '' : '[Attachment Sent]'),
+    content: hasText ? rawMarkdown : (attachmentObjects.length ? '' : '[Attachment Sent]'),
     attachments: attachmentObjects,
     sequence: createMessageSequence(currentChat.messages || []),
     createdAt: messageCreatedAt,
@@ -222,6 +229,7 @@ export async function sendMessage(updateSidebarCallback = null, options = {}) {
   try {
     // Durability remains a hard precondition for all external Gemini work.
     // This writes the user turn and original attachment Blobs first.
+    // The rich composer is intentionally NOT cleared until this succeeds.
     // TEMP_PERF_DIAGNOSTICS
     startPerformancePhase('persist_user_turn');
     try {
@@ -269,8 +277,9 @@ export async function sendMessage(updateSidebarCallback = null, options = {}) {
     endPerformancePhase('render_user_message');
   }
 
-  composerTextarea.value = '';
-  composerTextarea.style.height = 'auto';
+  // The durable write has succeeded. Reset the editor document and its undo
+  // history so an old sent prompt cannot be restored into the new draft.
+  clearComposer();
 
   // TEMP_PERF_DIAGNOSTICS
   startPerformancePhase('sidebar_update_before_generation');

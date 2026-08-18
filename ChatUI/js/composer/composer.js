@@ -1,11 +1,11 @@
 /**
- * composer.js — Textarea, live Markdown preview, tools, and send/stop button state.
+ * composer.js — Rich Markdown composer, tools, and send/stop button state.
  */
 
 import { state, setState, runtime } from '../state/store.js';
 import { persistSettings } from '../storage/storage.js';
 import { sendMessage } from '../chat/chat.js';
-import { renderMarkdown } from '../chat/markdown.js';
+import { initMarkdownComposer, isComposerEmpty } from './markdown-editor.js';
 import { isTodoBridgeSupported } from '../todo/todo-bridge-client.js';
 
 const TOOL_DESCRIPTORS = Object.freeze([
@@ -16,55 +16,15 @@ const TOOL_DESCRIPTORS = Object.freeze([
   { key: 'todo', icon: 'list-todo', label: 'To-Do', toggle: 'toggle-todo', sidebarToggle: 'sidebar-toggle-todo' }
 ]);
 let todoSupportListenerInstalled = false;
-let previewFrame = null;
 
 function toolAvailable(key) {
   return key !== 'todo' || isTodoBridgeSupported();
 }
 
-function ensureMarkdownPreview() {
-  let preview = document.getElementById('composer-markdown-preview');
-  if (preview) return preview;
-  const composerBar = document.getElementById('composer-bar');
-  if (!composerBar?.parentElement) return null;
-  preview = document.createElement('div');
-  preview.id = 'composer-markdown-preview';
-  preview.className = 'composer-markdown-preview hidden';
-  preview.setAttribute('aria-hidden', 'true');
-  composerBar.before(preview);
-  return preview;
-}
-
-export function syncComposerMarkdownPreview() {
-  const textarea = document.getElementById('composer-textarea');
-  const preview = ensureMarkdownPreview();
-  if (!textarea || !preview) return;
-  const source = textarea.value || '';
-  if (!source.trim()) {
-    preview.replaceChildren();
-    preview.classList.add('hidden');
-    return;
-  }
-  preview.innerHTML = renderMarkdown(source, { isFinal: false });
-  preview.classList.remove('hidden');
-  if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
-}
-
-function scheduleMarkdownPreview() {
-  if (previewFrame !== null) cancelAnimationFrame(previewFrame);
-  previewFrame = requestAnimationFrame(() => {
-    previewFrame = null;
-    syncComposerMarkdownPreview();
-  });
-}
-
 export function updateComposerButtons() {
-  const composerTextarea = document.getElementById('composer-textarea');
   const sendBtn = document.getElementById('send-btn');
   const startVoiceBtn = document.getElementById('open-voice-mode-btn');
   const stopGeneratingBtn = document.getElementById('stop-generating-btn');
-
-  scheduleMarkdownPreview();
   if (!sendBtn || !startVoiceBtn || !stopGeneratingBtn) return;
 
   if (runtime.isGenerating) {
@@ -75,7 +35,7 @@ export function updateComposerButtons() {
   }
 
   stopGeneratingBtn.classList.add('hidden');
-  const hasText = composerTextarea ? composerTextarea.value.trim().length > 0 : false;
+  const hasText = !isComposerEmpty();
   const hasAttachments = runtime.attachedFiles.length > 0;
   const shouldShowSend = hasText || hasAttachments || runtime.isRecordingAudio;
 
@@ -202,29 +162,18 @@ export function initToolsMenuListeners() {
   });
 }
 
-export function initComposerListeners(updateSidebarCallback = null) {
-  const composerTextarea = document.getElementById('composer-textarea');
+export async function initComposerListeners(updateSidebarCallback = null) {
   const sendBtn = document.getElementById('send-btn');
+  const editorHost = document.getElementById('composer-editor-host');
+  if (!editorHost) throw new Error('Composer editor host is missing.');
 
   initToolsMenuListeners();
-  ensureMarkdownPreview();
-
-  if (composerTextarea) {
-    composerTextarea.setAttribute('dir', 'auto');
-    composerTextarea.addEventListener('input', () => {
-      composerTextarea.style.height = 'auto';
-      composerTextarea.style.height = `${Math.min(composerTextarea.scrollHeight, 200)}px`;
-      updateComposerButtons();
-    });
-
-    composerTextarea.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage(updateSidebarCallback);
-      }
-    });
-  }
+  await initMarkdownComposer({
+    host: editorHost,
+    onChange: () => updateComposerButtons(),
+    onSubmit: () => sendMessage(updateSidebarCallback)
+  });
 
   sendBtn?.addEventListener('click', () => sendMessage(updateSidebarCallback));
-  syncComposerMarkdownPreview();
+  updateComposerButtons();
 }
