@@ -1,0 +1,202 @@
+/* Single-surface rich Markdown composer. Milkdown/ProseMirror lives inside the existing composer bar. */
+.composer-editor-host {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 34px;
+  max-height: min(200px, 32dvh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: start;
+  scrollbar-width: thin;
+}
+
+.composer-editor-host.is-initializing {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.composer-editor-host .milkdown,
+.composer-editor-host .ProseMirror {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  margin: 0;
+  padding: 6px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: start;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  white-space: break-spaces;
+  -webkit-font-variant-ligatures: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0;
+  caret-color: var(--text-primary);
+}
+
+.composer-editor-host.is-empty .ProseMirror::before {
+  content: "Ask anything";
+  position: absolute;
+  pointer-events: none;
+  color: var(--text-muted);
+  font: inherit;
+}
+
+.composer-editor-host .ProseMirror > :first-child { margin-top: 0; }
+.composer-editor-host .ProseMirror > :last-child { margin-bottom: 0; }
+
+.composer-editor-host .ProseMirror p {
+  margin: 0 0 8px;
+}
+
+.composer-editor-host .ProseMirror h1,
+.composer-editor-host .ProseMirror h2,
+.composer-editor-host .ProseMirror h3,
+.composer-editor-host .ProseMirror h4,
+.composer-editor-host .ProseMirror h5,
+.composer-editor-host .ProseMirror h6 {
+  margin-block: 8px 5px;
+  color: var(--text-primary);
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.composer-editor-host .ProseMirror h1 { font-size: 1.2em; }
+.composer-editor-host .ProseMirror h2 { font-size: 1.13em; }
+.composer-editor-host .ProseMirror h3 { font-size: 1.07em; }
+.composer-editor-host .ProseMirror h4,
+.composer-editor-host .ProseMirror h5,
+.composer-editor-host .ProseMirror h6 { font-size: 1em; }
+
+.composer-editor-host .ProseMirror ul,
+.composer-editor-host .ProseMirror ol {
+  margin-block: 5px 8px;
+  padding-inline-start: 24px;
+}
+
+.composer-editor-host .ProseMirror li {
+  position: relative;
+  margin-block: 2px;
+}
+
+.composer-editor-host .ProseMirror li > p {
+  margin-block: 0;
+}
+
+.composer-editor-host .ProseMirror blockquote {
+  margin-block: 7px;
+  padding-inline-start: 10px;
+  border-inline-start: 2px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.composer-editor-host .ProseMirror code {
+  direction: ltr;
+  unicode-bidi: isolate;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 0.88em;
+}
+
+.composer-editor-host .ProseMirror pre {
+  direction: ltr;
+  unicode-bidi: isolate;
+  max-width: 100%;
+  margin-block: 7px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: #0d1117;
+  white-space: pre;
+}
+
+.composer-editor-host .ProseMirror pre code {
+  padding: 0;
+  background: none;
+  white-space: inherit;
+}
+
+.composer-editor-host .ProseMirror table {
+  display: block;
+  max-width: 100%;
+  margin-block: 7px;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.composer-editor-host .ProseMirror th,
+.composer-editor-host .ProseMirror td {
+  min-width: 64px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-color);
+  text-align: start;
+  vertical-align: top;
+}
+
+.composer-editor-host .ProseMirror th {
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+}
+
+.composer-editor-host .ProseMirror hr {
+  margin-block: 9px;
+  border: 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.composer-editor-host .ProseMirror a {
+  color: var(--accent-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: text;
+}
+
+.composer-editor-host .ProseMirror input[type="checkbox"] {
+  pointer-events: none;
+  margin-inline: 0 6px;
+}
+
+.composer-image-markdown,
+.composer-editor-host .ProseMirror span[data-type="html"] {
+  display: inline;
+  direction: ltr;
+  unicode-bidi: isolate;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-secondary);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 0.86em;
+}
+
+.composer-editor-host .ProseMirror-selectednode {
+  outline: 2px solid rgba(37, 99, 235, 0.75);
+  outline-offset: 2px;
+}
+
+.composer-editor-host .ProseMirror-hideselection *::selection {
+  background: transparent;
+}
+
+.composer-editor-host .ProseMirror-hideselection {
+  caret-color: transparent;
+}
+
+@media (max-width: 767px) {
+  .composer-editor-host {
+    max-height: min(170px, 30dvh);
+    font-size: 16px;
+  }
+}

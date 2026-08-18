@@ -1,0 +1,12 @@
+{
+  "package": "@milkdown/kit",
+  "version": "7.22.0",
+  "license": "MIT",
+  "runtime": "pinned-esm-cdn",
+  "provider": "esm.sh",
+  "bundle": false,
+  "target": "es2022",
+  "reason": "ChatUI has no package/bundler pipeline. The pinned local vendor entry centralizes all Milkdown URLs and uses bundle=false so subpaths share dependency instances.",
+  "source": "https://github.com/Milkdown/milkdown",
+  "documentation": "https://milkdown.dev/docs/guide/using-milkdown-kit"
+}

@@ -11,7 +11,6 @@ function getDOMElements() {
   return {
     emptyState: document.getElementById('empty-state'),
     conversationThread: document.getElementById('conversation-thread'),
-    composerTextarea: document.getElementById('composer-textarea'),
     stopGeneratingBtn: document.getElementById('stop-generating-btn')
   };
 }

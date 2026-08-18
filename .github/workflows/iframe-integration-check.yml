@@ -15,6 +15,8 @@ jobs:
         run: node scripts/verify-integration.mjs
       - name: Verify ChatUI Implementation Plan ID 4
         run: node scripts/verify-chatui-plan4.mjs
+      - name: Verify ChatUI Implementation Plan ID 6
+        run: node scripts/verify-chatui-plan6.mjs
       - name: Verify Todo tool behavior
         run: node scripts/verify-todo-tools.mjs
       - name: Verify Todo selection behavior
@@ -44,6 +46,8 @@ jobs:
           node --check ChatUI/js/chat/markdown.js
           node --check ChatUI/js/chat/streaming.js
           node --check ChatUI/js/composer/composer.js
+          node --check ChatUI/js/composer/markdown-editor.js
+          node --check ChatUI/js/vendor/milkdown-composer.runtime.js
           node --check ChatUI/js/settings/workspace-backup-ui.js
           node --check ChatUI/js/sidebar/search.js
           node --check ChatUI/js/sidebar/sidebar-actions.js
@@ -83,6 +87,13 @@ jobs:
           node --check worker.js
       - name: Build safe runtime bundle
         run: node scripts/build-static.mjs
+      - name: Verify Plan 6 assets reached the safe runtime bundle
+        run: |
+          test -f dist/ChatUI/js/composer/markdown-editor.js
+          test -f dist/ChatUI/js/vendor/milkdown-composer.runtime.js
+          test -f dist/ChatUI/js/vendor/milkdown-composer.LICENSE.txt
+          test -f dist/ChatUI/js/vendor/milkdown-composer.version.json
+          test -f dist/ChatUI/css/chat/composer-editor.css
       - name: Verify local route behavior without browser automation
         run: |
           python server.py --port 8765 > /tmp/combined-server.log 2>&1 &
