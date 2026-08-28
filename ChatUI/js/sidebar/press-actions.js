@@ -4,11 +4,13 @@
 
 export const SIDEBAR_LONG_PRESS_MS = 500;
 export const SIDEBAR_LONG_PRESS_MOVE_PX = 10;
+const SUPPRESS_FOLLOWUP_CLICK_MS = 900;
 
 export function bindSidebarActionPress(target, onOpen) {
   if (!target || typeof onOpen !== 'function') return () => {};
 
   let pressTimer = null;
+  let suppressClickTimer = null;
   let activePointerId = null;
   let startX = 0;
   let startY = 0;
@@ -19,6 +21,18 @@ export function bindSidebarActionPress(target, onOpen) {
     if (pressTimer) window.clearTimeout(pressTimer);
     pressTimer = null;
     activePointerId = null;
+  };
+
+  const clearClickSuppression = () => {
+    if (suppressClickTimer) window.clearTimeout(suppressClickTimer);
+    suppressClickTimer = null;
+    suppressNextClick = false;
+  };
+
+  const armClickSuppression = () => {
+    clearClickSuppression();
+    suppressNextClick = true;
+    suppressClickTimer = window.setTimeout(clearClickSuppression, SUPPRESS_FOLLOWUP_CLICK_MS);
   };
 
   const openMenu = event => {
@@ -34,7 +48,7 @@ export function bindSidebarActionPress(target, onOpen) {
     startY = event.clientY;
     pressTimer = window.setTimeout(() => {
       pressTimer = null;
-      suppressNextClick = true;
+      armClickSuppression();
       openMenu(event);
     }, SIDEBAR_LONG_PRESS_MS);
   };
@@ -52,7 +66,7 @@ export function bindSidebarActionPress(target, onOpen) {
 
   const onClickCapture = event => {
     if (!suppressNextClick) return;
-    suppressNextClick = false;
+    clearClickSuppression();
     event.preventDefault();
     event.stopImmediatePropagation();
   };
@@ -60,7 +74,7 @@ export function bindSidebarActionPress(target, onOpen) {
   const onContextMenu = event => {
     event.preventDefault();
     cancelPress();
-    suppressNextClick = event.pointerType === 'touch';
+    if (event.pointerType === 'touch') armClickSuppression();
     if (Date.now() - lastOpenedAt < 700) return;
     openMenu(event);
   };
@@ -81,6 +95,7 @@ export function bindSidebarActionPress(target, onOpen) {
 
   return () => {
     cancelPress();
+    clearClickSuppression();
     target.removeEventListener('pointerdown', onPointerDown);
     target.removeEventListener('pointermove', onPointerMove);
     target.removeEventListener('pointerup', onPointerEnd);
