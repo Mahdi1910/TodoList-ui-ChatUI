@@ -19,6 +19,7 @@ body { font-family: var(--shell-font); background: var(--shell-bg); color: var(-
 button { font: inherit; }
 
 .shell {
+  position: relative;
   width: 100vw;
   height: 100dvh;
   display: flex;
@@ -171,7 +172,10 @@ button { font: inherit; }
     height: auto;
   }
   .shell-nav {
-    position: fixed;
+    /* Anchor the app rail to the shell layout box, not the shrinking visual
+       viewport. The software keyboard may cover this area, but it must never
+       lift the rail above itself. */
+    position: absolute;
     left: 0;
     right: 0;
     bottom: 0;

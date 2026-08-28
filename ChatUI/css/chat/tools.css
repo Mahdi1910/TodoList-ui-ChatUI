@@ -24,12 +24,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--text-primary);
   cursor: pointer;
   user-select: none;
@@ -49,8 +49,8 @@
 }
 
 .tool-indicator-pill .pill-icon svg {
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
 }
 
 /* Tools Popover Context Menu */
@@ -59,6 +59,7 @@
   bottom: calc(100% + 10px);
   left: 12px;
   width: 280px;
+  max-width: calc(100vw - 24px);
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
@@ -73,10 +74,11 @@
 }
 
 .tools-menu-header {
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 2px 6px 2px 14px;
   border-bottom: 1px solid var(--border-color);
   font-weight: 600;
   font-size: 13px;
@@ -84,29 +86,37 @@
 }
 
 .tools-menu-header .close-btn {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 10px;
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 18px;
+  font-size: 20px;
   cursor: pointer;
   padding: 0;
   line-height: 1;
 }
 
-.tools-menu-header .close-btn:hover {
+.tools-menu-header .close-btn:hover,
+.tools-menu-header .close-btn:focus-visible {
+  background-color: var(--bg-hover);
   color: var(--text-primary);
 }
 
 .tools-menu-body {
-  padding: 6px 0;
+  padding: 4px 0;
 }
 
 .tool-option {
-  min-height: 44px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
+  padding: 2px 8px 2px 14px;
+  cursor: pointer;
+  touch-action: manipulation;
   transition: background-color var(--transition-fast);
 }
 
@@ -119,6 +129,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  pointer-events: none;
 }
 
 .tool-option-info .tool-icon {
@@ -188,4 +199,35 @@
 
 .toggle-switch input:checked + .toggle-slider:before {
   transform: translateX(16px);
+}
+
+/* In the composer popover the visible switch stays compact, but its label gets
+   a full 44px finger target. Right-sidebar switches keep their existing size. */
+.tool-option .toggle-switch {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-option .toggle-slider {
+  position: relative;
+  inset: auto;
+  width: 34px;
+  height: 18px;
+  flex: 0 0 34px;
+}
+
+.tool-option.tool-unavailable {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 767px) {
+  .tool-indicator-pill {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
 }

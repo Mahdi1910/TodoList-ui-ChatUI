@@ -2,12 +2,12 @@
  * sidebar-render.js - Render pinned chats, projects, and independent chats.
  */
 
-import { state, runtime, setRuntime, updateChat } from '../state/store.js';
-import { persistSettings, persistChatMetadata } from '../storage/storage.js';
+import { state, runtime, setRuntime } from '../state/store.js';
+import { persistSettings } from '../storage/storage.js';
 import { loadChat } from '../chat/chat.js';
 import { buildChatHref, isUnmodifiedPrimaryNavigation } from '../router/app-links.js';
-import { createNewChatInProject } from './projects.js';
 import { openChatOptionsMenu, openProjectOptionsMenu } from './sidebar-actions.js';
+import { bindSidebarActionPress } from './press-actions.js';
 import { escapeHtml } from '../utils/dom.js';
 
 function sortChatsNewestFirst(chats) {
@@ -47,14 +47,11 @@ export function renderSidebar() {
         projHeader.setAttribute('role', 'button');
         projHeader.setAttribute('tabindex', '0');
         projHeader.setAttribute('aria-expanded', String(!isCollapsed));
+        projHeader.setAttribute('aria-label', `${project.name}. Press and hold or open the context menu for project actions.`);
         projHeader.innerHTML = `
           <i data-lucide="chevron-down" class="project-collapse-icon"></i>
           <i data-lucide="folder"></i>
-          <span class="chat-item-title">${escapeHtml(project.name)}</span>
-          <div class="chat-item-actions" aria-label="Project actions">
-            <button class="chat-action-btn add-chat-to-proj-btn" title="New chat in project" aria-label="New chat in ${escapeHtml(project.name)}"><i data-lucide="plus"></i></button>
-            <button class="chat-action-btn proj-options-btn" title="Project options" aria-label="Project options for ${escapeHtml(project.name)}"><i data-lucide="more-horizontal"></i></button>
-          </div>`;
+          <span class="chat-item-title">${escapeHtml(project.name)}</span>`;
 
         const toggleProject = async () => {
           const previousCollapsedProjectIds = new Set(runtime.collapsedProjectIds);
@@ -73,23 +70,14 @@ export function renderSidebar() {
           }
         };
 
+        bindSidebarActionPress(projHeader, () => openProjectOptionsMenu(projHeader, project, renderSidebar));
+
         projHeader.addEventListener('click', toggleProject);
         projHeader.addEventListener('keydown', event => {
-          if (event.target?.closest?.('.chat-item-actions')) return;
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             toggleProject();
           }
-        });
-
-        projHeader.querySelector('.add-chat-to-proj-btn')?.addEventListener('click', e => {
-          e.stopPropagation();
-          createNewChatInProject(project.id, renderSidebar);
-        });
-
-        projHeader.querySelector('.proj-options-btn')?.addEventListener('click', e => {
-          e.stopPropagation();
-          openProjectOptionsMenu(e, project, renderSidebar);
         });
 
         li.appendChild(projHeader);
@@ -124,6 +112,7 @@ function createChatItemNode(chat) {
   const link = document.createElement('a');
   link.className = 'chat-item-link';
   link.href = buildChatHref(chat.id);
+  link.setAttribute('aria-label', `${chat.title}. Press and hold or open the context menu for chat actions.`);
   if (active) link.setAttribute('aria-current', 'page');
 
   const icon = document.createElement('i');
@@ -142,38 +131,14 @@ function createChatItemNode(chat) {
     link.appendChild(indicator);
   }
 
+  bindSidebarActionPress(link, () => openChatOptionsMenu(link, chat, renderSidebar));
+
   link.addEventListener('click', event => {
     if (!isUnmodifiedPrimaryNavigation(event)) return;
     event.preventDefault();
     void loadChat(chat.id, renderSidebar, { historyMode: 'push' });
   });
 
-  const actions = document.createElement('div');
-  actions.className = 'chat-item-actions';
-  actions.setAttribute('aria-label', 'Chat actions');
-  actions.innerHTML = `
-    <button class="chat-action-btn pin-chat-btn" title="${chat.pinned ? 'Unpin chat' : 'Pin chat'}" aria-label="${chat.pinned ? 'Unpin chat' : 'Pin chat'}"><i data-lucide="pin"></i></button>
-    <button class="chat-action-btn chat-options-btn" title="Chat options" aria-label="Chat options"><i data-lucide="more-horizontal"></i></button>`;
-
-  actions.querySelector('.pin-chat-btn')?.addEventListener('click', async event => {
-    event.stopPropagation();
-    const previousPinned = chat.pinned;
-    const updatedChat = updateChat(chat.id, current => ({ ...current, pinned: !current.pinned, updatedAt: Date.now() }));
-    try {
-      await persistChatMetadata(updatedChat);
-    } catch (err) {
-      updateChat(chat.id, current => ({ ...current, pinned: previousPinned }));
-      console.error('Failed to save pin state:', err);
-      alert('Failed to save pin state: ' + err.message);
-      return;
-    }
-    renderSidebar();
-  });
-
-  actions.querySelector('.chat-options-btn')?.addEventListener('click', e => {
-    openChatOptionsMenu(e, chat, renderSidebar);
-  });
-
-  li.append(link, actions);
+  li.append(link);
   return li;
 }
