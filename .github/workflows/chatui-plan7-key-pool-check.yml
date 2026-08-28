@@ -1,0 +1,33 @@
+name: ChatUI Plan 7 Key Pool Check
+
+on:
+  pull_request:
+    paths:
+      - 'ChatUI/**'
+      - 'scripts/verify-chatui-plan7.mjs'
+      - '.github/workflows/chatui-plan7-key-pool-check.yml'
+      - 'implementation plan/Implementation Plan ID 7.md'
+
+jobs:
+  verify-key-pool:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check ChatUI/js/api/text-api-key-pool.js
+          node --check ChatUI/js/api/api-config.js
+          node --check ChatUI/js/api/gemini-file-recovery-wrapper.js
+          node --check ChatUI/js/storage/load.js
+          node --check scripts/verify-chatui-plan7.mjs
+      - name: Verify Plan 7 invariants
+        run: node scripts/verify-chatui-plan7.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify key-pool assets reached runtime bundle
+        run: |
+          test -f dist/ChatUI/js/api/text-api-key-pool.js
+          test -f dist/ChatUI/css/components/api-key-pool.css
