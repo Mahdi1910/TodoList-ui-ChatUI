@@ -76,6 +76,15 @@ function observeAppearance(getState) {
   window.addEventListener('workspace:theme-changed', report);
 }
 
+function applyShellViewportInsets(payload = {}) {
+  const rawBottom = Number(payload.keyboardOcclusionBottom);
+  const keyboardOcclusionBottom = Number.isFinite(rawBottom)
+    ? Math.max(0, Math.min(2000, Math.round(rawBottom)))
+    : 0;
+  document.documentElement.style.setProperty('--shell-keyboard-occlusion-bottom', `${keyboardOcclusionBottom}px`);
+  document.documentElement.dataset.shellKeyboardOpen = keyboardOcclusionBottom > 0 ? 'true' : 'false';
+}
+
 function isEmbeddedSafe() {
   return IS_EMBEDDED && window.parent !== window;
 }
@@ -88,6 +97,7 @@ export function initChatEmbeddedBridge({ navigateChat, navigateWorkspace, openSe
   installExternalLinkPolicy();
   observeTitle();
   observeAppearance(getState);
+  applyShellViewportInsets();
 
   window.addEventListener('message', async event => {
     if (!validShellMessage(event)) return;
@@ -129,6 +139,9 @@ export function initChatEmbeddedBridge({ navigateChat, navigateWorkspace, openSe
         case 'shell:request-appearance':
           postToShell('app:appearance', getAppearance(getState()));
           break;
+        case 'shell:viewport-insets':
+          applyShellViewportInsets(payload);
+          break;
         case 'shell:active':
           document.documentElement.dataset.shellActive = 'true';
           break;
@@ -152,7 +165,7 @@ export function initChatEmbeddedBridge({ navigateChat, navigateWorkspace, openSe
     currentChatId: state?.activeChatId || null,
     title: document.title || 'ChatUI',
     appearance: getAppearance(state),
-    capabilities: ['navigate-chat', 'navigate-workspace', 'open-settings', 'appearance', 'persistent-media']
+    capabilities: ['navigate-chat', 'navigate-workspace', 'open-settings', 'appearance', 'persistent-media', 'viewport-insets']
   });
   return true;
 }
