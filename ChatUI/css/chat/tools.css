@@ -102,10 +102,11 @@
 }
 
 .tool-option {
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 8px 14px;
   transition: background-color var(--transition-fast);
 }
 
@@ -114,6 +115,7 @@
 }
 
 .tool-option-info {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -123,22 +125,22 @@
   width: 16px;
   height: 16px;
   color: var(--text-primary);
+  flex-shrink: 0;
 }
 
 .tool-label-group {
+  min-width: 0;
   display: flex;
-  flex-direction: column;
+  align-items: center;
 }
 
 .tool-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
-}
-
-.tool-desc {
-  font-size: 11px;
-  color: var(--text-muted);
 }
 
 /* Toggle Switch Slider */
