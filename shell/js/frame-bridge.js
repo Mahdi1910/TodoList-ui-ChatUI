@@ -71,6 +71,10 @@ export function createFrameBridge(frameManager, callbacks = {}) {
     send(app, 'shell:request-appearance', {});
   }
 
+  function setViewportInsets(app, payload = {}) {
+    send(app, 'shell:viewport-insets', payload);
+  }
+
   function openSettings(app) {
     const requestId = safeRequestId('settings');
     send(app, 'shell:open-settings', { requestId });
@@ -179,5 +183,5 @@ export function createFrameBridge(frameManager, callbacks = {}) {
     }
   });
 
-  return { navigateChat, navigateChatRoute, setActive, requestAppearance, openSettings };
+  return { navigateChat, navigateChatRoute, setActive, requestAppearance, setViewportInsets, openSettings };
 }
