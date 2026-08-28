@@ -33,12 +33,47 @@
   .conversation-thread { gap: 20px; }
 
   .composer-container {
-    width: 100%; max-width: 100%; flex-shrink: 0;
+    width: 100%;
+    max-width: 100%;
+    flex-shrink: 0;
     padding: 0 8px max(8px, env(safe-area-inset-bottom));
   }
+
   .composer-bar {
-    width: 100%; min-width: 0; border-radius: 20px; padding: 7px 9px;
+    width: 100%;
+    min-width: 0;
+    min-height: 62px;
+    grid-template-columns: 44px 44px auto minmax(0, 1fr) 44px 44px;
+    border-radius: 31px;
+    padding: 8px;
+    column-gap: 2px;
   }
+
+  .composer-bar.composer-has-text {
+    grid-template-columns: 44px 44px minmax(0, 1fr) 44px 44px;
+    grid-template-rows: minmax(0, auto) 44px;
+    padding: 10px 8px 8px;
+    border-radius: 28px;
+    row-gap: 6px;
+  }
+
+  .composer-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .composer-btn svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .attach-btn svg { width: 23px; height: 23px; }
+  .tools-btn svg { width: 22px; height: 22px; }
+
+  .composer-bar:not(.composer-has-text) .active-tools-indicators {
+    max-width: 84px;
+  }
+
   .composer-editor-host,
   .composer-editor-host .milkdown,
   .composer-editor-host .ProseMirror {
