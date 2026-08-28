@@ -33,6 +33,9 @@
   padding: 6px 8px;
   border-radius: 6px;
   cursor: pointer;
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+  user-select: none;
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
@@ -81,6 +84,9 @@
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .chat-item-link > svg,
@@ -150,47 +156,6 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* Row actions live in a dedicated right-side zone instead of hugging the title. */
-.chat-item-actions {
-  display: none;
-  flex: 0 0 auto;
-  margin-left: auto;
-  margin-right: 4px;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-}
-
-.chat-item:hover > .chat-item-actions,
-.chat-item:focus-within > .chat-item-actions,
-.project-header-item:hover .chat-item-actions,
-.project-header-item:focus-within .chat-item-actions {
-  display: flex;
-}
-
-.chat-action-btn {
-  width: 26px;
-  height: 26px;
-  border-radius: 5px;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  transition: color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.chat-action-btn:hover,
-.chat-action-btn:focus-visible {
-  color: var(--text-primary);
-  background-color: var(--bg-tertiary);
-}
-
-.chat-action-btn:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.32);
-  outline-offset: -1px;
-}
-
 .chat-item:hover,
 .chat-item.active {
   background-color: var(--bg-hover);
@@ -200,24 +165,13 @@
 .chat-item.active { font-weight: 500; }
 .project-item.active > .project-header-item { color: var(--text-primary); }
 
-/* Touch devices cannot depend on hover. Keep row actions directly tappable. */
 @media (hover: none), (pointer: coarse) {
-  .chat-item > .chat-item-actions,
-  .project-header-item .chat-item-actions {
-    display: flex;
-  }
-
-  .chat-action-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 7px;
-  }
-
+  .project-header-item,
   .chat-item-link {
-    padding-right: 4px;
+    min-height: 40px;
   }
 
-  .project-header-item {
-    padding-right: 4px;
+  .action-menu-item {
+    min-height: 44px;
   }
 }
