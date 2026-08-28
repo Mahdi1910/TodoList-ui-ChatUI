@@ -129,7 +129,16 @@ export function initRightSidebarUI(updateSidebarCallback = null) {
     captureSelectedReadText();
     const chat = currentChat();
     const selectedText = getSelectedReadText();
-    openActionMenu(optionsBtn, [
+    const items = [];
+
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      items.push(
+        { label: 'Controls', icon: 'panel-right', onSelect: openRightSidebar },
+        { type: 'separator' }
+      );
+    }
+
+    items.push(
       { label: 'Rename Chat', icon: 'pencil', disabled: !chat, onSelect: handleRename },
       { label: 'Export Chat', icon: 'download', disabled: !chat, onSelect: handleExport },
       { label: 'Clear Messages', icon: 'eraser', disabled: !chat, onSelect: handleClear },
@@ -140,7 +149,9 @@ export function initRightSidebarUI(updateSidebarCallback = null) {
         onSelect: () => readSelectedText(selectedText)
       },
       { label: 'Delete Chat', icon: 'trash-2', danger: true, disabled: !chat, onSelect: handleDelete }
-    ]);
+    );
+
+    openActionMenu(optionsBtn, items);
   });
 
   clearBtn?.addEventListener('click', handleClear);
