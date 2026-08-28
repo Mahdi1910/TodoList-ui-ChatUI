@@ -9,27 +9,26 @@ const responsiveCss = fs.readFileSync('ChatUI/css/responsive.css', 'utf8');
 const mainChatHtml = fs.readFileSync('ChatUI/html/main-chat.html', 'utf8');
 const apiConfig = fs.readFileSync('ChatUI/js/api/api-config.js', 'utf8');
 
-assert.match(
-  composerJs,
-  /classList\.toggle\('composer-has-text',\s*Boolean\(hasText\)\)/,
-  'composer state must toggle the adaptive text-layout class'
-);
-assert.match(
-  composerJs,
-  /const hasText = !isComposerEmpty\(\);[\s\S]*syncComposerLayoutState\(hasText\);/,
-  'layout state must follow the actual editor contents'
-);
-
 assert.match(composerCss, /\.composer-bar\s*\{[\s\S]*display:\s*grid;/, 'composer bar must use CSS grid');
 assert.match(
   composerCss,
-  /grid-template-areas:\s*"attach tools indicators editor record primary"/,
-  'empty composer must keep controls and placeholder on one horizontal row'
+  /grid-template-rows:\s*minmax\(56px,\s*auto\) 40px;/,
+  'desktop composer must always reserve a text row above the controls row'
 );
 assert.match(
   composerCss,
-  /\.composer-bar\.composer-has-text\s*\{[\s\S]*grid-template-areas:[\s\S]*"editor editor editor editor editor"[\s\S]*"attach tools indicators record primary"/,
-  'text composer must place the editor above a stable action row'
+  /grid-template-areas:[\s\S]*"editor editor editor editor editor"[\s\S]*"attach tools indicators record primary"/,
+  'editor must always occupy the top row and controls must always occupy the bottom row'
+);
+assert.doesNotMatch(
+  composerCss,
+  /grid-template-areas:\s*"attach tools indicators editor record primary"/,
+  'empty composer must never place placeholder/editor between bottom controls'
+);
+assert.doesNotMatch(
+  composerCss,
+  /\.composer-bar\.composer-has-text\s*\{[\s\S]*grid-template-(?:areas|rows|columns):/,
+  'two-row geometry must not depend on whether text is present'
 );
 assert.doesNotMatch(
   composerCss,
@@ -38,29 +37,30 @@ assert.doesNotMatch(
 );
 assert.match(composerCss, /\.composer-btn\s*\{[\s\S]*width:\s*40px;[\s\S]*height:\s*40px;/, 'desktop composer controls must have consistent hit targets');
 
+assert.match(composerEditorCss, /min-height:\s*56px;/, 'desktop editor must keep a dedicated top-row height when empty');
 assert.match(composerEditorCss, /max-height:\s*min\(280px,\s*38dvh\)/, 'desktop editor must have a bounded multiline height');
 assert.match(composerEditorCss, /overflow-y:\s*auto;/, 'long prompts must scroll inside the editor after the height cap');
-assert.match(
+assert.doesNotMatch(
   composerEditorCss,
-  /\.composer-bar:not\(\.composer-has-text\) \.composer-editor-host\s*\{[\s\S]*max-height:\s*40px;/,
-  'empty desktop composer must remain compact'
+  /\.composer-bar:not\(\.composer-has-text\) \.composer-editor-host/,
+  'empty editor must not collapse into the controls row'
 );
 assert.match(composerEditorCss, /position:\s*relative;/, 'placeholder positioning must be anchored to the ProseMirror surface');
 
 assert.match(
   responsiveCss,
-  /\.composer-bar\s*\{[\s\S]*grid-template-columns:\s*44px 44px auto minmax\(0, 1fr\) 44px 44px;/,
-  'mobile empty composer must keep touch controls aligned on one row'
+  /\.composer-bar\s*\{[\s\S]*grid-template-columns:\s*44px 44px minmax\(0, 1fr\) 44px 44px;[\s\S]*grid-template-rows:\s*minmax\(64px,\s*auto\) 44px;/,
+  'mobile composer must always keep a dedicated top editor row and fixed bottom controls row'
 );
 assert.match(
   responsiveCss,
-  /\.composer-bar\.composer-has-text\s*\{[\s\S]*grid-template-rows:\s*minmax\(0, auto\) 44px;/,
-  'mobile text composer must anchor controls in a fixed-height bottom row'
+  /grid-template-areas:[\s\S]*"editor editor editor editor editor"[\s\S]*"attach tools indicators record primary"/,
+  'mobile editor and controls must remain in separate rows'
 );
 assert.match(
   composerEditorCss,
-  /@media \(max-width: 767px\)[\s\S]*max-height:\s*min\(340px,\s*42dvh\);[\s\S]*font-size:\s*16px;/,
-  'mobile editor must grow comfortably while preserving the anti-zoom 16px font'
+  /@media \(max-width: 767px\)[\s\S]*min-height:\s*64px;[\s\S]*max-height:\s*min\(340px,\s*42dvh\);[\s\S]*font-size:\s*16px;/,
+  'mobile editor must keep a dedicated empty height, bounded growth, and anti-zoom 16px font'
 );
 
 for (const id of [
@@ -76,10 +76,15 @@ for (const id of [
 }
 
 assert.match(
+  composerJs,
+  /const hasText = !isComposerEmpty\(\);/,
+  'existing text-aware Send/Voice behavior must remain intact'
+);
+assert.match(
   markdownEditorJs,
   /function handleComposerKeyDown\([\s\S]*event\.key !== 'Enter'[\s\S]*requestSubmit\(\)/,
   'existing keyboard submit behavior must remain intact'
 );
-assert.match(apiConfig, /CHATUI_VERSION = '1\.4'/, 'ChatUI Settings version must be 1.4');
+assert.match(apiConfig, /CHATUI_VERSION = '1\.5'/, 'ChatUI Settings version must be 1.5');
 
-console.log('ChatUI Plan 8 adaptive composer verification passed.');
+console.log('ChatUI Plan 8 two-part composer verification passed.');
