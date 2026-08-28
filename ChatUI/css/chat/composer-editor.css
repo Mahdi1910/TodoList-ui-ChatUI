@@ -1,9 +1,10 @@
-/* Single-surface rich Markdown composer. Milkdown/ProseMirror lives inside the existing composer bar. */
+/* Single-surface rich Markdown composer. Milkdown/ProseMirror lives inside the adaptive composer bar. */
 .composer-editor-host {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 34px;
-  max-height: min(200px, 32dvh);
+  min-height: 40px;
+  max-height: min(280px, 38dvh);
+  padding-inline: 2px;
   overflow-y: auto;
   overflow-x: hidden;
   color: var(--text-primary);
@@ -11,6 +12,14 @@
   line-height: 1.5;
   text-align: start;
   scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+
+.composer-bar:not(.composer-has-text) .composer-editor-host {
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  overflow-y: hidden;
 }
 
 .composer-editor-host.is-initializing {
@@ -22,9 +31,9 @@
 .composer-editor-host .ProseMirror {
   width: 100%;
   min-width: 0;
-  min-height: 34px;
+  min-height: 40px;
   margin: 0;
-  padding: 6px 0;
+  padding: 8px 4px;
   border: 0;
   outline: 0;
   background: transparent;
@@ -42,12 +51,28 @@
   caret-color: var(--text-primary);
 }
 
+.composer-editor-host .ProseMirror {
+  position: relative;
+}
+
+.composer-bar.composer-has-text .composer-editor-host .milkdown,
+.composer-bar.composer-has-text .composer-editor-host .ProseMirror {
+  min-height: 30px;
+}
+
+.composer-bar.composer-has-text .composer-editor-host .ProseMirror {
+  padding: 4px 4px 2px;
+}
+
 .composer-editor-host.is-empty .ProseMirror::before {
   content: "Ask anything";
   position: absolute;
+  top: 8px;
+  inset-inline-start: 4px;
   pointer-events: none;
   color: var(--text-muted);
   font: inherit;
+  line-height: inherit;
 }
 
 .composer-editor-host .ProseMirror > :first-child { margin-top: 0; }
@@ -196,7 +221,35 @@
 
 @media (max-width: 767px) {
   .composer-editor-host {
-    max-height: min(170px, 30dvh);
+    max-height: min(340px, 42dvh);
     font-size: 16px;
+  }
+
+  .composer-bar:not(.composer-has-text) .composer-editor-host {
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+  }
+
+  .composer-editor-host .milkdown,
+  .composer-editor-host .ProseMirror {
+    min-height: 44px;
+  }
+
+  .composer-editor-host .ProseMirror {
+    padding: 10px 4px;
+  }
+
+  .composer-bar.composer-has-text .composer-editor-host .milkdown,
+  .composer-bar.composer-has-text .composer-editor-host .ProseMirror {
+    min-height: 32px;
+  }
+
+  .composer-bar.composer-has-text .composer-editor-host .ProseMirror {
+    padding: 4px 4px 2px;
+  }
+
+  .composer-editor-host.is-empty .ProseMirror::before {
+    top: 10px;
   }
 }
