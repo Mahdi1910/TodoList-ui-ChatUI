@@ -12,9 +12,10 @@ import {
   textApiKeyPoolText,
   validateTextApiKeyPool
 } from './text-api-key-pool.js';
+import { normalizeMultilineApiKeyText } from './text-api-key-input.js';
 
 export const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
-export const CHATUI_VERSION = '1.1';
+export const CHATUI_VERSION = '1.2';
 
 let validationTimer = null;
 let validationController = null;
@@ -43,7 +44,7 @@ export async function saveApiSettings(settings) {
   }
 
   const textInput = document.getElementById('text-api-key-input');
-  if (textInput) setTextApiKeyPoolFromText(textInput.value);
+  if (textInput) setTextApiKeyPoolFromText(normalizeMultilineApiKeyText(textInput.value));
   const values = {
     textBaseUrl: document.getElementById('text-base-url-input')?.value.trim(),
     voiceApiKey: document.getElementById('voice-api-key-input')?.value.trim(),
@@ -56,22 +57,59 @@ export async function saveApiSettings(settings) {
   await persistSettings();
 }
 
+function configureMultilineTextKeyInput(textarea) {
+  textarea.classList.add('api-key-pool-input');
+  textarea.placeholder = 'One Gemini Text API Key per line';
+  textarea.rows = 6;
+  textarea.wrap = 'off';
+  textarea.setAttribute('autocomplete', 'off');
+  textarea.setAttribute('autocapitalize', 'off');
+  textarea.setAttribute('autocorrect', 'off');
+  textarea.setAttribute('spellcheck', 'false');
+  textarea.setAttribute('inputmode', 'text');
+  textarea.setAttribute('aria-label', 'Gemini text API keys, one per line');
+  return textarea;
+}
+
 function ensureMultilineTextKeyInput() {
   const existing = document.getElementById('text-api-key-input');
   if (!existing) return null;
-  if (existing.tagName === 'TEXTAREA') return existing;
+  if (existing.tagName === 'TEXTAREA') return configureMultilineTextKeyInput(existing);
 
   const textarea = document.createElement('textarea');
   textarea.id = existing.id;
-  textarea.className = `${existing.className} api-key-pool-input`;
-  textarea.placeholder = 'One Gemini Text API Key per line';
-  textarea.rows = 6;
-  textarea.setAttribute('autocomplete', 'off');
-  textarea.setAttribute('autocapitalize', 'off');
-  textarea.setAttribute('spellcheck', 'false');
-  textarea.setAttribute('aria-label', 'Gemini text API keys, one per line');
+  textarea.className = existing.className;
   existing.replaceWith(textarea);
-  return textarea;
+  return configureMultilineTextKeyInput(textarea);
+}
+
+function normalizeTextareaLineBreaks(input) {
+  const rawValue = input.value;
+  const normalizedValue = normalizeMultilineApiKeyText(rawValue);
+  if (rawValue === normalizedValue) return normalizedValue;
+
+  const selectionStart = Number.isInteger(input.selectionStart) ? input.selectionStart : rawValue.length;
+  const selectionEnd = Number.isInteger(input.selectionEnd) ? input.selectionEnd : selectionStart;
+  const normalizedStart = normalizeMultilineApiKeyText(rawValue.slice(0, selectionStart)).length;
+  const normalizedEnd = normalizeMultilineApiKeyText(rawValue.slice(0, selectionEnd)).length;
+  input.value = normalizedValue;
+  try { input.setSelectionRange(normalizedStart, normalizedEnd); } catch (_) {}
+  return normalizedValue;
+}
+
+function insertNormalizedClipboardText(input, event) {
+  const clipboard = event.clipboardData;
+  if (!clipboard || typeof clipboard.getData !== 'function') return false;
+  const pastedText = clipboard.getData('text/plain');
+  if (typeof pastedText !== 'string') return false;
+
+  event.preventDefault();
+  const normalizedText = normalizeMultilineApiKeyText(pastedText);
+  const start = Number.isInteger(input.selectionStart) ? input.selectionStart : input.value.length;
+  const end = Number.isInteger(input.selectionEnd) ? input.selectionEnd : start;
+  input.setRangeText(normalizedText, start, end, 'end');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
 }
 
 function ensureKeyPoolStatusUI(input) {
@@ -182,7 +220,8 @@ async function validateCurrentPool() {
 function schedulePoolSaveAndValidation(input) {
   window.clearTimeout(validationTimer);
   validationTimer = window.setTimeout(async () => {
-    const cleanedApi = setTextApiKeyPoolFromText(input.value);
+    const normalizedText = normalizeTextareaLineBreaks(input);
+    const cleanedApi = setTextApiKeyPoolFromText(normalizedText);
     input.value = (cleanedApi.textApiKeys || []).map(entry => entry.key).join('\n');
     try {
       await persistSettings();
@@ -248,7 +287,13 @@ export function initApiSettingsUI() {
   };
 
   if (textApiKeyInput) {
-    textApiKeyInput.addEventListener('input', () => schedulePoolSaveAndValidation(textApiKeyInput));
+    textApiKeyInput.addEventListener('paste', event => {
+      insertNormalizedClipboardText(textApiKeyInput, event);
+    });
+    textApiKeyInput.addEventListener('input', () => {
+      normalizeTextareaLineBreaks(textApiKeyInput);
+      schedulePoolSaveAndValidation(textApiKeyInput);
+    });
     textApiKeyInput.addEventListener('change', () => schedulePoolSaveAndValidation(textApiKeyInput));
   }
   if (textBaseUrlInput) textBaseUrlInput.addEventListener('change', async () => {
