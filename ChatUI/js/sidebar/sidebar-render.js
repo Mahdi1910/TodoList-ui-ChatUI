@@ -51,9 +51,9 @@ export function renderSidebar() {
           <i data-lucide="chevron-down" class="project-collapse-icon"></i>
           <i data-lucide="folder"></i>
           <span class="chat-item-title">${escapeHtml(project.name)}</span>
-          <div class="chat-item-actions">
-            <button class="chat-action-btn add-chat-to-proj-btn" title="New chat in project"><i data-lucide="plus"></i></button>
-            <button class="chat-action-btn proj-options-btn" title="Project options"><i data-lucide="more-horizontal"></i></button>
+          <div class="chat-item-actions" aria-label="Project actions">
+            <button class="chat-action-btn add-chat-to-proj-btn" title="New chat in project" aria-label="New chat in ${escapeHtml(project.name)}"><i data-lucide="plus"></i></button>
+            <button class="chat-action-btn proj-options-btn" title="Project options" aria-label="Project options for ${escapeHtml(project.name)}"><i data-lucide="more-horizontal"></i></button>
           </div>`;
 
         const toggleProject = async () => {
@@ -75,6 +75,7 @@ export function renderSidebar() {
 
         projHeader.addEventListener('click', toggleProject);
         projHeader.addEventListener('keydown', event => {
+          if (event.target?.closest?.('.chat-item-actions')) return;
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             toggleProject();
@@ -149,11 +150,13 @@ function createChatItemNode(chat) {
 
   const actions = document.createElement('div');
   actions.className = 'chat-item-actions';
+  actions.setAttribute('aria-label', 'Chat actions');
   actions.innerHTML = `
     <button class="chat-action-btn pin-chat-btn" title="${chat.pinned ? 'Unpin chat' : 'Pin chat'}" aria-label="${chat.pinned ? 'Unpin chat' : 'Pin chat'}"><i data-lucide="pin"></i></button>
     <button class="chat-action-btn chat-options-btn" title="Chat options" aria-label="Chat options"><i data-lucide="more-horizontal"></i></button>`;
 
-  actions.querySelector('.pin-chat-btn')?.addEventListener('click', async () => {
+  actions.querySelector('.pin-chat-btn')?.addEventListener('click', async event => {
+    event.stopPropagation();
     const previousPinned = chat.pinned;
     const updatedChat = updateChat(chat.id, current => ({ ...current, pinned: !current.pinned, updatedAt: Date.now() }));
     try {
