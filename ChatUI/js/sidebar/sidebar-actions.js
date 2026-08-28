@@ -16,10 +16,15 @@ import {
 
 export { closeActionMenu };
 
-export function openChatOptionsMenu(event, chat, updateSidebarCallback = null) {
-  event?.stopPropagation?.();
-  if (!chat || !event?.currentTarget) return;
-  openActionMenu(event.currentTarget, [
+function actionAnchor(source) {
+  source?.stopPropagation?.();
+  return source?.currentTarget || source || null;
+}
+
+export function openChatOptionsMenu(source, chat, updateSidebarCallback = null) {
+  const anchor = actionAnchor(source);
+  if (!chat || !anchor) return;
+  openActionMenu(anchor, [
     {
       label: chat.pinned ? 'Unpin Chat' : 'Pin Chat', icon: 'pin',
       onSelect: async () => {
@@ -48,10 +53,10 @@ export function openChatOptionsMenu(event, chat, updateSidebarCallback = null) {
   ]);
 }
 
-export function openProjectOptionsMenu(event, project, updateSidebarCallback = null) {
-  event?.stopPropagation?.();
-  if (!project || !event?.currentTarget) return;
-  openActionMenu(event.currentTarget, [
+export function openProjectOptionsMenu(source, project, updateSidebarCallback = null) {
+  const anchor = actionAnchor(source);
+  if (!project || !anchor) return;
+  openActionMenu(anchor, [
     {
       label: 'Create Chat Inside', icon: 'plus',
       onSelect: () => createNewChatInProject(project.id, updateSidebarCallback)
