@@ -19,6 +19,7 @@ jobs:
       - name: Check changed JavaScript syntax
         run: |
           node --check ChatUI/js/api/text-api-key-pool.js
+          node --check ChatUI/js/api/text-api-key-input.js
           node --check ChatUI/js/api/api-config.js
           node --check ChatUI/js/api/gemini-file-recovery-wrapper.js
           node --check ChatUI/js/storage/load.js
@@ -30,4 +31,5 @@ jobs:
       - name: Verify key-pool assets reached runtime bundle
         run: |
           test -f dist/ChatUI/js/api/text-api-key-pool.js
+          test -f dist/ChatUI/js/api/text-api-key-input.js
           test -f dist/ChatUI/css/components/api-key-pool.css
