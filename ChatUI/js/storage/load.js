@@ -259,6 +259,10 @@ export async function loadState(options = {}) {
       },
       api: {
         textApiKey: settings.api?.textApiKey || '',
+        textApiKeys: Array.isArray(settings.api?.textApiKeys) ? settings.api.textApiKeys : [],
+        textApiKeyIndex: Number.isInteger(Number(settings.api?.textApiKeyIndex))
+          ? Number(settings.api.textApiKeyIndex)
+          : 0,
         textBaseUrl: settings.api?.textBaseUrl || '',
         voiceApiKey: settings.api?.voiceApiKey || '',
         voiceBaseUrl: settings.api?.voiceBaseUrl || ''
