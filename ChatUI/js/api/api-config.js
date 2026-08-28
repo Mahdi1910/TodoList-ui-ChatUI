@@ -100,8 +100,8 @@ function normalizeTextareaLineBreaks(input) {
 function insertNormalizedClipboardText(input, event) {
   const clipboard = event.clipboardData;
   if (!clipboard || typeof clipboard.getData !== 'function') return false;
-  const pastedText = clipboard.getData('text/plain');
-  if (typeof pastedText !== 'string') return false;
+  const pastedText = clipboard.getData('text/plain') || clipboard.getData('text');
+  if (typeof pastedText !== 'string' || pastedText.length === 0) return false;
 
   event.preventDefault();
   const normalizedText = normalizeMultilineApiKeyText(pastedText);
