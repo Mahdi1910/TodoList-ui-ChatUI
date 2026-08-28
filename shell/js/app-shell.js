@@ -7,11 +7,14 @@ const navChat = document.getElementById('shell-nav-chat');
 const settingsButton = document.getElementById('shell-open-settings');
 const chatStatus = document.getElementById('shell-chat-status');
 const toast = document.getElementById('shell-toast');
+const shellStage = document.getElementById('shell-stage');
 
 let activeApp = 'todo';
 const appearances = new Map();
 const titles = new Map([['todo', 'To-Do'], ['chat', 'ChatUI']]);
 let toastTimer = null;
+let viewportSyncFrame = 0;
+let lastChatKeyboardOcclusion = -1;
 
 function showToast(message) {
   if (!toast) return;
@@ -80,6 +83,7 @@ const bridge = createFrameBridge(frameManager, {
         const lastPath = router.rememberChatFromReady(payload.currentChatId || null);
         bridge.navigateChatRoute(parseShellRoute(lastPath), 'ready-sync');
       }
+      syncChatViewportInsets(true);
     }
 
     if (app === activeApp) {
@@ -114,6 +118,33 @@ const bridge = createFrameBridge(frameManager, {
   }
 });
 
+function getChatKeyboardOcclusion() {
+  if (!window.matchMedia('(max-width: 768px)').matches || !shellStage) return 0;
+  const viewport = window.visualViewport;
+  if (!viewport) return 0;
+  const stageBottom = shellStage.getBoundingClientRect().bottom;
+  const visibleBottom = viewport.offsetTop + viewport.height;
+  const occlusion = Math.max(0, stageBottom - visibleBottom);
+  // Ignore small browser-chrome/rounding changes. A software keyboard creates a
+  // much larger occlusion and should move ChatUI's composer, not the shell rail.
+  return occlusion >= 80 ? Math.round(occlusion) : 0;
+}
+
+function syncChatViewportInsets(force = false) {
+  const keyboardOcclusionBottom = getChatKeyboardOcclusion();
+  if (!force && keyboardOcclusionBottom === lastChatKeyboardOcclusion) return;
+  lastChatKeyboardOcclusion = keyboardOcclusionBottom;
+  bridge.setViewportInsets('chat', { keyboardOcclusionBottom });
+}
+
+function scheduleChatViewportSync() {
+  if (viewportSyncFrame) return;
+  viewportSyncFrame = window.requestAnimationFrame(() => {
+    viewportSyncFrame = 0;
+    syncChatViewportInsets();
+  });
+}
+
 function activateRoute(route, meta = {}) {
   const previousApp = activeApp;
   activeApp = route.app;
@@ -137,6 +168,7 @@ function activateRoute(route, meta = {}) {
   if (route.app === 'chat' && meta.source !== 'child') {
     bridge.navigateChatRoute(route, meta.source || 'shell');
   }
+  scheduleChatViewportSync();
 }
 
 router = createShellRouter(activateRoute);
@@ -151,5 +183,11 @@ settingsButton?.addEventListener('click', () => {
   bridge.openSettings(activeApp);
 });
 
+window.visualViewport?.addEventListener('resize', scheduleChatViewportSync);
+window.visualViewport?.addEventListener('scroll', scheduleChatViewportSync);
+window.addEventListener('resize', scheduleChatViewportSync);
+window.addEventListener('orientationchange', scheduleChatViewportSync);
+
 router.start();
 frameManager.startAll();
+scheduleChatViewportSync();
