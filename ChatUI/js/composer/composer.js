@@ -21,12 +21,6 @@ function toolAvailable(key) {
   return key !== 'todo' || isTodoBridgeSupported();
 }
 
-function syncComposerLayoutState(hasText) {
-  const composerBar = document.getElementById('composer-bar');
-  if (!composerBar) return;
-  composerBar.classList.toggle('composer-has-text', Boolean(hasText));
-}
-
 export function updateComposerButtons() {
   const sendBtn = document.getElementById('send-btn');
   const startVoiceBtn = document.getElementById('open-voice-mode-btn');
@@ -34,7 +28,6 @@ export function updateComposerButtons() {
   if (!sendBtn || !startVoiceBtn || !stopGeneratingBtn) return;
 
   const hasText = !isComposerEmpty();
-  syncComposerLayoutState(hasText);
 
   if (runtime.isGenerating) {
     sendBtn.classList.add('hidden');
