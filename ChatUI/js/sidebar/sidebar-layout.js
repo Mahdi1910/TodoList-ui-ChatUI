@@ -10,6 +10,7 @@ import { renderSidebar } from './sidebar-render.js';
 
 export function initSidebarUI() {
   const sidebar = document.getElementById('sidebar');
+  const sidebarBackdrop = document.getElementById('sidebar-backdrop');
   const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
   const openSidebarBtn = document.getElementById('open-sidebar-btn');
   const newChatBtn = document.getElementById('new-chat-btn');
@@ -17,25 +18,42 @@ export function initSidebarUI() {
   const brandNewChat = document.getElementById('brand-new-chat');
   const createProjectTrigger = document.getElementById('create-project-trigger');
   const createProjectModal = document.getElementById('create-project-modal');
+  const mobileQuery = window.matchMedia('(max-width: 767px)');
 
-  if (toggleSidebarBtn && sidebar) {
-    toggleSidebarBtn.addEventListener('click', () => sidebar.classList.add('collapsed'));
-  }
+  const syncSidebarBackdrop = () => {
+    if (!sidebarBackdrop || !sidebar) return;
+    const visible = mobileQuery.matches && !sidebar.classList.contains('collapsed');
+    sidebarBackdrop.classList.toggle('hidden', !visible);
+    sidebarBackdrop.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  };
 
-  if (openSidebarBtn && sidebar) {
-    openSidebarBtn.addEventListener('click', () => sidebar.classList.remove('collapsed'));
-  }
-
-  document.addEventListener('click', event => {
-    if (!window.matchMedia('(max-width: 767px)').matches) return;
-    if (sidebar.classList.contains('collapsed')) return;
-    if (sidebar.contains(event.target) || openSidebarBtn?.contains(event.target)) return;
+  const closeSidebar = () => {
+    if (!sidebar) return;
     sidebar.classList.add('collapsed');
+    syncSidebarBackdrop();
+  };
+
+  const openSidebar = () => {
+    if (!sidebar) return;
+    sidebar.classList.remove('collapsed');
+    syncSidebarBackdrop();
+  };
+
+  toggleSidebarBtn?.addEventListener('click', closeSidebar);
+  openSidebarBtn?.addEventListener('click', openSidebar);
+
+  sidebarBackdrop?.addEventListener('click', event => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeSidebar();
   });
 
-  if (sidebar && window.matchMedia('(max-width: 767px)').matches) {
-    sidebar.classList.add('collapsed');
-  }
+  if (sidebar && mobileQuery.matches) closeSidebar();
+  else syncSidebarBackdrop();
+
+  const handleViewportModeChange = () => syncSidebarBackdrop();
+  if (typeof mobileQuery.addEventListener === 'function') mobileQuery.addEventListener('change', handleViewportModeChange);
+  else mobileQuery.addListener?.(handleViewportModeChange);
 
   const goToNewChat = () => startNewChat(renderSidebar);
   const newChatHref = buildNewChatHref();
