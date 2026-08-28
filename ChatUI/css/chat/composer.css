@@ -12,38 +12,103 @@
 }
 
 .composer-bar {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
-  border-radius: 24px;
-  padding: 8px 12px;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  transition: border-color var(--transition-fast);
+  border-radius: 30px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 40px 40px auto minmax(0, 1fr) 40px 40px;
+  grid-template-areas: "attach tools indicators editor record primary";
+  align-items: center;
+  column-gap: 4px;
+  row-gap: 0;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-radius var(--transition-fast),
+    padding var(--transition-fast);
 }
 
-.composer-bar:focus-within { border-color: rgba(255, 255, 255, 0.25); }
+.composer-bar.composer-has-text {
+  grid-template-columns: 40px 40px minmax(0, 1fr) 40px 40px;
+  grid-template-rows: minmax(0, auto) 40px;
+  grid-template-areas:
+    "editor editor editor editor editor"
+    "attach tools indicators record primary";
+  align-items: center;
+  row-gap: 6px;
+  padding: 10px 10px 8px;
+  border-radius: 28px;
+}
+
+.composer-bar:focus-within {
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.composer-bar .attach-btn { grid-area: attach; }
+.composer-bar .tools-btn { grid-area: tools; margin-right: 0; }
+.composer-bar .active-tools-indicators {
+  grid-area: indicators;
+  min-width: 0;
+  max-width: 112px;
+  margin-right: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.composer-bar .active-tools-indicators::-webkit-scrollbar { display: none; }
+.composer-bar.composer-has-text .active-tools-indicators { max-width: none; }
+.composer-bar .composer-editor-host { grid-area: editor; }
+.composer-bar .record-audio-btn { grid-area: record; }
+.composer-bar .voice-mode-btn,
+.composer-bar .send-btn,
+.composer-bar .stop-generating-btn { grid-area: primary; }
 
 .composer-btn {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   color: var(--text-secondary);
   flex-shrink: 0;
+  align-self: center;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
-.composer-btn:hover { background-color: var(--bg-hover); color: var(--text-primary); }
+.composer-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+}
 
-.send-btn, .stop-generating-btn, .voice-mode-btn {
-  transition: opacity 160ms ease, transform 160ms ease, background-color var(--transition-fast);
+.attach-btn svg { width: 22px; height: 22px; }
+.tools-btn svg { width: 21px; height: 21px; }
+
+.composer-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .composer-bar .hidden { display: none !important; }
 
-.send-btn, .send-btn.active {
+.send-btn,
+.send-btn.active {
   background-color: var(--text-primary);
   color: var(--bg-primary);
   cursor: pointer;
+}
+
+.send-btn:hover {
+  background-color: rgba(255, 255, 255, 0.88);
+  color: var(--bg-primary);
 }
 
 .stop-generating-btn {
@@ -67,8 +132,15 @@
   border-radius: 2px;
 }
 
-.voice-mode-btn { background-color: var(--accent-blue); color: #FFFFFF; }
-.voice-mode-btn:hover { background-color: var(--accent-blue-hover); }
+.voice-mode-btn {
+  background-color: var(--accent-blue);
+  color: #FFFFFF;
+}
+
+.voice-mode-btn:hover {
+  background-color: var(--accent-blue-hover);
+  color: #FFFFFF;
+}
 
 .chat-disclaimer {
   font-size: 12px;
