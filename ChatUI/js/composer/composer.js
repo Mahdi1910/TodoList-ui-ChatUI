@@ -142,8 +142,18 @@ export function initToolsMenuListeners() {
   };
 
   TOOL_DESCRIPTORS.forEach(tool => {
-    document.getElementById(tool.toggle)?.addEventListener('change', e => handleToggle(tool.key, e.target.checked));
+    const composerToggle = document.getElementById(tool.toggle);
+    composerToggle?.addEventListener('change', e => handleToggle(tool.key, e.target.checked));
     document.getElementById(tool.sidebarToggle)?.addEventListener('change', e => handleToggle(tool.key, e.target.checked));
+
+    const row = composerToggle?.closest('.tool-option');
+    row?.addEventListener('click', event => {
+      // The switch label already toggles its checkbox natively. Everywhere else
+      // in the row is also a finger target, without double-toggling the switch.
+      if (event.target.closest?.('.toggle-switch') || composerToggle.disabled) return;
+      composerToggle.checked = !composerToggle.checked;
+      composerToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    });
   });
 
   document.addEventListener('click', e => {
