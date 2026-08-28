@@ -11,6 +11,7 @@ import { streamChat } from './gemini.js';
 import { recoverGenerationFilePermissionFailure } from '../chat/file-reference-recovery.js';
 import { isFileSpecificPermissionDeniedError } from '../chat/attachment-file-errors.js';
 import { createFileRecoveryMessages } from '../chat/file-history-sanitizer.js';
+import { runWithTextApiKeyFailover } from './text-api-key-pool.js';
 
 export const MAX_FILE_RECOVERY_RETRIES = 3;
 
@@ -25,7 +26,7 @@ function recoveryExhaustedError(lastError, attempts) {
   return error;
 }
 
-export async function streamChatWithFileRecovery(options = {}) {
+async function streamChatForCurrentKey(options = {}) {
   let recoveryAttempts = 0;
 
   while (true) {
@@ -55,6 +56,9 @@ export async function streamChatWithFileRecovery(options = {}) {
     try {
       return await streamChat(attemptOptions);
     } catch (error) {
+      if (generationStarted) {
+        try { error.chatUiGenerationStarted = true; } catch (_) {}
+      }
       if (generationStarted || error?.name === 'AbortError') throw error;
       if (!isFileSpecificPermissionDeniedError(error)) throw error;
 
@@ -74,4 +78,14 @@ export async function streamChatWithFileRecovery(options = {}) {
       // retry-only history. Any later visible/tool activity disables more retries.
     }
   }
+}
+
+export async function streamChatWithFileRecovery(options = {}) {
+  return runWithTextApiKeyFailover(
+    () => streamChatForCurrentKey(options),
+    {
+      signal: options.signal,
+      canReplay: error => error?.chatUiGenerationStarted !== true
+    }
+  );
 }
