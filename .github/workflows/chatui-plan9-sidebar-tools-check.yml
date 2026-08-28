@@ -1,0 +1,37 @@
+name: ChatUI Plan 9 Sidebar Tools Check
+
+on:
+  pull_request:
+    paths:
+      - 'ChatUI/html/main-chat.html'
+      - 'ChatUI/js/sidebar/**'
+      - 'ChatUI/css/sidebar/**'
+      - 'ChatUI/css/chat/tools.css'
+      - 'ChatUI/js/api/api-config.js'
+      - 'scripts/verify-chatui-plan9.mjs'
+      - '.github/workflows/chatui-plan9-sidebar-tools-check.yml'
+      - 'implementation plan/Implementation Plan ID 9.md'
+
+jobs:
+  verify-sidebar-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check ChatUI/js/sidebar/sidebar-render.js
+          node --check ChatUI/js/api/api-config.js
+          node --check scripts/verify-chatui-plan9.mjs
+      - name: Verify Plan 9 sidebar and tools invariants
+        run: node scripts/verify-chatui-plan9.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify updated assets reached runtime bundle
+        run: |
+          test -f dist/ChatUI/html/main-chat.html
+          test -f dist/ChatUI/js/sidebar/sidebar-render.js
+          test -f dist/ChatUI/css/sidebar/items.css
+          test -f dist/ChatUI/css/chat/tools.css
