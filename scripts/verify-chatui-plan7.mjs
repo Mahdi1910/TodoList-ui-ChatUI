@@ -77,11 +77,17 @@ const loadSource = fs.readFileSync('ChatUI/js/storage/load.js', 'utf8');
 const recoverySource = fs.readFileSync('ChatUI/js/api/gemini-file-recovery-wrapper.js', 'utf8');
 const cssIndex = fs.readFileSync('ChatUI/css/components.css', 'utf8');
 
-assert.match(apiConfig, /CHATUI_VERSION = '1\.2'/, 'ChatUI Settings version must be 1.2');
+assert.match(apiConfig, /CHATUI_VERSION = '1\.3'/, 'ChatUI Settings version must be 1.3');
 assert.match(apiConfig, /normalizeMultilineApiKeyText/, 'text API key input must normalize mobile clipboard line endings');
 assert.match(apiConfig, /addEventListener\('paste'/, 'text API key textarea must explicitly preserve multiline paste');
 assert.match(settingsHtml, /<textarea[^>]+id="text-api-key-input"/, 'text API key control must be a native textarea in the settings markup');
 assert.match(settingsHtml, /wrap="off"/, 'text API key textarea must preserve one visual row per key instead of soft-wrapping');
+assert.match(apiConfig, /setTextApiKeyPoolFromText\(normalizedText\);/, 'editor changes must still update the cleaned internal key pool');
+assert.doesNotMatch(
+  apiConfig,
+  /input\.value\s*=\s*\([^;]*textApiKeys[^;]*join/,
+  'debounced save must not rewrite the textarea and remove blank lines while the user is editing'
+);
 assert.match(apiConfig, /validateTextApiKeyPool/, 'settings must automatically validate the key pool');
 assert.match(loadSource, /textApiKeys:/, 'startup load must restore text API key pool metadata');
 assert.match(loadSource, /textApiKeyIndex:/, 'startup load must restore the active pool index');
