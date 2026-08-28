@@ -42,16 +42,16 @@
   .composer-bar {
     width: 100%;
     min-width: 0;
-    min-height: 136px;
+    min-height: 104px;
     grid-template-columns: 44px 44px minmax(0, 1fr) 44px 44px;
-    grid-template-rows: minmax(64px, auto) 44px;
+    grid-template-rows: minmax(44px, auto) 44px;
     grid-template-areas:
       "editor editor editor editor editor"
       "attach tools indicators record primary";
-    border-radius: 28px;
-    padding: 12px 8px 8px;
+    border-radius: 24px;
+    padding: 6px 8px;
     column-gap: 2px;
-    row-gap: 8px;
+    row-gap: 4px;
   }
 
   .composer-btn {

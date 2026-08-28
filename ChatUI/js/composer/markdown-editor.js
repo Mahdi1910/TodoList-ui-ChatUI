@@ -20,6 +20,10 @@ import {
   getMarkdown,
   replaceAll
 } from '../vendor/milkdown-composer.runtime.js';
+import {
+  COMPOSER_PASTE_ENTER_GUARD_MS,
+  normalizePastedComposerText
+} from './paste-normalization.js';
 
 let editor = null;
 let editorHost = null;
@@ -30,6 +34,7 @@ let changeCallback = null;
 let compositionActive = false;
 let directionFrame = null;
 let editorDom = null;
+let suppressPasteEnterUntil = 0;
 
 function normalizeMarkdown(value) {
   return typeof value === 'string' ? value : String(value ?? '');
@@ -101,9 +106,19 @@ function requestSubmit() {
   });
 }
 
+function markComposerPaste() {
+  suppressPasteEnterUntil = Date.now() + COMPOSER_PASTE_ENTER_GUARD_MS;
+}
+
 function handleComposerKeyDown(view, event) {
   if (event.key !== 'Enter') return false;
   if (compositionActive || event.isComposing || view?.composing) return false;
+
+  // Some mobile keyboards/clipboard integrations emit an Enter key event as part
+  // of paste completion. Consume that event without submitting or inserting an
+  // extra line. A normal user Enter after the short paste window keeps the
+  // existing submit behavior unchanged.
+  if (Date.now() < suppressPasteEnterUntil) return true;
 
   const modifierSubmit = (event.ctrlKey || event.metaKey) && !event.altKey;
   if (modifierSubmit) {
@@ -170,6 +185,7 @@ function attachEditorDomListeners() {
   editorDom.setAttribute('aria-multiline', 'true');
   editorDom.setAttribute('aria-placeholder', 'Ask anything');
   editorDom.setAttribute('dir', 'auto');
+  editorDom.addEventListener('paste', markComposerPaste, true);
   editorDom.addEventListener('compositionstart', handleCompositionStart);
   editorDom.addEventListener('compositionend', handleCompositionEnd);
   editorDom.addEventListener('click', preventComposerLinkNavigation);
@@ -177,11 +193,13 @@ function attachEditorDomListeners() {
 
 function detachEditorDomListeners() {
   if (!editorDom) return;
+  editorDom.removeEventListener('paste', markComposerPaste, true);
   editorDom.removeEventListener('compositionstart', handleCompositionStart);
   editorDom.removeEventListener('compositionend', handleCompositionEnd);
   editorDom.removeEventListener('click', preventComposerLinkNavigation);
   editorDom = null;
   compositionActive = false;
+  suppressPasteEnterUntil = 0;
 }
 
 export async function initMarkdownComposer(options = {}) {
@@ -207,6 +225,12 @@ export async function initMarkdownComposer(options = {}) {
         nodeViews: {
           ...(previous?.nodeViews || {}),
           image: safeImageNodeView
+        },
+        transformPastedText(text, plain, view) {
+          const transformed = typeof previous?.transformPastedText === 'function'
+            ? previous.transformPastedText(text, plain, view)
+            : text;
+          return normalizePastedComposerText(transformed);
         },
         handleKeyDown(view, event) {
           if (handleComposerKeyDown(view, event)) return true;
@@ -292,6 +316,7 @@ export async function destroyComposer() {
   currentMarkdown = '';
   submitCallback = null;
   changeCallback = null;
+  suppressPasteEnterUntil = 0;
   if (oldEditor) await oldEditor.destroy();
   if (editorHost) {
     editorHost.classList.remove('is-initializing', 'is-empty');

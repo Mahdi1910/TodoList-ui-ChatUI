@@ -24,6 +24,8 @@ jobs:
       - name: Check changed JavaScript syntax
         run: |
           node --check ChatUI/js/composer/composer.js
+          node --check ChatUI/js/composer/markdown-editor.js
+          node --check ChatUI/js/composer/paste-normalization.js
           node --check ChatUI/js/api/api-config.js
           node --check scripts/verify-chatui-plan8.mjs
       - name: Verify Plan 8 adaptive composer invariants
@@ -33,5 +35,7 @@ jobs:
       - name: Verify composer assets reached runtime bundle
         run: |
           test -f dist/ChatUI/js/composer/composer.js
+          test -f dist/ChatUI/js/composer/markdown-editor.js
+          test -f dist/ChatUI/js/composer/paste-normalization.js
           test -f dist/ChatUI/css/chat/composer.css
           test -f dist/ChatUI/css/chat/composer-editor.css
