@@ -21,12 +21,12 @@ for (const id of [
   assert.match(mainChatHtml, new RegExp(`id="${id}"`), `tool toggle ${id} must remain present`);
 }
 assert.doesNotMatch(toolsCss, /\.tool-desc\s*\{/, 'removed tool descriptions must not retain dedicated layout CSS');
-assert.match(toolsCss, /\.tool-option\s*\{[\s\S]*min-height:\s*44px;/, 'tool rows must remain compact and tappable');
+assert.match(toolsCss, /\.tool-option\s*\{[\s\S]*min-height:\s*48px;/, 'tool rows must remain compact while providing a larger touch target');
 
 assert.match(
   sidebarItemsCss,
   /\.project-item\s*\{[\s\S]*align-items:\s*stretch;[\s\S]*padding:\s*0;/,
-  'project rows must be first-level full-width items without extra outer indentation'
+  'project rows must remain first-level full-width items without extra outer indentation'
 );
 assert.match(
   sidebarItemsCss,
@@ -36,22 +36,7 @@ assert.match(
 assert.match(
   sidebarItemsCss,
   /\.nested-project-chats\s*\{[\s\S]*width:\s*100%;[\s\S]*padding-left:\s*24px;[\s\S]*border-left:\s*0;/,
-  'project chats must be the single indented second level and use the available row width'
-);
-assert.match(
-  sidebarItemsCss,
-  /\.chat-item-actions\s*\{[\s\S]*margin-left:\s*auto;/,
-  'chat and project action controls must occupy a right-aligned action zone'
-);
-assert.match(
-  sidebarItemsCss,
-  /@media \(hover:\s*none\), \(pointer:\s*coarse\)[\s\S]*\.chat-item > \.chat-item-actions,[\s\S]*\.project-header-item \.chat-item-actions[\s\S]*display:\s*flex;/,
-  'touch/coarse-pointer devices must expose chat and project actions without hover'
-);
-assert.match(
-  sidebarItemsCss,
-  /@media \(hover:\s*none\), \(pointer:\s*coarse\)[\s\S]*\.chat-action-btn\s*\{[\s\S]*width:\s*32px;[\s\S]*height:\s*32px;/,
-  'touch sidebar actions must use larger hit targets'
+  'project chats must remain the single indented second level and use the available row width'
 );
 assert.match(
   sidebarItemsCss,
@@ -59,14 +44,9 @@ assert.match(
   'existing selected-chat styling must remain present'
 );
 
-for (const className of ['add-chat-to-proj-btn', 'proj-options-btn', 'pin-chat-btn', 'chat-options-btn']) {
-  assert.match(sidebarRenderJs, new RegExp(className), `sidebar action ${className} must remain wired`);
-}
-assert.match(
-  sidebarRenderJs,
-  /event\.target\?\.closest\?\.\('\.chat-item-actions'\)\) return;/,
-  'project action keyboard events must not also toggle project collapse state'
-);
-assert.match(apiConfig, /CHATUI_VERSION = '1\.7'/, 'ChatUI Settings version must be 1.7');
+assert.doesNotMatch(sidebarRenderJs, /add-chat-to-proj-btn|proj-options-btn|pin-chat-btn|chat-options-btn/, 'per-row action buttons must stay removed');
+assert.match(sidebarRenderJs, /bindSidebarActionPress\(projHeader/, 'project rows must expose actions through the press-action primitive');
+assert.match(sidebarRenderJs, /bindSidebarActionPress\(link/, 'chat rows must expose actions through the press-action primitive');
+assert.match(apiConfig, /CHATUI_VERSION = '1\.8'/, 'ChatUI Settings version must be 1.8');
 
 console.log('ChatUI Plan 9 sidebar and tools verification passed.');
