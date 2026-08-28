@@ -2,87 +2,85 @@
 
 ## Goal
 
-Redesign the existing ChatUI composer so it behaves like a polished adaptive chat input while preserving all current functionality: Milkdown/ProseMirror Markdown editing, attachments, AI tools, audio recording, Live Voice, Send, Stop generation, keyboard submission, and embedded/standalone behavior.
+Keep the existing two-part ChatUI composer, but make its empty state compact like the supplied Google AI Studio reference and make mobile paste safe from trailing Enter/newline behavior. Preserve Milkdown/ProseMirror Markdown editing, attachments, AI tools, audio recording, Live Voice, Send, Stop generation, keyboard submission, and embedded/standalone behavior.
 
 ## Current problem
 
-The original composer placed the editor and every control in one flex row with `align-items: flex-end`. Plan 8 first replaced that with an adaptive grid, but the empty state still kept the placeholder/editor between the controls on one horizontal row. The final reference behavior requires a stricter layout contract:
+The composer now correctly separates editor content from controls, but its fixed empty sizing is too tall on mobile. The mobile rules force a 64px text row plus a 44px controls row, extra spacing/padding, and a 136px minimum composer height. This makes the empty composer substantially taller than the supplied reference.
 
-1. The editor/placeholder must always live in a dedicated top region.
-2. Attach, Tools, active-tool indicators, Record, and the primary action must always live in a dedicated bottom region.
-3. Empty and non-empty composer states must use the same two-row structure so the input never jumps between fundamentally different geometries.
-
-The editor already provides the correct rich-text behavior and should not be replaced.
+A second issue exists at the editor boundary: clipboard text can end with newline/Enter characters, and some mobile clipboard/keyboard integrations can also emit an Enter key event immediately after paste. A paste must never submit the message or create a meaningless trailing blank paragraph.
 
 ## Design behavior
 
-### All composer states
+### Permanent two-part structure
 
-- Always use a two-row grid.
-- Put the Milkdown/ProseMirror editor and placeholder on the full top row.
-- Put Attach, Tools, active-tool indicators, Record, and Live Voice/Send/Stop on the bottom row.
+- Keep the Milkdown/ProseMirror editor and placeholder exclusively in the top row.
+- Keep Attach, Tools, active-tool indicators, Record, and Live Voice/Send/Stop exclusively in the bottom row.
 - Never allow editor text or placeholder content to share the controls row.
-- Keep consistent circular hit targets and stable bottom-row alignment.
-- Keep active-tool indicators usable without allowing them to destroy editor width.
 
-### Empty composer
+### Compact empty composer
 
-- Keep a dedicated top text area even when no text exists.
-- Show the placeholder near the top/start of that text area, matching the supplied reference.
-- Keep the bottom row visually separate and free of input text.
-- Avoid the previous pill-like single-line empty geometry.
+- Desktop: start with a 40px editor row over a 40px controls row.
+- Mobile: start with a 44px editor row over a 44px controls row.
+- Keep only a small gap/padding between the rows so the empty composer is compact.
+- The text row should be approximately the same height as the controls row when empty or when showing one short line.
+- The editor must grow naturally only when content requires additional lines.
+- Preserve the existing bounded maximum editor height and internal scrolling for long prompts.
 
-### Composer with text
+### Paste safety
 
-- Keep the same two-row structure used by the empty state.
-- Let the editor grow upward naturally with wrapped/multiline content.
-- Cap editor height and use internal scrolling after the cap.
-- Keep the bottom action row anchored while the editor scrolls.
+- Preserve intentional internal line breaks in pasted text.
+- Normalize mobile/Unicode clipboard line separators to normal line feeds.
+- Remove only trailing pasted newline/Enter characters so copied text ending with a return does not create an empty paragraph.
+- Mark paste events at the editor DOM boundary.
+- For a short bounded window immediately after paste, consume any Enter key event emitted by a mobile clipboard/keyboard integration instead of submitting or inserting another line.
+- Outside that short paste guard, preserve the existing manual Enter-to-send, modifier submit, Shift+Enter, Alt+Enter, and composition behavior.
 
 ### Mobile
 
-- Preserve the existing 16px editor font to avoid unwanted mobile browser zoom.
-- Use touch-friendly 44px controls.
-- Reserve a 64px minimum editor row above the controls even when empty.
-- Allow a larger bounded editor height for long prompts.
+- Preserve the 16px editor font to avoid browser auto-zoom.
+- Keep 44px touch targets for composer controls.
 - Keep safe-area padding and the existing `100dvh` application layout.
 
 ## Implementation
 
 1. `ChatUI/css/chat/composer.css`
-   - Use one permanent two-row CSS grid for every composer state.
-   - Reserve a desktop editor row above the fixed controls row.
-   - Standardize button dimensions/icon alignment and primary action appearance.
-   - Keep tool popover positioning compatible with the composer bar.
+   - Reduce the desktop minimum composer height.
+   - Use equal 40px minimum editor/control rows with a small row gap.
 
 2. `ChatUI/css/chat/composer-editor.css`
-   - Give the editor a dedicated minimum top-row height even when empty.
-   - Anchor placeholder positioning inside the ProseMirror surface.
-   - Keep bounded multiline growth and internal scrolling.
+   - Reduce the empty editor minimum to the corresponding control height.
+   - Keep placeholder alignment, bounded multiline growth, and internal scrolling.
 
 3. `ChatUI/css/responsive.css`
-   - Apply the same permanent two-row geometry on mobile.
-   - Keep 44px touch targets and a 64px minimum editor row.
+   - Reduce the mobile minimum composer height from the oversized previous value.
+   - Use equal 44px editor/control rows.
 
-4. `ChatUI/js/composer/composer.js`
-   - Preserve existing text-aware Send/Voice/Stop decision logic.
-   - No layout behavior should depend on the text-present state.
+4. `ChatUI/js/composer/paste-normalization.js`
+   - Add a pure clipboard text normalizer and the bounded mobile paste Enter-guard duration.
 
-5. `ChatUI/js/api/api-config.js`
-   - Bump visible ChatUI version from 1.4 to 1.5.
+5. `ChatUI/js/composer/markdown-editor.js`
+   - Normalize pasted plain text through the new helper.
+   - Mark paste events and suppress paste-generated Enter submission during the short guard window.
+   - Preserve normal keyboard submission outside that window.
+
+6. `ChatUI/js/api/api-config.js`
+   - Bump visible ChatUI version from 1.5 to 1.6.
 
 ## Non-goals
 
 - No changes to Gemini networking, key rotation, storage, message persistence, or tool execution.
-- No changes to Enter/Shift+Enter/keyboard submission semantics.
+- No changes to normal manual keyboard submission semantics outside the paste guard.
 - No replacement of Milkdown/ProseMirror.
 - No removal of existing composer controls.
 - No browser automation.
 
 ## Verification
 
-- Deterministic source assertions that the editor is always on the top grid row and controls are always on the bottom grid row.
-- Reject any future single-row grid area containing both `editor` and control areas.
-- Verify mobile keeps a dedicated editor row, 16px anti-zoom font, and bounded scrollable height.
-- Run the existing Plan 7 key-pool checks, Plan 8 composer checks, safe build/integration workflow, and syntax checks.
+- Deterministic checks for 40px desktop and 44px mobile equal-height empty rows.
+- Verify the reduced overall minimum composer heights.
+- Unit-style checks that pasted internal newlines remain while trailing line breaks are removed.
+- Verify the editor installs both paste normalization and the short Enter guard.
+- Verify normal Enter submission code remains present.
+- Run Plan 7, Plan 8, JavaScript syntax checks, safe runtime build, and repository integration workflow.
 - Require a successful Cloudflare branch/commit preview on the exact PR head before merge.
