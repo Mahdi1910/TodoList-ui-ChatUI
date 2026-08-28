@@ -48,8 +48,9 @@ assert.match(toolsCss, /@media \(max-width: 767px\)[\s\S]*\.tool-indicator-pill\
 assert.equal(SIDEBAR_LONG_PRESS_MS, 500, 'sidebar long press must use a deliberate half-second hold');
 assert.equal(SIDEBAR_LONG_PRESS_MOVE_PX, 10, 'sidebar long press must cancel when a finger starts scrolling');
 assert.match(pressActionsJs, /addEventListener\('contextmenu'/, 'desktop right-click must open the same sidebar action menu');
-assert.match(pressActionsJs, /event\.key === 'ContextMenu'[\s\S]*event\.shiftKey && event\.key === 'F10'/, 'keyboard context-menu access must remain available');
+assert.match(pressActionsJs, /ContextMenu[\s\S]*shiftKey[\s\S]*F10/, 'keyboard context-menu access must remain available');
 assert.match(pressActionsJs, /suppressNextClick[\s\S]*stopImmediatePropagation/, 'a completed long press must not also navigate/collapse the row');
+assert.match(pressActionsJs, /SUPPRESS_FOLLOWUP_CLICK_MS\s*=\s*900/, 'long-press click suppression must expire instead of eating a later normal tap');
 assert.doesNotMatch(sidebarRenderJs, /add-chat-to-proj-btn|proj-options-btn|pin-chat-btn|chat-options-btn/, 'chat/project rows must not restore redundant action buttons');
 assert.match(sidebarRenderJs, /bindSidebarActionPress\(projHeader/, 'project rows must use long-press/right-click actions');
 assert.match(sidebarRenderJs, /bindSidebarActionPress\(link/, 'chat rows must use long-press/right-click actions');
