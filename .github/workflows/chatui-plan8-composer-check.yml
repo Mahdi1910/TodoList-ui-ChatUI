@@ -1,0 +1,37 @@
+name: ChatUI Plan 8 Composer Check
+
+on:
+  pull_request:
+    paths:
+      - 'ChatUI/html/main-chat.html'
+      - 'ChatUI/js/composer/**'
+      - 'ChatUI/css/chat/composer.css'
+      - 'ChatUI/css/chat/composer-editor.css'
+      - 'ChatUI/css/responsive.css'
+      - 'ChatUI/js/api/api-config.js'
+      - 'scripts/verify-chatui-plan8.mjs'
+      - '.github/workflows/chatui-plan8-composer-check.yml'
+      - 'implementation plan/Implementation Plan ID 8.md'
+
+jobs:
+  verify-composer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check ChatUI/js/composer/composer.js
+          node --check ChatUI/js/api/api-config.js
+          node --check scripts/verify-chatui-plan8.mjs
+      - name: Verify Plan 8 adaptive composer invariants
+        run: node scripts/verify-chatui-plan8.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify composer assets reached runtime bundle
+        run: |
+          test -f dist/ChatUI/js/composer/composer.js
+          test -f dist/ChatUI/css/chat/composer.css
+          test -f dist/ChatUI/css/chat/composer-editor.css
