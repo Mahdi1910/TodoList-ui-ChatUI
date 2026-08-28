@@ -42,19 +42,16 @@
   .composer-bar {
     width: 100%;
     min-width: 0;
-    min-height: 62px;
-    grid-template-columns: 44px 44px auto minmax(0, 1fr) 44px 44px;
-    border-radius: 31px;
-    padding: 8px;
-    column-gap: 2px;
-  }
-
-  .composer-bar.composer-has-text {
+    min-height: 136px;
     grid-template-columns: 44px 44px minmax(0, 1fr) 44px 44px;
-    grid-template-rows: minmax(0, auto) 44px;
-    padding: 10px 8px 8px;
+    grid-template-rows: minmax(64px, auto) 44px;
+    grid-template-areas:
+      "editor editor editor editor editor"
+      "attach tools indicators record primary";
     border-radius: 28px;
-    row-gap: 6px;
+    padding: 12px 8px 8px;
+    column-gap: 2px;
+    row-gap: 8px;
   }
 
   .composer-btn {
@@ -69,10 +66,6 @@
 
   .attach-btn svg { width: 23px; height: 23px; }
   .tools-btn svg { width: 22px; height: 22px; }
-
-  .composer-bar:not(.composer-has-text) .active-tools-indicators {
-    max-width: 84px;
-  }
 
   .composer-editor-host,
   .composer-editor-host .milkdown,
