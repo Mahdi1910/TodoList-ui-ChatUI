@@ -15,7 +15,7 @@ import {
 import { normalizeMultilineApiKeyText } from './text-api-key-input.js';
 
 export const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
-export const CHATUI_VERSION = '1.2';
+export const CHATUI_VERSION = '1.3';
 
 let validationTimer = null;
 let validationController = null;
@@ -120,7 +120,7 @@ function ensureKeyPoolStatusUI(input) {
     const hint = document.createElement('div');
     hint.id = 'text-api-key-pool-hint';
     hint.className = 'api-key-pool-hint';
-    hint.textContent = 'One key per line. Whitespace and duplicate keys are removed automatically. Keys are validated after editing.';
+    hint.textContent = 'One key per line. Blank lines stay while you edit; whitespace, empty lines, and duplicates are ignored when saving.';
     group.appendChild(hint);
   }
   if (!document.getElementById('text-api-key-pool-status')) {
@@ -221,9 +221,11 @@ function schedulePoolSaveAndValidation(input) {
   window.clearTimeout(validationTimer);
   validationTimer = window.setTimeout(async () => {
     const normalizedText = normalizeTextareaLineBreaks(input);
-    const cleanedApi = setTextApiKeyPoolFromText(normalizedText);
-    input.value = (cleanedApi.textApiKeys || []).map(entry => entry.key).join('\n');
+    setTextApiKeyPoolFromText(normalizedText);
     try {
+      // Persist the cleaned internal key pool, but never rewrite the textarea while
+      // the user is editing. Rewriting here used to remove blank lines and move the
+      // caret after the 700 ms debounce, which broke sequential mobile pastes.
       await persistSettings();
       renderKeyPoolStatus();
       await validateCurrentPool();
