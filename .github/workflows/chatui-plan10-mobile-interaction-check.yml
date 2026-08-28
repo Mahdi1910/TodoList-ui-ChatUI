@@ -1,0 +1,56 @@
+name: ChatUI Plan 10 Mobile Interaction Check
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'shell/css/shell.css'
+      - 'shell/js/app-shell.js'
+      - 'shell/js/frame-bridge.js'
+      - 'ChatUI/js/embedded/shell-bridge.js'
+      - 'ChatUI/css/responsive.css'
+      - 'ChatUI/css/chat/tools.css'
+      - 'ChatUI/js/composer/composer.js'
+      - 'ChatUI/js/ui/chat-controls.js'
+      - 'ChatUI/html/left-sidebar.html'
+      - 'ChatUI/css/sidebar/items.css'
+      - 'ChatUI/js/sidebar/**'
+      - 'ChatUI/js/api/api-config.js'
+      - 'scripts/verify-chatui-plan10.mjs'
+      - '.github/workflows/chatui-plan10-mobile-interaction-check.yml'
+      - 'implementation plan/Implementation Plan ID 10.md'
+
+jobs:
+  verify-mobile-interactions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check shell/js/app-shell.js
+          node --check shell/js/frame-bridge.js
+          node --check ChatUI/js/embedded/shell-bridge.js
+          node --check ChatUI/js/composer/composer.js
+          node --check ChatUI/js/ui/chat-controls.js
+          node --check ChatUI/js/sidebar/press-actions.js
+          node --check ChatUI/js/sidebar/sidebar-actions.js
+          node --check ChatUI/js/sidebar/sidebar-layout.js
+          node --check ChatUI/js/sidebar/sidebar-render.js
+          node --check ChatUI/js/api/api-config.js
+          node --check scripts/verify-chatui-plan10.mjs
+      - name: Verify Plan 10 mobile interaction invariants
+        run: node scripts/verify-chatui-plan10.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify updated assets reached runtime bundle
+        run: |
+          test -f dist/index.html
+          test -f dist/shell/css/shell.css
+          test -f dist/shell/js/app-shell.js
+          test -f dist/ChatUI/js/embedded/shell-bridge.js
+          test -f dist/ChatUI/js/sidebar/press-actions.js
+          test -f dist/ChatUI/css/responsive.css
+          test -f dist/ChatUI/css/chat/tools.css
