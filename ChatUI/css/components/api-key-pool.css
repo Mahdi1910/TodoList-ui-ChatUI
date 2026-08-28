@@ -1,0 +1,68 @@
+.api-key-pool-input {
+  min-height: 132px;
+  resize: vertical;
+  line-height: 1.45;
+  white-space: pre;
+  overflow-wrap: normal;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.api-key-pool-input:not(.api-key-visible) {
+  -webkit-text-security: disc;
+}
+
+.api-key-pool-hint,
+.api-key-pool-status {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.api-key-pool-status {
+  color: var(--text-secondary);
+}
+
+.api-key-pool-list {
+  margin-top: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+}
+
+.api-key-pool-list:empty {
+  display: none;
+}
+
+.api-key-pool-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+}
+
+.api-key-pool-row:last-child {
+  border-bottom: 0;
+}
+
+.api-key-pool-key {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.api-key-pool-state {
+  flex: 0 0 auto;
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.setting-version-value {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
