@@ -61,6 +61,6 @@ assert.match(responsiveCss, /\.sidebar-backdrop:not\(\.hidden\)[\s\S]*z-index:\s
 assert.doesNotMatch(responsiveCss, /sidebar:not\(\.collapsed\)::after[\s\S]*pointer-events:\s*none/, 'non-interactive pseudo backdrops must not return');
 assert.match(sidebarLayoutJs, /sidebarBackdrop\?\.addEventListener\('click'[\s\S]*event\.stopPropagation\(\);[\s\S]*closeSidebar\(\)/, 'backdrop taps must close the drawer without passing through');
 
-assert.match(apiConfig, /CHATUI_VERSION = '2\.0'/, 'ChatUI Settings version must be 2.0');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.1'/, 'ChatUI Settings version must be 2.1');
 
 console.log('ChatUI Plan 10 mobile interaction verification passed.');
