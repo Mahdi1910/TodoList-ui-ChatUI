@@ -1,13 +1,15 @@
 /* ============================================================================
-   MAIN.CSS — Base Dark Theme, Typography & Layout Variables
+   MAIN.CSS — Base Theme, Typography & Layout Variables
    ========================================================================== */
 
 :root {
-  /* Color Palette */
   --bg-primary: #000000;
   --bg-secondary: #000000;
   --bg-tertiary: #212121;
   --bg-hover: #2F2F2F;
+  --bg-selected: #303030;
+  --menu-bg: #242424;
+  --menu-hover: #343434;
 
   --text-primary: #FFFFFF;
   --text-secondary: #AFAFAF;
@@ -15,16 +17,19 @@
 
   --accent-blue: #2563EB;
   --accent-blue-hover: #1D4ED8;
+  --accent-soft: rgba(37, 99, 235, 0.16);
   --border-color: rgba(255, 255, 255, 0.1);
-  --border-light: rgba(255, 255, 255, 0.15);
+  --border-light: rgba(255, 255, 255, 0.18);
+  --focus-ring: #A3A3A3;
+  --scrollbar-thumb: rgba(148, 163, 184, 0.42);
+  --scrollbar-thumb-hover: rgba(148, 163, 184, 0.62);
+  --menu-shadow: 0 18px 44px rgba(0, 0, 0, 0.52);
 
-  /* Layout Sizes */
   --sidebar-width: 260px;
   --right-sidebar-width: 280px;
   --header-height: 60px;
   --chat-max-width: 880px;
 
-  /* Transitions */
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;
 }
@@ -53,7 +58,6 @@ body {
   position: relative;
 }
 
-/* Common Button Styles */
 button {
   background: none;
   border: none;
@@ -66,31 +70,23 @@ button {
   justify-content: center;
 }
 
-/* One visible keyboard-focus language across buttons, links, custom rows, and
-   native form fields. Mouse/touch focus keeps the existing visual treatment. */
+/* Keyboard users still get a quiet, theme-aware focus cue on discrete controls.
+   Text fields deliberately keep their normal border: the user does not want a
+   blue/accent ring drawn around inputs or the composer while typing. */
 button:focus-visible,
 a:focus-visible,
-[tabindex]:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--accent-blue);
+[tabindex]:focus-visible {
+  outline: 1px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
-/* Individual components may move the focus ring to a containing control (for
-   example icon-wrapped inputs and visual toggle tracks). */
 input:focus,
 textarea:focus,
-select:focus {
-  outline: none;
-}
-
+select:focus,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--accent-blue);
-  outline-offset: 2px;
+  outline: none;
 }
 
 .visually-hidden {
@@ -185,7 +181,6 @@ select:focus-visible {
   color: #000;
 }
 
-/* Utilities */
 .hidden {
   display: none !important;
 }
