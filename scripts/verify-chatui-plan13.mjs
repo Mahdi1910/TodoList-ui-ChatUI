@@ -108,6 +108,6 @@ assert.match(mainChatHtml, /landing-title default-landing-title/, 'default empty
 assert.match(refinementsCss, /#empty-state \.landing-title\.default-landing-title\s*\{[\s\S]*display:\s*none;/, 'default new-chat heading must be hidden');
 assert.match(conversation, /title\.classList\.toggle\('default-landing-title', message === 'What can I help with\?'\)/, 'loading/error messages must remove the default-only hidden marker');
 
-assert.match(apiConfig, /CHATUI_VERSION = '2\.2'/, 'ChatUI Settings version must be 2.2');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.3'/, 'ChatUI Settings version must be 2.3');
 
 console.log('ChatUI Plan 13 theme, profiles, layout, menu, and automatic-title verification passed.');
