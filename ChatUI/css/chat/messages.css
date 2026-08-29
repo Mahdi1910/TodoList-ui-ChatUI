@@ -31,7 +31,7 @@
   background-color: var(--user-bubble-bg);
   color: var(--user-bubble-text);
   border-bottom-right-radius: 4px;
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .assistant-bubble {
@@ -76,6 +76,21 @@
   width: 100%;
   unicode-bidi: plaintext;
   text-align: start;
+}
+
+/* Normal sent-message prose must wrap inside the bubble rather than making the
+   whole bubble horizontally scrollable. Dedicated code/table surfaces retain
+   their own local overflow rules below. */
+.user-bubble .markdown-content,
+.user-bubble .message-text,
+.user-bubble p,
+.user-bubble li,
+.user-bubble blockquote {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 /* Long sent prompts stay compact in the transcript. The full message remains
