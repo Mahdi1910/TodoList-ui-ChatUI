@@ -22,7 +22,7 @@ import {
 import { normalizeMultilineApiKeyText } from './text-api-key-input.js';
 
 export const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
-export const CHATUI_VERSION = '2.2';
+export const CHATUI_VERSION = '2.3';
 
 let validationTimer = null;
 let validationController = null;
