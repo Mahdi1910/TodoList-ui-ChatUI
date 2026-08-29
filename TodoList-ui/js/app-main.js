@@ -42,6 +42,7 @@ function assertIntegrations() {
   assertMethod(ScheduleComponent, 'showRepeatValidationError', 'ScheduleComponent');
   assertMethod(AppDataService, 'whenIdle', 'AppDataService');
   assertMethod(AppDataService, 'repairRepeatState', 'AppDataService');
+  assertMethod(AppDataService, 'repairAfterDependencies', 'AppDataService');
   assertMethod(TodoToolExecutor, 'executeRequest', 'TodoToolExecutor');
   assertMethod(TaskSelectionController, 'install', 'TaskSelectionController');
 }
@@ -55,7 +56,10 @@ export async function startApplication({ runStage, setStorageErrorReporter }) {
   });
   await runStage('DATABASE_OPEN', () => AppPersistence.initialize());
   await runStage('HYDRATION', () => AppPersistence.hydrateState());
-  await runStage('DATABASE_REPAIR', () => AppDataService.repairRepeatState());
+  await runStage('DATABASE_REPAIR', async () => {
+    await AppDataService.repairRepeatState();
+    await AppDataService.repairAfterDependencies();
+  });
   await runStage('UI_INIT', async () => {
     SidebarComponent.init();
     SidebarComponent.initTaxonomyDrag();
