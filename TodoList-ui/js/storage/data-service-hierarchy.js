@@ -194,6 +194,7 @@ export const DataServiceHierarchyMethods = {
             repeatStateChanged = true;
           }
           moved.dueDate = nextDate;
+          moved.after = null;
         } else if (destinationContext.groupType === 'project') {
           if (targetLevel === 'root') {
             const nextProject = this.validateProjectId(key || '');
