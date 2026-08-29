@@ -108,7 +108,11 @@ export const DataServiceAfterMethods = {
         const check = TaskAfter.validate(task.after);
         const source = check.valid ? byId.get(check.after.taskId) : null;
         const cyclic = check.valid && TaskAfter.wouldCreateCycle(task.id, check.after.taskId, tasks);
-        if (!check.valid || !source || source.id === task.id || cyclic || (task.completed && !task.after.resolvedAt)) {
+        const impossiblePendingSource = Boolean(
+          check.valid && source && !check.after.resolvedAt && source.completed && !source.completedAt
+        );
+        if (!check.valid || !source || source.id === task.id || cyclic ||
+            impossiblePendingSource || (task.completed && !task.after.resolvedAt)) {
           task.after = null;
           task.updatedAt = now;
           changed.set(task.id, task);
