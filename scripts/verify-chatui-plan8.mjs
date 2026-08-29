@@ -106,6 +106,6 @@ assert.match(
   /function handleComposerKeyDown\([\s\S]*event\.key !== 'Enter'[\s\S]*requestSubmit\(\)/,
   'normal keyboard submit behavior must remain intact outside the paste guard'
 );
-assert.match(apiConfig, /CHATUI_VERSION = '2\.1'/, 'ChatUI Settings version must be 2.1');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.2'/, 'ChatUI Settings version must be 2.2');
 
 console.log('ChatUI Plan 8 compact composer and paste-safety verification passed.');
