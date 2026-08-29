@@ -30,7 +30,9 @@ let navigationSequence = 0;
 
 function setLandingMessage(message = 'What can I help with?') {
   const title = document.querySelector('#empty-state .landing-title');
-  if (title) title.textContent = message;
+  if (!title) return;
+  title.textContent = message;
+  title.classList.toggle('default-landing-title', message === 'What can I help with?');
 }
 
 function showLoadingState() {
@@ -211,7 +213,13 @@ export function initRenameChatModal(updateSidebarCallback = null) {
     if (!currentChat) return;
     const previousChats = state.chats;
     const updatedAt = Date.now();
-    const renamedChat = updateChat(currentChat.id, current => ({ ...current, title: newTitle, updatedAt }));
+    // A title explicitly chosen by the user always wins over background auto-title.
+    const renamedChat = updateChat(currentChat.id, current => ({
+      ...current,
+      title: newTitle,
+      titleSource: 'manual',
+      updatedAt
+    }));
     try {
       await persistChatMetadata(renamedChat);
     } catch (err) {
@@ -220,6 +228,7 @@ export function initRenameChatModal(updateSidebarCallback = null) {
       alert('Failed to rename chat: ' + err.message);
       return;
     }
+    if (state.activeChatId === renamedChat.id) document.title = `${newTitle} — ChatUI`;
     modal.classList.add('hidden');
     setRuntime({ activeChatForRename: null });
     updateSidebarCallback?.();
@@ -245,8 +254,6 @@ export async function clearActiveChatMessages(updateSidebarCallback = null) {
   }));
 
   try {
-    // Explicitly reconcile only this loaded chat so its messages and all normal
-    // or generated attachments are removed without touching any other chat.
     await reconcileLoadedChat(clearedChat);
   } catch (err) {
     updateChat(activeChat.id, current => ({

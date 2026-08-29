@@ -125,9 +125,6 @@ export async function sendMessage(updateSidebarCallback = null, options = {}) {
     }
   }
 
-  // Read Markdown again after async recorder finalization so text typed during
-  // that short interval is included. Trimming is only an emptiness test; the
-  // persisted prompt remains the editor's Markdown serialization.
   const rawMarkdown = getComposerMarkdown();
   const hasText = rawMarkdown.trim().length > 0;
   if (!hasText && runtime.attachedFiles.length === 0) {
@@ -173,6 +170,8 @@ export async function sendMessage(updateSidebarCallback = null, options = {}) {
     currentChat = {
       id: createEntityId('chat'),
       title: (titleText || 'Multimodal Chat').slice(0, 24) + ((titleText || '').length > 24 ? '...' : ''),
+      titleSource: 'auto',
+      autoTitleGeneratedAt: 0,
       projectId,
       pinned: false,
       createdAt: now,
@@ -277,8 +276,6 @@ export async function sendMessage(updateSidebarCallback = null, options = {}) {
     endPerformancePhase('render_user_message');
   }
 
-  // The durable write has succeeded. Reset the editor document and its undo
-  // history so an old sent prompt cannot be restored into the new draft.
   clearComposer();
 
   // TEMP_PERF_DIAGNOSTICS

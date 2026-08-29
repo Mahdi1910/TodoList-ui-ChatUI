@@ -15,46 +15,81 @@ import {
   normalizeCustomToolRoundLimit
 } from '../tools/custom-tool-limits.js';
 
-export function applyTheme(mode) {
-  setState({ theme: mode });
-  if (mode === 'light') {
-    document.documentElement.style.setProperty('--bg-primary', '#FCFCFC');
-    document.documentElement.style.setProperty('--bg-secondary', '#FCFCFC');
-    document.documentElement.style.setProperty('--bg-tertiary', '#F3F4F6');
-    document.documentElement.style.setProperty('--text-primary', '#0D0D0D');
-    document.documentElement.style.setProperty('--text-secondary', '#4B5563');
-    document.documentElement.style.setProperty('--border-color', '#E5E7EB');
-    document.documentElement.style.setProperty('--workspace-canvas-bg', '#EDEEF0');
-    document.documentElement.style.setProperty('--workspace-paper-bg', '#FFFFFF');
-    document.documentElement.style.setProperty('--workspace-paper-text', '#111111');
-    document.documentElement.style.setProperty('--workspace-paper-border', '#D7DADF');
-    document.documentElement.style.setProperty('--workspace-paper-shadow', '0 18px 48px rgba(0, 0, 0, 0.12)');
-    document.documentElement.style.setProperty('--workspace-code-bg', '#F3F4F6');
-  } else {
-    document.documentElement.style.setProperty('--bg-primary', '#000000');
-    document.documentElement.style.setProperty('--bg-secondary', '#000000');
-    document.documentElement.style.setProperty('--bg-tertiary', '#212121');
-    document.documentElement.style.setProperty('--text-primary', '#FFFFFF');
-    document.documentElement.style.setProperty('--text-secondary', '#AFAFAF');
-    document.documentElement.style.setProperty('--border-color', 'rgba(255, 255, 255, 0.1)');
-    document.documentElement.style.setProperty('--workspace-canvas-bg', '#090909');
-    document.documentElement.style.setProperty('--workspace-paper-bg', '#111111');
-    document.documentElement.style.setProperty('--workspace-paper-text', '#F5F5F5');
-    document.documentElement.style.setProperty('--workspace-paper-border', 'rgba(255, 255, 255, 0.12)');
-    document.documentElement.style.setProperty('--workspace-paper-shadow', '0 18px 48px rgba(0, 0, 0, 0.42)');
-    document.documentElement.style.setProperty('--workspace-code-bg', '#080808');
+const THEME_TOKENS = Object.freeze({
+  light: {
+    '--bg-primary': '#FCFCFC',
+    '--bg-secondary': '#FCFCFC',
+    '--bg-tertiary': '#F3F4F6',
+    '--bg-hover': '#E9ECEF',
+    '--bg-selected': '#E2E6EA',
+    '--menu-bg': '#FFFFFF',
+    '--menu-hover': '#F2F4F6',
+    '--text-primary': '#0D0D0D',
+    '--text-secondary': '#4B5563',
+    '--text-muted': '#6B7280',
+    '--border-color': '#E5E7EB',
+    '--border-light': '#D1D5DB',
+    '--focus-ring': '#7A828D',
+    '--scrollbar-thumb': 'rgba(75, 85, 99, 0.34)',
+    '--scrollbar-thumb-hover': 'rgba(75, 85, 99, 0.52)',
+    '--menu-shadow': '0 18px 44px rgba(15, 23, 42, 0.18)',
+    '--workspace-canvas-bg': '#EDEEF0',
+    '--workspace-paper-bg': '#FFFFFF',
+    '--workspace-paper-text': '#111111',
+    '--workspace-paper-border': '#D7DADF',
+    '--workspace-paper-shadow': '0 18px 48px rgba(0, 0, 0, 0.12)',
+    '--workspace-code-bg': '#F3F4F6'
+  },
+  dark: {
+    '--bg-primary': '#000000',
+    '--bg-secondary': '#000000',
+    '--bg-tertiary': '#212121',
+    '--bg-hover': '#2F2F2F',
+    '--bg-selected': '#303030',
+    '--menu-bg': '#242424',
+    '--menu-hover': '#343434',
+    '--text-primary': '#FFFFFF',
+    '--text-secondary': '#AFAFAF',
+    '--text-muted': '#AFAFAF',
+    '--border-color': 'rgba(255, 255, 255, 0.1)',
+    '--border-light': 'rgba(255, 255, 255, 0.18)',
+    '--focus-ring': '#A3A3A3',
+    '--scrollbar-thumb': 'rgba(148, 163, 184, 0.42)',
+    '--scrollbar-thumb-hover': 'rgba(148, 163, 184, 0.62)',
+    '--menu-shadow': '0 18px 44px rgba(0, 0, 0, 0.52)',
+    '--workspace-canvas-bg': '#090909',
+    '--workspace-paper-bg': '#111111',
+    '--workspace-paper-text': '#F5F5F5',
+    '--workspace-paper-border': 'rgba(255, 255, 255, 0.12)',
+    '--workspace-paper-shadow': '0 18px 48px rgba(0, 0, 0, 0.42)',
+    '--workspace-code-bg': '#080808'
   }
+});
 
-  window.dispatchEvent(new CustomEvent('workspace:theme-changed', { detail: { theme: mode } }));
+const ACCENTS = Object.freeze({
+  blue: { base: '#2563EB', hover: '#1D4ED8', soft: 'rgba(37, 99, 235, 0.16)' },
+  green: { base: '#10A37F', hover: '#0D8A6C', soft: 'rgba(16, 163, 127, 0.16)' },
+  purple: { base: '#8B5CF6', hover: '#7C3AED', soft: 'rgba(139, 92, 246, 0.16)' }
+});
+
+export function applyTheme(mode) {
+  const normalizedMode = mode === 'light' ? 'light' : 'dark';
+  setState({ theme: normalizedMode });
+  document.documentElement.dataset.theme = normalizedMode;
+  Object.entries(THEME_TOKENS[normalizedMode]).forEach(([name, value]) => {
+    document.documentElement.style.setProperty(name, value);
+  });
+  window.dispatchEvent(new CustomEvent('workspace:theme-changed', { detail: { theme: normalizedMode } }));
 }
 
 export function applyAccentColor(color) {
-  let hex = '#10A37F';
-  if (color === 'blue') hex = '#2563EB';
-  if (color === 'purple') hex = '#8B5CF6';
-
-  setState({ accentColor: hex });
-  document.documentElement.style.setProperty('--accent-blue', hex);
+  const accentName = Object.prototype.hasOwnProperty.call(ACCENTS, color) ? color : 'green';
+  const accent = ACCENTS[accentName];
+  setState({ accentColor: accent.base });
+  // --accent-blue remains as a compatibility alias used throughout the existing UI.
+  document.documentElement.style.setProperty('--accent-blue', accent.base);
+  document.documentElement.style.setProperty('--accent-blue-hover', accent.hover);
+  document.documentElement.style.setProperty('--accent-soft', accent.soft);
 }
 
 export function openSettingsModal() {
@@ -106,13 +141,11 @@ export function initSettingsUI() {
   const thinkingWasCorrected = !selectedModel.thinkingLevels.includes(state.thinkingLevel);
   if (thinkingWasCorrected) setState({ thinkingLevel: selectedModel.defaultThinkingLevel });
 
-  if (state.theme) applyTheme(state.theme);
-  if (state.accentColor) {
-    let colorName = 'default';
-    if (state.accentColor === '#2563EB') colorName = 'blue';
-    if (state.accentColor === '#8B5CF6') colorName = 'purple';
-    applyAccentColor(colorName);
-  }
+  applyTheme(state.theme || 'dark');
+  let colorName = 'green';
+  if (String(state.accentColor).toUpperCase() === '#2563EB') colorName = 'blue';
+  if (String(state.accentColor).toUpperCase() === '#8B5CF6') colorName = 'purple';
+  applyAccentColor(colorName);
 
   const openSettingsTrigger = document.getElementById('open-settings-trigger');
   const closeSettingsModalBtn = document.getElementById('close-settings-modal-btn');
@@ -139,7 +172,8 @@ export function initSettingsUI() {
   };
 
   if (thinkingWasCorrected) persistSettingsChange();
-  if (appearanceSelect && state.theme) appearanceSelect.value = state.theme;
+  if (appearanceSelect) appearanceSelect.value = state.theme || 'dark';
+  if (accentColorSelect) accentColorSelect.value = colorName;
 
   if (customToolLimitInput) {
     customToolLimitInput.value = String(normalizeCustomToolRoundLimit(state.customToolRoundLimit));
@@ -216,7 +250,7 @@ export function initSettingsUI() {
       setState({ currentModel: model.name, thinkingLevel });
       syncModelDisplay();
       syncThinkingDisplay();
-      settingsThinkingLevel.value = thinkingLevel;
+      if (settingsThinkingLevel) settingsThinkingLevel.value = thinkingLevel;
       persistSettingsChange();
     });
   }

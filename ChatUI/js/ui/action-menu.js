@@ -29,19 +29,35 @@ export function closeActionMenu({ restoreFocus = false } = {}) {
   if (restoreFocus) anchor?.focus?.();
 }
 
-function positionMenu(menu, anchor) {
+function positionMenu(menu, anchor, placement = 'bottom-end') {
   const rect = anchor.getBoundingClientRect();
   const gap = 6;
   const viewportPadding = 8;
   const width = menu.offsetWidth || 224;
   const height = menu.offsetHeight || 0;
-  let left = rect.right - width;
-  let top = rect.bottom + gap;
+  let left;
+  let top;
+
+  if (placement === 'top-start') {
+    // ChatGPT-style message menu: its leading edge begins at the three-dot
+    // control and the popup grows upward, keeping the message text unobscured.
+    left = rect.left;
+    top = rect.top - height - gap;
+    if (top < viewportPadding) top = rect.bottom + gap;
+  } else if (placement === 'top-end') {
+    left = rect.right - width;
+    top = rect.top - height - gap;
+    if (top < viewportPadding) top = rect.bottom + gap;
+  } else {
+    left = rect.right - width;
+    top = rect.bottom + gap;
+    if (top + height > window.innerHeight - viewportPadding) {
+      top = Math.max(viewportPadding, rect.top - height - gap);
+    }
+  }
 
   left = Math.max(viewportPadding, Math.min(left, window.innerWidth - width - viewportPadding));
-  if (top + height > window.innerHeight - viewportPadding) {
-    top = Math.max(viewportPadding, rect.top - height - gap);
-  }
+  top = Math.max(viewportPadding, Math.min(top, window.innerHeight - height - viewportPadding));
   menu.style.left = `${Math.round(left)}px`;
   menu.style.top = `${Math.round(top)}px`;
 }
@@ -75,7 +91,7 @@ function createMenuNode(item) {
   return button;
 }
 
-export function openActionMenu(anchor, items = []) {
+export function openActionMenu(anchor, items = [], options = {}) {
   const menu = getMenu();
   if (!menu || !anchor) return;
   if (menu.classList.contains('show') && activeAnchor === anchor) {
@@ -87,13 +103,13 @@ export function openActionMenu(anchor, items = []) {
   anchor.setAttribute('aria-haspopup', 'menu');
   anchor.setAttribute('aria-expanded', 'true');
   menu.setAttribute('role', 'menu');
-  menu.setAttribute('aria-label', 'Actions');
+  menu.setAttribute('aria-label', options.ariaLabel || 'Actions');
   menu.replaceChildren(...items.map(createMenuNode));
   menu.removeAttribute('hidden');
   menu.classList.add('show');
-  positionMenu(menu, anchor);
+  positionMenu(menu, anchor, options.placement || 'bottom-end');
   initializeIcons();
-  menu.querySelector('.action-menu-item:not(:disabled)')?.focus();
+  if (options.focusFirst !== false) menu.querySelector('.action-menu-item:not(:disabled)')?.focus();
 }
 
 function focusMenuBoundary(menu, end = false) {

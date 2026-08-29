@@ -5,10 +5,9 @@
 import { state, runtime } from '../state/store.js';
 import { copyTextToClipboard } from '../utils/dom.js';
 import { readAssistantMessage } from '../voice/read-aloud.js';
+import { openActionMenu, closeActionMenu } from '../ui/action-menu.js';
 
 let activeEditCancel = null;
-let activeOverflowMenu = null;
-let overflowGlobalListenersInstalled = false;
 
 function initializeIcons() {
   if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
@@ -20,33 +19,8 @@ function resolveFreshContext(chatRef, msgObj) {
   return { chat, message };
 }
 
-function closeOverflowMenu({ restoreFocus = false } = {}) {
-  const active = activeOverflowMenu;
-  if (!active) return;
-  active.menu.classList.add('hidden');
-  active.button.setAttribute('aria-expanded', 'false');
-  activeOverflowMenu = null;
-  if (restoreFocus && active.button.isConnected) active.button.focus();
-}
-
-function ensureOverflowGlobalListeners() {
-  if (overflowGlobalListenersInstalled) return;
-  overflowGlobalListenersInstalled = true;
-  document.addEventListener('click', event => {
-    if (!activeOverflowMenu) return;
-    if (activeOverflowMenu.menu.contains(event.target) || activeOverflowMenu.button.contains(event.target)) return;
-    closeOverflowMenu();
-  });
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && activeOverflowMenu) {
-      event.preventDefault();
-      closeOverflowMenu({ restoreFocus: true });
-    }
-  });
-}
-
 function createEditControl(msgObj, row, chatRef, callbacks, renderMessage) {
-  closeOverflowMenu();
+  closeActionMenu();
   activeEditCancel?.();
   const { onEditSaveCallback, onRegenerateCallback, onDeleteCallback } = callbacks;
   const editor = document.createElement('div');
@@ -103,12 +77,7 @@ function createEditControl(msgObj, row, chatRef, callbacks, renderMessage) {
   };
 }
 
-function makeMenuItem({ className, icon, label, danger = false }) {
-  return `<button type="button" class="message-menu-item ${className}${danger ? ' danger' : ''}" role="menuitem"><i data-lucide="${icon}"></i><span>${label}</span></button>`;
-}
-
 export function appendMessageToolbar(row, msgObj, chatRef, callbacks, renderMessage) {
-  ensureOverflowGlobalListeners();
   const { onRegenerateCallback, onDeleteCallback, onEditSaveCallback } = callbacks;
   const toolbar = document.createElement('div');
   toolbar.className = 'message-toolbar';
@@ -120,35 +89,24 @@ export function appendMessageToolbar(row, msgObj, chatRef, callbacks, renderMess
   const primaryRoleAction = isAssistant
     ? `<button class="toolbar-btn regenerate-msg-btn" title="Regenerate response" aria-label="Regenerate response"><i data-lucide="rotate-cw"></i></button>`
     : `<button class="toolbar-btn edit-msg-btn" title="Edit message" aria-label="Edit message"><i data-lucide="pencil"></i></button>`;
-  const overflowActions = isAssistant
-    ? [
-        makeMenuItem({ className: 'edit-msg-menu-item', icon: 'pencil', label: 'Edit message' }),
-        makeMenuItem({ className: 'delete-msg-menu-item', icon: 'trash-2', label: 'Delete message', danger: true })
-      ].join('')
-    : [
-        makeMenuItem({ className: 'regenerate-msg-menu-item', icon: 'rotate-cw', label: 'Regenerate response' }),
-        makeMenuItem({ className: 'delete-msg-menu-item', icon: 'trash-2', label: 'Delete message', danger: true })
-      ].join('');
 
   toolbar.innerHTML = `
     <button class="toolbar-btn copy-msg-btn" title="Copy text" aria-label="Copy message"><i data-lucide="copy"></i></button>
     ${readButton}
     ${primaryRoleAction}
-    <button class="toolbar-btn message-more-btn" title="More actions" aria-label="More message actions" aria-haspopup="menu" aria-expanded="false"><i data-lucide="more-horizontal"></i></button>
-    <div class="message-more-menu hidden" role="menu" aria-label="More message actions">${overflowActions}</div>`;
+    <button class="toolbar-btn message-more-btn" title="More actions" aria-label="More message actions" aria-haspopup="menu" aria-expanded="false" aria-controls="action-menu"><i data-lucide="more-horizontal"></i></button>`;
   row.appendChild(toolbar);
 
   const copyBtn = toolbar.querySelector('.copy-msg-btn');
   const moreBtn = toolbar.querySelector('.message-more-btn');
-  const moreMenu = toolbar.querySelector('.message-more-menu');
 
   const handleDelete = () => {
-    closeOverflowMenu();
+    closeActionMenu();
     if (chatRef && onDeleteCallback) onDeleteCallback(chatRef, msgObj, row);
   };
 
   const handleEdit = () => {
-    closeOverflowMenu();
+    closeActionMenu();
     if (runtime.isGenerating || !chatRef || !onEditSaveCallback) return;
     const fresh = resolveFreshContext(chatRef, msgObj);
     if (!fresh.chat || !fresh.message) return;
@@ -156,7 +114,7 @@ export function appendMessageToolbar(row, msgObj, chatRef, callbacks, renderMess
   };
 
   const handleRegenerate = () => {
-    closeOverflowMenu();
+    closeActionMenu();
     if (runtime.isGenerating || !chatRef) return;
     onRegenerateCallback?.(chatRef, msgObj);
   };
@@ -178,45 +136,32 @@ export function appendMessageToolbar(row, msgObj, chatRef, callbacks, renderMess
 
   toolbar.querySelector('.edit-msg-btn')?.addEventListener('click', handleEdit);
   toolbar.querySelector('.regenerate-msg-btn')?.addEventListener('click', handleRegenerate);
-  toolbar.querySelector('.edit-msg-menu-item')?.addEventListener('click', handleEdit);
-  toolbar.querySelector('.regenerate-msg-menu-item')?.addEventListener('click', handleRegenerate);
-  toolbar.querySelector('.delete-msg-menu-item')?.addEventListener('click', handleDelete);
+
+  const openMore = ({ focusFirst = true } = {}) => {
+    const items = isAssistant
+      ? [
+          { icon: 'pencil', label: 'Edit message', disabled: runtime.isGenerating, onSelect: handleEdit },
+          { icon: 'trash-2', label: 'Delete message', danger: true, onSelect: handleDelete }
+        ]
+      : [
+          { icon: 'rotate-cw', label: 'Regenerate response', disabled: runtime.isGenerating, onSelect: handleRegenerate },
+          { icon: 'trash-2', label: 'Delete message', danger: true, onSelect: handleDelete }
+        ];
+    openActionMenu(moreBtn, items, {
+      placement: 'top-start',
+      ariaLabel: 'More message actions',
+      focusFirst
+    });
+  };
 
   moreBtn.addEventListener('click', event => {
     event.stopPropagation();
-    if (activeOverflowMenu?.menu === moreMenu) {
-      closeOverflowMenu();
-      return;
-    }
-    closeOverflowMenu();
-    moreMenu.classList.remove('hidden');
-    moreBtn.setAttribute('aria-expanded', 'true');
-    activeOverflowMenu = { menu: moreMenu, button: moreBtn };
+    openMore({ focusFirst: false });
   });
-
-  moreMenu.addEventListener('click', event => event.stopPropagation());
-  moreMenu.addEventListener('keydown', event => {
-    const items = [...moreMenu.querySelectorAll('.message-menu-item:not(:disabled)')];
-    const index = items.indexOf(document.activeElement);
-    let nextIndex = index;
-    if (event.key === 'ArrowDown') nextIndex = Math.min(items.length - 1, index + 1);
-    else if (event.key === 'ArrowUp') nextIndex = Math.max(0, index - 1);
-    else if (event.key === 'Home') nextIndex = 0;
-    else if (event.key === 'End') nextIndex = items.length - 1;
-    else if (event.key === 'Escape') {
-      event.preventDefault();
-      closeOverflowMenu({ restoreFocus: true });
-      return;
-    } else return;
-    event.preventDefault();
-    items[Math.max(0, nextIndex)]?.focus();
-  });
-
   moreBtn.addEventListener('keydown', event => {
-    if (event.key !== 'ArrowDown') return;
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     event.preventDefault();
-    moreBtn.click();
-    moreMenu.querySelector('.message-menu-item:not(:disabled)')?.focus();
+    openMore({ focusFirst: true });
   });
 
   const readBtn = toolbar.querySelector('.read-msg-btn');
