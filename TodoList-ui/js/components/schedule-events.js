@@ -107,7 +107,6 @@ export const ScheduleEventMethods = {
       this.renderRepeatPresetList();
       this.updateRepeatSummary();
     } else if (tabName === 'after') {
-      this.ensureAfterDraft?.();
       this.renderAfterPanel?.();
     }
   },
