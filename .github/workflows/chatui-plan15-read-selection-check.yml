@@ -1,0 +1,44 @@
+name: ChatUI Plan 15 Read Selection Check
+
+on:
+  pull_request:
+    paths:
+      - 'ChatUI/css/chat/messages.css'
+      - 'ChatUI/css/chat/markdown.css'
+      - 'ChatUI/js/chat/message-renderer.js'
+      - 'ChatUI/js/chat/activity-renderer.js'
+      - 'ChatUI/js/ui/chat-controls.js'
+      - 'ChatUI/js/voice/read-selection.js'
+      - 'ChatUI/js/voice/read-aloud.js'
+      - 'ChatUI/js/api/gemini-live-audio.js'
+      - 'ChatUI/js/api/api-config.js'
+      - 'scripts/verify-chatui-plan15.mjs'
+      - '.github/workflows/chatui-plan15-read-selection-check.yml'
+      - 'implementation plan/Implementation Plan ID 15.md'
+
+jobs:
+  verify-read-selection-and-disclosure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check ChatUI/js/api/api-config.js
+          node --check ChatUI/js/chat/message-renderer.js
+          node --check ChatUI/js/voice/read-selection.js
+          node --check scripts/verify-chatui-plan15.mjs
+      - name: Verify Plan 15 invariants
+        run: node scripts/verify-chatui-plan15.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify updated assets reached runtime bundle
+        run: |
+          test -f dist/ChatUI/css/chat/messages.css
+          test -f dist/ChatUI/css/chat/markdown.css
+          test -f dist/ChatUI/js/chat/message-renderer.js
+          test -f dist/ChatUI/js/voice/read-selection.js
+          grep -q '#2F6FBA' dist/ChatUI/css/chat/messages.css
+          grep -q 'activity-item-text' dist/ChatUI/js/voice/read-selection.js
