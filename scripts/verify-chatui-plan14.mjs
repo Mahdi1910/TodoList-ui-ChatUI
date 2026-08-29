@@ -42,20 +42,22 @@ assert.match(apiKeyCss, /\.api-key-pool-input\s*\{[\s\S]*min-height:\s*44px;[\s\
 assert.match(sidebarShellCss, /\.sidebar-nav\s*\{[\s\S]*gap:\s*8px;/, 'New Chat and Workspace must have visible vertical separation');
 assert.match(sidebarShellCss, /\.new-chat-btn,\s*\.workspace-nav-btn\s*\{[\s\S]*text-decoration:\s*none;/, 'Workspace must share the same first-level navigation styling as New Chat');
 
-assert.match(messagesCss, /\.user-bubble\s*\{[\s\S]*--user-bubble-bg:\s*#173E76;[\s\S]*--user-bubble-text:\s*#F8FAFC;/, 'sent messages must use the requested deep-blue bubble with light text');
+assert.match(messagesCss, /\.user-bubble\s*\{[\s\S]*--user-bubble-bg:\s*#2F6FBA;[\s\S]*--user-bubble-text:\s*#FFFFFF;/, 'sent messages must use the lighter blue bubble with high-contrast text');
 assert.match(messagesCss, /\.user-message-collapsible\.is-collapsed\s*\{[\s\S]*max-height:\s*9\.6em;[\s\S]*overflow:\s*hidden;/, 'long sent prompts must initially cap at approximately six lines');
 assert.match(messagesCss, /\.user-message-collapsible\.is-collapsed\.has-overflow::after[\s\S]*linear-gradient/, 'collapsed prompts must have a subtle bottom fade instead of a hard text cut');
 assert.match(messagesCss, /\.user-message-toggle\s*\{[\s\S]*font-size:\s*12px;[\s\S]*font-weight:\s*600;/, 'Show more / Show less must remain a compact in-bubble control');
 assert.match(markdownCss, /\.user-bubble h1,[\s\S]*color:\s*inherit;/, 'user Markdown headings must remain readable on the blue bubble');
-assert.match(markdownCss, /\.user-bubble a\s*\{[\s\S]*color:\s*#BFDBFE;/, 'user Markdown links must remain readable on the blue bubble');
+assert.match(markdownCss, /\.user-bubble a\s*\{[\s\S]*color:\s*#FFFFFF;/, 'user Markdown links must remain readable on the lighter blue bubble');
 
 assert.match(messageRenderer, /USER_MESSAGE_COLLAPSE_LINES\s*=\s*6/, 'sent-message collapse threshold must stay at six lines');
 assert.match(messageRenderer, /function appendUserContent\([\s\S]*user-message-collapsible is-collapsed/, 'only the user-content rendering path must own the disclosure wrapper');
-assert.match(messageRenderer, /toggle\.textContent = 'Show more'/, 'collapsed sent prompts must expose Show more');
+assert.match(messageRenderer, /toggle\.hidden = true;/, 'sent-message disclosure must start hidden until real overflow is measured');
+assert.doesNotMatch(messageRenderer, /USER_MESSAGE_COLLAPSE_CHAR_HINT|likelyNeedsUserCollapse/, 'sent-message disclosure must not use character or newline heuristics');
+assert.match(messageRenderer, /naturalHeight > collapsedHeight \+ 2/, 'disclosure visibility must come from actual rendered text height beyond six lines');
 assert.match(messageRenderer, /toggle\.textContent = expanding \? 'Show less' : 'Show more'/, 'expanded sent prompts must expose Show less');
-assert.match(messageRenderer, /collapsible\.scrollHeight > visibleHeight \+ 2/, 'disclosure visibility must be confirmed from actual rendered overflow');
+assert.match(messageRenderer, /observer\.observe\(text\)/, 'sent-message overflow must remeasure when responsive or iframe visibility changes affect text size');
 assert.match(messageRenderer, /else if \(content\) \{\s*appendUserContent\(bubble, content\);\s*\}/, 'assistant messages must not be routed through the sent-message collapse path');
 
-assert.match(apiConfig, /CHATUI_VERSION = '2\.2'/, 'ChatUI Settings version must be 2.2');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.3'/, 'ChatUI Settings version must be 2.3');
 
 console.log('ChatUI Plan 14 embedded light theme and sent-message compactness verification passed.');
