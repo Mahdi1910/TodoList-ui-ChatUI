@@ -1,4 +1,4 @@
-/* ==========================================================================
+/* ============================================================================
    MAIN.CSS — Base Dark Theme, Typography & Layout Variables
    ========================================================================== */
 
@@ -66,19 +66,31 @@ button {
   justify-content: center;
 }
 
+/* One visible keyboard-focus language across buttons, links, custom rows, and
+   native form fields. Mouse/touch focus keeps the existing visual treatment. */
 button:focus-visible,
 a:focus-visible,
-[tabindex]:focus-visible {
+[tabindex]:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--accent-blue);
   outline-offset: 2px;
 }
 
-/* Text fields use their own focus treatment; don't show the browser-style
-   blue keyboard ring around the editable field itself. */
+/* Individual components may move the focus ring to a containing control (for
+   example icon-wrapped inputs and visual toggle tracks). */
 input:focus,
 textarea:focus,
 select:focus {
   outline: none;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
 }
 
 .visually-hidden {
