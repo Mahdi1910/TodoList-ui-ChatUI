@@ -8,6 +8,9 @@ import { renderActivityTimeline } from './activity-renderer.js';
 import { appendToolMetadata } from './message-tools.js';
 import { appendMessageToolbar } from './message-controls.js';
 
+export const USER_MESSAGE_COLLAPSE_LINES = 6;
+const USER_MESSAGE_COLLAPSE_CHAR_HINT = 360;
+
 function appendLegacyAssistantContent(bubble, msgObj, content, thinking) {
   const thinkingSlot = document.createElement('div');
   const shouldHideThinking = msgObj.status === 'error' || (!thinking && content);
@@ -37,6 +40,66 @@ function appendLegacyAssistantContent(bubble, msgObj, content, thinking) {
   bubble.append(thinkingSlot, contentSlot);
 }
 
+function likelyNeedsUserCollapse(content) {
+  const source = String(content || '').trim();
+  if (!source) return false;
+  if (source.split(/\r?\n/).length > USER_MESSAGE_COLLAPSE_LINES) return true;
+  return source.length > USER_MESSAGE_COLLAPSE_CHAR_HINT;
+}
+
+function appendUserContent(bubble, content) {
+  const collapsible = document.createElement('div');
+  collapsible.className = 'user-message-collapsible is-collapsed';
+
+  const text = document.createElement('div');
+  text.className = 'message-text';
+  text.innerHTML = renderMarkdown(content);
+  collapsible.appendChild(text);
+  bubble.appendChild(collapsible);
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'user-message-toggle';
+  toggle.textContent = 'Show more';
+  toggle.setAttribute('aria-expanded', 'false');
+
+  const hintedOverflow = likelyNeedsUserCollapse(content);
+  toggle.hidden = !hintedOverflow;
+  collapsible.classList.toggle('has-overflow', hintedOverflow);
+  bubble.appendChild(toggle);
+
+  toggle.addEventListener('click', () => {
+    const expanding = collapsible.classList.contains('is-collapsed');
+    collapsible.classList.toggle('is-collapsed', !expanding);
+    collapsible.classList.toggle('has-overflow', !expanding);
+    toggle.setAttribute('aria-expanded', String(expanding));
+    toggle.textContent = expanding ? 'Show less' : 'Show more';
+  });
+
+  // Markdown structure and wrapping determine the real visual height. Measure
+  // after insertion so short messages never get a needless disclosure button.
+  const measureOverflow = () => {
+    if (!collapsible.isConnected || !collapsible.classList.contains('is-collapsed')) return false;
+    const visibleHeight = collapsible.clientHeight;
+    if (visibleHeight <= 0) return false; // keep the heuristic while an iframe/view is hidden
+    const hasOverflow = collapsible.scrollHeight > visibleHeight + 2;
+    collapsible.classList.toggle('has-overflow', hasOverflow);
+    toggle.hidden = !hasOverflow;
+    return true;
+  };
+  requestAnimationFrame(() => requestAnimationFrame(measureOverflow));
+
+  // The combined shell preloads ChatUI while its iframe can still be hidden.
+  // ResizeObserver gives that preloaded transcript one real measurement as soon
+  // as the frame becomes visible, then disconnects to avoid per-message churn.
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(() => {
+      if (measureOverflow()) observer.disconnect();
+    });
+    observer.observe(collapsible);
+  }
+}
+
 export function renderMessageDOM(msgInput, chatRef = null, onRegenerateCallback = null, onDeleteCallback = null, onEditSaveCallback = null) {
   const msgObj = typeof msgInput === 'object' ? msgInput : { role: msgInput, content: arguments[1] || '' };
   const role = msgObj.role;
@@ -63,10 +126,7 @@ export function renderMessageDOM(msgInput, chatRef = null, onRegenerateCallback 
     }
     if (msgObj.toolMetadata) appendToolMetadata(bubble, msgObj.toolMetadata, msgObj);
   } else if (content) {
-    const text = document.createElement('div');
-    text.className = 'message-text';
-    text.innerHTML = renderMarkdown(content);
-    bubble.appendChild(text);
+    appendUserContent(bubble, content);
   }
 
   row.appendChild(bubble);

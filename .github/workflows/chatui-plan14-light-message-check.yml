@@ -1,0 +1,44 @@
+name: ChatUI Plan 14 Light Theme Message Check
+
+on:
+  pull_request:
+    paths:
+      - 'ChatUI/embedded.html'
+      - 'ChatUI/css/refinements.css'
+      - 'ChatUI/css/components/api-key-pool.css'
+      - 'ChatUI/css/sidebar/shell.css'
+      - 'ChatUI/css/chat/messages.css'
+      - 'ChatUI/css/chat/markdown.css'
+      - 'ChatUI/js/chat/message-renderer.js'
+      - 'ChatUI/js/api/api-config.js'
+      - 'scripts/verify-chatui-plan14.mjs'
+      - '.github/workflows/chatui-plan14-light-message-check.yml'
+      - 'implementation plan/Implementation Plan ID 14.md'
+
+jobs:
+  verify-light-theme-message-compactness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check ChatUI/js/api/api-config.js
+          node --check ChatUI/js/chat/message-renderer.js
+          node --check scripts/verify-chatui-plan14.mjs
+      - name: Verify Plan 14 invariants
+        run: node scripts/verify-chatui-plan14.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify updated assets reached runtime bundle
+        run: |
+          test -f dist/ChatUI/embedded.html
+          test -f dist/ChatUI/css/refinements.css
+          test -f dist/ChatUI/css/components/api-key-pool.css
+          test -f dist/ChatUI/css/sidebar/shell.css
+          test -f dist/ChatUI/css/chat/messages.css
+          test -f dist/ChatUI/css/chat/markdown.css
+          test -f dist/ChatUI/js/chat/message-renderer.js
+          grep -q '/ChatUI/css/refinements.css' dist/ChatUI/embedded.html

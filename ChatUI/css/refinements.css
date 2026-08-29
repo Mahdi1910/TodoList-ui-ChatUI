@@ -1,4 +1,4 @@
-/* ChatUI 2.1 final refinement layer. Loaded after responsive.css. */
+/* ChatUI 2.2 final refinement layer. Loaded after responsive.css. */
 
 /* Text editing surfaces intentionally keep a stable border while focused. */
 .composer-editor-host .ProseMirror:focus-visible,
@@ -24,8 +24,13 @@
   outline-offset: 1px;
 }
 
-/* Shared popup menus must follow the active appearance instead of staying dark. */
-.action-popup-menu {
+/* Shared popup menus and selector menus follow the active appearance instead of
+   inheriting dark surfaces from their original component definitions. */
+.action-popup-menu,
+.message-more-menu,
+.model-dropdown-menu,
+.thinking-dropdown-menu,
+.tools-popup-menu {
   background: var(--menu-bg) !important;
   border-color: var(--border-color) !important;
   box-shadow: var(--menu-shadow) !important;
@@ -36,9 +41,28 @@
 }
 
 .action-menu-item:hover,
-.action-menu-item:focus-visible {
+.action-menu-item:focus-visible,
+.message-menu-item:hover,
+.message-menu-item:focus-visible,
+.model-option:hover,
+.thinking-option:hover,
+.tool-option:hover,
+.tools-menu-header .close-btn:hover,
+.tools-menu-header .close-btn:focus-visible {
   background: var(--menu-hover) !important;
   color: var(--text-primary) !important;
+}
+
+.action-menu-item:disabled:hover {
+  background: transparent !important;
+}
+
+.action-menu-item.danger:hover,
+.action-menu-item.danger:focus-visible,
+.message-menu-item.danger:hover,
+.message-menu-item.danger:focus-visible {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #F87171 !important;
 }
 
 .action-menu-item:focus-visible {
@@ -50,23 +74,19 @@
   background: var(--border-color) !important;
 }
 
-/* Plan 12's local message popup is retained only as defensive legacy styling;
-   current message overflow actions use the shared fixed popup primitive. */
-.message-more-menu {
-  background: var(--menu-bg) !important;
-  border-color: var(--border-color) !important;
-  box-shadow: var(--menu-shadow) !important;
-}
-
-.message-menu-item:hover,
-.message-menu-item:focus-visible {
-  background: var(--menu-hover) !important;
+.model-option.active,
+.thinking-option.selected {
+  background: var(--bg-selected) !important;
 }
 
 /* Settings and Audio Read surfaces inherit the same theme tokens. */
 .settings-card .settings-close-btn {
   background: var(--menu-bg) !important;
   color: var(--text-primary);
+}
+
+.settings-card .settings-close-btn:hover {
+  background: var(--menu-hover) !important;
 }
 
 .audio-voice-menu {
@@ -123,37 +143,51 @@
   padding-top: 8px !important;
 }
 
-/* Gemini Text API profile selector and compact key editor. */
+/* Centered segmented control for the two persistent Gemini Text API profiles. */
 .text-api-profile-switcher {
+  width: min(250px, 100%);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin: 0 0 14px;
-  padding: 4px;
+  gap: 3px;
+  margin: 2px auto 16px;
+  padding: 3px;
   border: 1px solid var(--border-color);
-  border-radius: 11px;
+  border-radius: 999px;
   background: var(--bg-tertiary);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .text-api-profile-btn {
-  min-height: 36px;
-  padding: 7px 12px;
-  border-radius: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   color: var(--text-secondary);
   font-weight: 600;
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.text-api-profile-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.text-api-profile-btn[aria-pressed="true"] {
-  background: var(--bg-selected);
+.text-api-profile-btn:hover {
+  background: var(--menu-hover);
   color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px var(--border-light);
+}
+
+.text-api-profile-btn[aria-pressed="true"] {
+  background: var(--menu-bg);
+  border-color: var(--border-light);
+  color: var(--accent-blue);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Keep a multi-key pool possible without turning Settings into one giant field. */
+#tab-gemini .api-key-form-group .input-with-icon {
+  padding-block: 7px;
 }
 
 .api-key-pool-input {
-  min-height: 76px !important;
-  height: 76px !important;
-  max-height: 132px !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  max-height: 88px !important;
   resize: vertical;
   overflow-y: auto !important;
 }

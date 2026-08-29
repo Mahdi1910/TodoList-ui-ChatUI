@@ -22,7 +22,7 @@ import {
 import { normalizeMultilineApiKeyText } from './text-api-key-input.js';
 
 export const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
-export const CHATUI_VERSION = '2.1';
+export const CHATUI_VERSION = '2.2';
 
 let validationTimer = null;
 let validationController = null;
@@ -72,7 +72,7 @@ export async function saveApiSettings(settings) {
 function configureMultilineTextKeyInput(textarea) {
   textarea.classList.add('api-key-pool-input');
   textarea.placeholder = 'One Gemini Text API Key per line';
-  textarea.rows = 3;
+  textarea.rows = 2;
   textarea.wrap = 'off';
   textarea.setAttribute('autocomplete', 'off');
   textarea.setAttribute('autocapitalize', 'off');
