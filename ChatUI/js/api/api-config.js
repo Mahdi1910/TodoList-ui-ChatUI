@@ -12,18 +12,27 @@ import {
   textApiKeyPoolText,
   validateTextApiKeyPool
 } from './text-api-key-pool.js';
+import {
+  TEXT_API_PROFILE_DEFINITIONS,
+  commitActiveTextApiState,
+  ensureTextApiProfilesState,
+  getActiveTextApiProfile,
+  selectTextApiProfile
+} from './text-api-profiles.js';
 import { normalizeMultilineApiKeyText } from './text-api-key-input.js';
 
 export const DEFAULT_GOOGLE_BASE_URL = 'https://generativelanguage.googleapis.com';
-export const CHATUI_VERSION = '2.0';
+export const CHATUI_VERSION = '2.1';
 
 let validationTimer = null;
 let validationController = null;
 let validationRunId = 0;
 
 export function getApiSettings() {
+  ensureTextApiProfilesState();
   const api = ensureTextApiKeyPoolState();
   return {
+    activeTextProfileId: api.activeTextProfileId || 'mode-1',
     textApiKey: api.textApiKey || '',
     textApiKeys: Array.isArray(api.textApiKeys) ? api.textApiKeys : [],
     textApiKeyIndex: Number(api.textApiKeyIndex) || 0,
@@ -34,6 +43,7 @@ export function getApiSettings() {
 }
 
 export async function saveApiSettings(settings) {
+  ensureTextApiProfilesState();
   if (settings) {
     setState({ api: { ...state.api, ...Object.fromEntries(
       Object.entries(settings).filter(([, value]) => value !== undefined)
@@ -45,8 +55,10 @@ export async function saveApiSettings(settings) {
 
   const textInput = document.getElementById('text-api-key-input');
   if (textInput) setTextApiKeyPoolFromText(normalizeMultilineApiKeyText(textInput.value));
+  commitActiveTextApiState({
+    textBaseUrl: document.getElementById('text-base-url-input')?.value.trim() || ''
+  });
   const values = {
-    textBaseUrl: document.getElementById('text-base-url-input')?.value.trim(),
     voiceApiKey: document.getElementById('voice-api-key-input')?.value.trim(),
     voiceBaseUrl: document.getElementById('voice-base-url-input')?.value.trim()
   };
@@ -60,7 +72,7 @@ export async function saveApiSettings(settings) {
 function configureMultilineTextKeyInput(textarea) {
   textarea.classList.add('api-key-pool-input');
   textarea.placeholder = 'One Gemini Text API Key per line';
-  textarea.rows = 6;
+  textarea.rows = 3;
   textarea.wrap = 'off';
   textarea.setAttribute('autocomplete', 'off');
   textarea.setAttribute('autocapitalize', 'off');
@@ -81,6 +93,41 @@ function ensureMultilineTextKeyInput() {
   textarea.className = existing.className;
   existing.replaceWith(textarea);
   return configureMultilineTextKeyInput(textarea);
+}
+
+function ensureTextProfileSwitcher() {
+  let switcher = document.getElementById('text-api-profile-switcher');
+  if (switcher) return switcher;
+  const pane = document.getElementById('tab-gemini');
+  const group = pane?.querySelector('.api-settings-group');
+  const firstField = group?.querySelector('.form-group');
+  if (!group || !firstField) return null;
+
+  switcher = document.createElement('div');
+  switcher.id = 'text-api-profile-switcher';
+  switcher.className = 'text-api-profile-switcher';
+  switcher.setAttribute('role', 'group');
+  switcher.setAttribute('aria-label', 'Gemini Text API mode');
+  TEXT_API_PROFILE_DEFINITIONS.forEach(profile => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'text-api-profile-btn';
+    button.dataset.textApiProfile = profile.id;
+    button.textContent = profile.name;
+    button.setAttribute('aria-pressed', 'false');
+    switcher.appendChild(button);
+  });
+  group.insertBefore(switcher, firstField);
+  return switcher;
+}
+
+function syncTextProfileButtons() {
+  const activeId = ensureTextApiProfilesState().activeTextProfileId;
+  document.querySelectorAll('[data-text-api-profile]').forEach(button => {
+    const active = button.dataset.textApiProfile === activeId;
+    button.setAttribute('aria-pressed', String(active));
+    button.title = active ? `${button.textContent} is active` : `Use ${button.textContent}`;
+  });
 }
 
 function normalizeTextareaLineBreaks(input) {
@@ -153,11 +200,12 @@ function formatLocalTime(timestamp) {
 
 function renderKeyPoolStatus(progressText = '') {
   const api = ensureTextApiKeyPoolState();
+  const activeProfile = getActiveTextApiProfile();
   const summary = getTextApiKeyPoolSummary();
   const status = document.getElementById('text-api-key-pool-status');
   const list = document.getElementById('text-api-key-pool-list');
   if (status) {
-    status.textContent = progressText || `${summary.total} keys • ${summary.available} available • ${summary.cooling} cooling • ${summary.invalid} invalid`;
+    status.textContent = progressText || `${activeProfile?.name || 'Mode'} • ${summary.total} keys • ${summary.available} available • ${summary.cooling} cooling • ${summary.invalid} invalid`;
   }
   if (!list) return;
   list.innerHTML = '';
@@ -193,7 +241,7 @@ async function validateCurrentPool() {
   const runId = ++validationRunId;
   validationController?.abort();
   validationController = new AbortController();
-  const cleanBaseUrl = getCleanBaseUrl(state.api?.textBaseUrl || '');
+  const cleanBaseUrl = getCleanBaseUrl(ensureTextApiProfilesState().textBaseUrl || '');
   const total = ensureTextApiKeyPoolState().textApiKeys?.length || 0;
   if (!total) {
     renderKeyPoolStatus();
@@ -223,9 +271,6 @@ function schedulePoolSaveAndValidation(input) {
     const normalizedText = normalizeTextareaLineBreaks(input);
     setTextApiKeyPoolFromText(normalizedText);
     try {
-      // Persist the cleaned internal key pool, but never rewrite the textarea while
-      // the user is editing. Rewriting here used to remove blank lines and move the
-      // caret after the 700 ms debounce, which broke sequential mobile pastes.
       await persistSettings();
       renderKeyPoolStatus();
       await validateCurrentPool();
@@ -257,7 +302,20 @@ function ensureVersionRow() {
   else pane.appendChild(row);
 }
 
+function renderActiveProfileIntoInputs(textApiKeyInput, textBaseUrlInput) {
+  ensureTextApiProfilesState();
+  ensureTextApiKeyPoolState();
+  if (textApiKeyInput) {
+    textApiKeyInput.value = textApiKeyPoolText();
+    textApiKeyInput.classList.remove('api-key-visible');
+  }
+  if (textBaseUrlInput) textBaseUrlInput.value = state.api.textBaseUrl || '';
+  syncTextProfileButtons();
+  renderKeyPoolStatus();
+}
+
 export function initApiSettingsUI() {
+  ensureTextApiProfilesState();
   ensureTextApiKeyPoolState();
   const textApiKeyInput = ensureMultilineTextKeyInput();
   const textBaseUrlInput = document.getElementById('text-base-url-input');
@@ -265,19 +323,15 @@ export function initApiSettingsUI() {
   const voiceBaseUrlInput = document.getElementById('voice-base-url-input');
   const toggleTextKeyBtn = document.getElementById('toggle-text-key-visibility');
   const toggleVoiceKeyBtn = document.getElementById('toggle-voice-key-visibility');
+  const profileSwitcher = ensureTextProfileSwitcher();
 
   ensureKeyPoolStatusUI(textApiKeyInput);
   ensureVersionRow();
 
   const settings = getApiSettings();
-  if (textApiKeyInput) {
-    textApiKeyInput.value = textApiKeyPoolText();
-    textApiKeyInput.classList.remove('api-key-visible');
-  }
-  if (textBaseUrlInput) textBaseUrlInput.value = settings.textBaseUrl;
+  renderActiveProfileIntoInputs(textApiKeyInput, textBaseUrlInput);
   if (voiceApiKeyInput) voiceApiKeyInput.value = settings.voiceApiKey;
   if (voiceBaseUrlInput) voiceBaseUrlInput.value = settings.voiceBaseUrl;
-  renderKeyPoolStatus();
 
   const persistApiSettings = async () => {
     try {
@@ -287,6 +341,20 @@ export function initApiSettingsUI() {
       alert('Failed to save API settings: ' + err.message);
     }
   };
+
+  profileSwitcher?.addEventListener('click', async event => {
+    const button = event.target.closest('[data-text-api-profile]');
+    if (!button || button.dataset.textApiProfile === state.api.activeTextProfileId) return;
+
+    window.clearTimeout(validationTimer);
+    validationController?.abort();
+    if (textApiKeyInput) setTextApiKeyPoolFromText(normalizeMultilineApiKeyText(textApiKeyInput.value));
+    commitActiveTextApiState({ textBaseUrl: textBaseUrlInput?.value.trim() || '' });
+    selectTextApiProfile(button.dataset.textApiProfile);
+    ensureTextApiKeyPoolState();
+    await persistSettings();
+    renderActiveProfileIntoInputs(textApiKeyInput, textBaseUrlInput);
+  });
 
   if (textApiKeyInput) {
     textApiKeyInput.addEventListener('paste', event => {
@@ -299,7 +367,8 @@ export function initApiSettingsUI() {
     textApiKeyInput.addEventListener('change', () => schedulePoolSaveAndValidation(textApiKeyInput));
   }
   if (textBaseUrlInput) textBaseUrlInput.addEventListener('change', async () => {
-    await persistApiSettings();
+    commitActiveTextApiState({ textBaseUrl: textBaseUrlInput.value.trim() });
+    await persistSettings();
     await validateCurrentPool();
   });
   if (voiceApiKeyInput) voiceApiKeyInput.addEventListener('change', persistApiSettings);
