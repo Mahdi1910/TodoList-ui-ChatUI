@@ -47,6 +47,6 @@ assert.match(
 assert.doesNotMatch(sidebarRenderJs, /add-chat-to-proj-btn|proj-options-btn|pin-chat-btn|chat-options-btn/, 'per-row action buttons must stay removed');
 assert.match(sidebarRenderJs, /bindSidebarActionPress\(projHeader/, 'project rows must expose actions through the press-action primitive');
 assert.match(sidebarRenderJs, /bindSidebarActionPress\(link/, 'chat rows must expose actions through the press-action primitive');
-assert.match(apiConfig, /CHATUI_VERSION = '2\.0'/, 'ChatUI Settings version must be 2.0');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.1'/, 'ChatUI Settings version must be 2.1');
 
 console.log('ChatUI Plan 9 sidebar and tools verification passed.');
