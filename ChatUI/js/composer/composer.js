@@ -12,7 +12,7 @@ const TOOL_DESCRIPTORS = Object.freeze([
   { key: 'googleSearch', icon: 'search', label: 'Google Search', toggle: 'toggle-google-search', sidebarToggle: 'sidebar-toggle-google-search' },
   { key: 'urlContext', icon: 'link', label: 'URL Context', toggle: 'toggle-url-context', sidebarToggle: 'sidebar-toggle-url-context' },
   { key: 'codeExecution', icon: 'code-2', label: 'Code Execution', toggle: 'toggle-code-execution', sidebarToggle: 'sidebar-toggle-code-execution' },
-  { key: 'workspace', icon: 'folder-tree', label: 'Workspace', toggle: 'toggle-workspace', sidebarToggle: 'sidebar-toggle-workspace' },
+  { key: 'workspace', icon: 'folder-tree', label: 'Workspace Access', toggle: 'toggle-workspace', sidebarToggle: 'sidebar-toggle-workspace' },
   { key: 'todo', icon: 'list-todo', label: 'To-Do', toggle: 'toggle-todo', sidebarToggle: 'sidebar-toggle-todo' }
 ]);
 let todoSupportListenerInstalled = false;
