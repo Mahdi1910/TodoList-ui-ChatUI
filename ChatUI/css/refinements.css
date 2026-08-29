@@ -1,0 +1,174 @@
+/* ChatUI 2.1 final refinement layer. Loaded after responsive.css. */
+
+/* Text editing surfaces intentionally keep a stable border while focused. */
+.composer-editor-host .ProseMirror:focus-visible,
+.message-edit-input:focus-visible,
+.modal-input:focus-visible,
+.select-dropdown:focus-visible {
+  outline: none !important;
+}
+
+.input-with-icon:focus-within {
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+}
+
+.composer-bar:focus-within,
+.composer-bar:has(.ProseMirror:focus-visible) {
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+}
+
+.message-more-btn:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* Shared popup menus must follow the active appearance instead of staying dark. */
+.action-popup-menu {
+  background: var(--menu-bg) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: var(--menu-shadow) !important;
+}
+
+.action-menu-item {
+  color: var(--text-primary) !important;
+}
+
+.action-menu-item:hover,
+.action-menu-item:focus-visible {
+  background: var(--menu-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.action-menu-separator {
+  background: var(--border-color) !important;
+}
+
+/* Plan 12's local message popup is retained only as defensive legacy styling;
+   current message overflow actions use the shared fixed popup primitive. */
+.message-more-menu {
+  background: var(--menu-bg) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: var(--menu-shadow) !important;
+}
+
+.message-menu-item:hover,
+.message-menu-item:focus-visible {
+  background: var(--menu-hover) !important;
+}
+
+/* Settings and Audio Read surfaces inherit the same theme tokens. */
+.settings-card .settings-close-btn {
+  background: var(--menu-bg) !important;
+  color: var(--text-primary);
+}
+
+.audio-voice-menu {
+  background: var(--menu-bg) !important;
+  box-shadow: var(--menu-shadow) !important;
+}
+
+.audio-voice-option[aria-selected="true"] {
+  color: var(--text-primary) !important;
+  background: var(--bg-selected) !important;
+}
+
+.audio-voice-preview-btn.is-playing {
+  border-color: var(--accent-blue) !important;
+  background: var(--accent-soft) !important;
+  color: var(--accent-blue) !important;
+}
+
+.settings-home,
+.settings-content,
+.audio-voice-menu,
+.sidebar-scrollable,
+.right-sidebar-scrollable {
+  scrollbar-color: var(--scrollbar-thumb) transparent !important;
+}
+
+.settings-home::-webkit-scrollbar-thumb,
+.settings-content::-webkit-scrollbar-thumb,
+.audio-voice-menu::-webkit-scrollbar-thumb,
+.sidebar-scrollable::-webkit-scrollbar-thumb,
+.right-sidebar-scrollable::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb) !important;
+  background-clip: padding-box !important;
+}
+
+.settings-home::-webkit-scrollbar-thumb:hover,
+.settings-content::-webkit-scrollbar-thumb:hover,
+.audio-voice-menu::-webkit-scrollbar-thumb:hover,
+.sidebar-scrollable::-webkit-scrollbar-thumb:hover,
+.right-sidebar-scrollable::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover) !important;
+  background-clip: padding-box !important;
+}
+
+/* Selection is stronger than hover, but never becomes a dark-theme block in Light mode. */
+.chat-item:hover { background: var(--bg-hover); }
+.chat-item.active { background: var(--bg-selected) !important; color: var(--text-primary); }
+.project-header-item:hover,
+.project-header-item:focus-visible { background: var(--bg-hover); }
+
+/* Give quick navigation breathing room below the logo/search header. */
+.sidebar-nav {
+  padding-top: 8px !important;
+}
+
+/* Gemini Text API profile selector and compact key editor. */
+.text-api-profile-switcher {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 11px;
+  background: var(--bg-tertiary);
+}
+
+.text-api-profile-btn {
+  min-height: 36px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.text-api-profile-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.text-api-profile-btn[aria-pressed="true"] {
+  background: var(--bg-selected);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--border-light);
+}
+
+.api-key-pool-input {
+  min-height: 76px !important;
+  height: 76px !important;
+  max-height: 132px !important;
+  resize: vertical;
+  overflow-y: auto !important;
+}
+
+/* Theme-aware code/editor fragments that previously assumed a black canvas. */
+[data-theme="light"] .composer-editor-host .ProseMirror pre {
+  background: #F5F6F8;
+  color: #111827;
+}
+
+[data-theme="light"] .composer-editor-host .ProseMirror code,
+[data-theme="light"] .composer-image-markdown,
+[data-theme="light"] .composer-editor-host .ProseMirror span[data-type="html"] {
+  background: rgba(15, 23, 42, 0.07);
+}
+
+[data-theme="light"] .composer-editor-host .ProseMirror th {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+/* Empty new-chat screen stays clean; loading/error messages can still opt in. */
+#empty-state .landing-title.default-landing-title {
+  display: none;
+}
