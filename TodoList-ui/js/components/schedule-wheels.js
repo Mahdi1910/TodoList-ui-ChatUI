@@ -80,6 +80,9 @@ export const ScheduleWheelMethods = {
     if (!wheel) return;
 
     let accumulatedDelta = 0;
+    const markAbsoluteTimeEdit = () => {
+      if (['hour', 'minute', 'period'].includes(type) && this.draftAfter) this.clearAfterDraft?.();
+    };
 
     wheel.addEventListener('wheel', e => {
       e.preventDefault();
@@ -89,6 +92,7 @@ export const ScheduleWheelMethods = {
 
       const direction = accumulatedDelta > 0 ? 1 : -1;
       accumulatedDelta = 0;
+      markAbsoluteTimeEdit();
 
       const currentIndex = Math.round(wheel.scrollTop / this.ITEM_HEIGHT);
       const newIndex = Math.max(0, Math.min(wheel._maxIndex, currentIndex + direction));
@@ -113,6 +117,7 @@ export const ScheduleWheelMethods = {
 
     wheel.addEventListener('touchend', () => {
       isTouch = false;
+      markAbsoluteTimeEdit();
       requestAnimationFrame(() => {
         const index = Math.round(wheel.scrollTop / this.ITEM_HEIGHT);
         this.scrollWheelToIndex(wheel, index, true, type);
@@ -125,6 +130,7 @@ export const ScheduleWheelMethods = {
       const items = [...wheel.querySelectorAll('.wheel-item')];
       const index = items.indexOf(item);
       if (index !== -1) {
+        markAbsoluteTimeEdit();
         this.scrollWheelToIndex(wheel, index, true, type);
       }
     });
@@ -174,9 +180,7 @@ export const ScheduleWheelMethods = {
           const oldUnit = this.draftRepeat.custom.unit;
           const newUnit = selectedItem.dataset.value;
           this.draftRepeat.custom.unit = newUnit;
-          if (oldUnit !== newUnit) {
-            this.updateCustomRepeatSubviews(newUnit);
-          }
+          if (oldUnit !== newUnit) this.updateCustomRepeatSubviews(newUnit);
         }
       } else {
         if (!this.draftTime) this.draftTime = this.getCurrentTimeObj();
