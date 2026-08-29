@@ -8,7 +8,7 @@ const sidebarRenderJs = fs.readFileSync('ChatUI/js/sidebar/sidebar-render.js', '
 const apiConfig = fs.readFileSync('ChatUI/js/api/api-config.js', 'utf8');
 
 assert.doesNotMatch(mainChatHtml, /class="tool-desc"/, 'composer Tools popover must not include descriptive subtitle text');
-for (const label of ['Google Search', 'URL Context', 'Code Execution', 'Workspace', 'To-Do']) {
+for (const label of ['Google Search', 'URL Context', 'Code Execution', 'Workspace Access', 'To-Do']) {
   assert.match(mainChatHtml, new RegExp(`class="tool-name">${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}<`), `tool name ${label} must remain visible`);
 }
 for (const id of [
@@ -47,6 +47,6 @@ assert.match(
 assert.doesNotMatch(sidebarRenderJs, /add-chat-to-proj-btn|proj-options-btn|pin-chat-btn|chat-options-btn/, 'per-row action buttons must stay removed');
 assert.match(sidebarRenderJs, /bindSidebarActionPress\(projHeader/, 'project rows must expose actions through the press-action primitive');
 assert.match(sidebarRenderJs, /bindSidebarActionPress\(link/, 'chat rows must expose actions through the press-action primitive');
-assert.match(apiConfig, /CHATUI_VERSION = '1\.8'/, 'ChatUI Settings version must be 1.8');
+assert.match(apiConfig, /CHATUI_VERSION = '1\.9'/, 'ChatUI Settings version must be 1.9');
 
 console.log('ChatUI Plan 9 sidebar and tools verification passed.');
