@@ -19,32 +19,6 @@ export const ScheduleEventMethods = {
     // Reset Time Action
     this.btnResetTime?.addEventListener('click', () => this.resetTime());
 
-    // Reminder Menu Trigger & Multi-select
-    this.btnReminderTrigger?.addEventListener('click', e => {
-      e.stopPropagation();
-      this.toggleReminderMenu();
-    });
-
-    this.menuReminder?.addEventListener('click', e => {
-      const item = e.target.closest('.reminder-menu-item');
-      if (!item || item.id === 'btn-open-custom-reminder') return;
-
-      const delBtn = e.target.closest('.btn-del-custom-rem');
-      if (delBtn) {
-        e.stopPropagation();
-        this.deleteCustomReminder(delBtn.dataset.id);
-        return;
-      }
-
-      this.toggleReminderSelection(item.dataset.reminder);
-    });
-
-    this.btnOpenCustomReminder?.addEventListener('click', e => {
-      e.stopPropagation();
-      this.closeReminderMenu();
-      this.openCustomReminderModal();
-    });
-
     // Repeat Presets List Selection
     this.repeatOptionsList?.addEventListener('click', e => {
       const item = e.target.closest('.repeat-option-item');
@@ -76,7 +50,8 @@ export const ScheduleEventMethods = {
     this.btnRepeatYearPrev?.addEventListener('click', () => this.navigateRepeatYearMonth(-1));
     this.btnRepeatYearNext?.addEventListener('click', () => this.navigateRepeatYearMonth(1));
 
-    // Custom Reminder Modal Actions
+    // Custom Reminder Modal Actions. The Time and After reminder surfaces
+    // themselves are bound centrally by initReminderSurfaces().
     this.btnCloseCustomReminder?.addEventListener('click', () => this.closeCustomReminderModal());
     this.btnCustomRemCancel?.addEventListener('click', () => this.closeCustomReminderModal());
     this.customReminderForm?.addEventListener('submit', e => {
@@ -92,40 +67,48 @@ export const ScheduleEventMethods = {
       if (e.target === this.modalEl) this.close(true);
     });
 
-    document.addEventListener('click', e => {
-      if (this.menuReminder?.classList.contains('open') && !this.menuReminder.contains(e.target) && e.target !== this.btnReminderTrigger) {
-        this.closeReminderMenu();
-      }
-    });
-
     this.modalEl?.addEventListener('keydown', e => this.handleKeydown(e));
   },
 
   switchTab(tabName) {
-    if (tabName === this.activeTab) return;
+    if (!['date', 'time', 'repeat', 'after'].includes(tabName)) return;
+    if (tabName === this.activeTab) {
+      if (tabName === 'after') this.renderAfterPanel?.();
+      return;
+    }
+    this.closeReminderMenu?.();
+    this.closeAfterTaskMenu?.();
     this.activeTab = tabName;
 
-    this.tabDate.classList.toggle('active', tabName === 'date');
-    this.tabDate.setAttribute('aria-selected', tabName === 'date' ? 'true' : 'false');
-
-    this.tabTime.classList.toggle('active', tabName === 'time');
-    this.tabTime.setAttribute('aria-selected', tabName === 'time' ? 'true' : 'false');
-
-    this.tabRepeat.classList.toggle('active', tabName === 'repeat');
-    this.tabRepeat.setAttribute('aria-selected', tabName === 'repeat' ? 'true' : 'false');
-
-    this.panelDate.classList.toggle('active', tabName === 'date');
-    this.panelTime.classList.toggle('active', tabName === 'time');
-    this.panelRepeat.classList.toggle('active', tabName === 'repeat');
+    const tabs = {
+      date: this.tabDate,
+      time: this.tabTime,
+      repeat: this.tabRepeat,
+      after: this.tabAfter
+    };
+    const panels = {
+      date: this.panelDate,
+      time: this.panelTime,
+      repeat: this.panelRepeat,
+      after: this.panelAfter
+    };
+    Object.entries(tabs).forEach(([name, tab]) => {
+      tab?.classList.toggle('active', name === tabName);
+      tab?.setAttribute('aria-selected', name === tabName ? 'true' : 'false');
+    });
+    Object.entries(panels).forEach(([name, panel]) => {
+      panel?.classList.toggle('active', name === tabName);
+    });
 
     if (tabName === 'time') {
-      if (!this.draftTime) {
-        this.draftTime = this.getCurrentTimeObj();
-      }
+      if (!this.draftTime) this.draftTime = this.getCurrentTimeObj();
       this.scrollWheelsToDraftTime();
     } else if (tabName === 'repeat') {
       this.renderRepeatPresetList();
       this.updateRepeatSummary();
+    } else if (tabName === 'after') {
+      this.ensureAfterDraft?.();
+      this.renderAfterPanel?.();
     }
   },
 };
