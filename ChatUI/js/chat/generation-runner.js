@@ -10,6 +10,7 @@ import { streamAssistantResponse } from './streaming.js';
 import { getChatDOMElements, scrollToBottom } from './ui.js';
 import { messageDeleteHandler, messageEditHandler } from './message-actions.js';
 import { beginGeneration, finishGenerating, isCurrentGeneration } from './generation-lifecycle.js';
+import { maybeGenerateAutomaticChatTitle } from './auto-title.js';
 // TEMP_PERF_DIAGNOSTICS
 import {
   endPerformancePhase,
@@ -215,6 +216,13 @@ export async function runGeneration(
             ? 'interrupted'
             : 'error';
       finishPerformanceRun(diagnosticStatus);
+    }
+
+    // Title generation is deliberately detached from the answer lifecycle. It
+    // runs only after a completed assistant answer is safely persisted, and a
+    // failure here can never turn a successful chat answer into an error.
+    if (!persistenceError && assistantMessage.status === 'completed') {
+      void maybeGenerateAutomaticChatTitle(chat.id, updateSidebarCallback);
     }
 
     if (persistenceError) throw persistenceError;
