@@ -83,7 +83,7 @@ assert.match(rightSidebarCss, /@media \(max-width: 767px\)[\s\S]*\.right-sidebar
 // and the key editor must start compact.
 assert.match(settingsHtml, /id="text-api-profile-switcher"[\s\S]*data-text-api-profile="mode-1"[\s\S]*Mode 1[\s\S]*data-text-api-profile="mode-2"[\s\S]*Mode 2/, 'Gemini Settings must render Mode 1 and Mode 2 explicitly');
 assert.match(settingsHtml, /<textarea[^>]+id="text-api-key-input"[^>]+rows="3"/, 'Gemini text-key textarea must start compact');
-assert.match(apiConfig, /selectTextApiProfile\(profileId\)/, 'mode selection must use the persistent Text API profile state');
+assert.match(apiConfig, /selectTextApiProfile\(button\.dataset\.textApiProfile\)/, 'mode selection must use the persistent Text API profile state');
 
 // Background title generation must use the repository's streaming-only text
 // transport and the selected Text API profile/failover path.
