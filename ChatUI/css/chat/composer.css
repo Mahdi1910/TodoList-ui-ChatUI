@@ -39,6 +39,18 @@
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.035);
 }
 
+/* The rich editor is part of one rounded composer surface. Keep keyboard focus
+   visible on the outer composer instead of drawing a rectangular ring around
+   the inner ProseMirror editing area. */
+.composer-bar:has(.ProseMirror:focus-visible) {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.28);
+}
+
+.composer-bar .composer-editor-host .ProseMirror:focus-visible {
+  outline: none;
+}
+
 .composer-bar .attach-btn { grid-area: attach; }
 .composer-bar .tools-btn { grid-area: tools; margin-right: 0; }
 .composer-bar .active-tools-indicators {
