@@ -1,0 +1,66 @@
+name: ChatUI Plan 13 Theme Profiles Title Check
+
+on:
+  pull_request:
+    paths:
+      - 'ChatUI/css/main.css'
+      - 'ChatUI/css/refinements.css'
+      - 'ChatUI/css/components/right-sidebar.css'
+      - 'ChatUI/css/components/settings.css'
+      - 'ChatUI/html/main-chat.html'
+      - 'ChatUI/html/settings-modal.html'
+      - 'ChatUI/index.html'
+      - 'ChatUI/js/api/api-config.js'
+      - 'ChatUI/js/api/gemini-utility.js'
+      - 'ChatUI/js/api/text-api-profiles.js'
+      - 'ChatUI/js/api/text-api-key-pool.js'
+      - 'ChatUI/js/chat/auto-title.js'
+      - 'ChatUI/js/chat/conversation.js'
+      - 'ChatUI/js/chat/generation-runner.js'
+      - 'ChatUI/js/chat/message-controls.js'
+      - 'ChatUI/js/chat/send-message.js'
+      - 'ChatUI/js/settings/settings.js'
+      - 'ChatUI/js/state/store.js'
+      - 'ChatUI/js/storage/load.js'
+      - 'ChatUI/js/storage/records.js'
+      - 'ChatUI/js/ui/action-menu.js'
+      - 'scripts/verify-chatui-plan13.mjs'
+      - '.github/workflows/chatui-plan13-theme-profiles-title-check.yml'
+      - 'implementation plan/Implementation Plan ID 13.md'
+
+jobs:
+  verify-theme-profiles-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check ChatUI/js/api/api-config.js
+          node --check ChatUI/js/api/gemini-utility.js
+          node --check ChatUI/js/api/text-api-profiles.js
+          node --check ChatUI/js/chat/auto-title.js
+          node --check ChatUI/js/chat/conversation.js
+          node --check ChatUI/js/chat/generation-runner.js
+          node --check ChatUI/js/chat/message-controls.js
+          node --check ChatUI/js/chat/send-message.js
+          node --check ChatUI/js/settings/settings.js
+          node --check ChatUI/js/state/store.js
+          node --check ChatUI/js/storage/load.js
+          node --check ChatUI/js/storage/records.js
+          node --check ChatUI/js/ui/action-menu.js
+          node --check scripts/verify-chatui-plan13.mjs
+      - name: Verify Plan 13 invariants
+        run: node scripts/verify-chatui-plan13.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify updated assets reached runtime bundle
+        run: |
+          test -f dist/ChatUI/css/refinements.css
+          test -f dist/ChatUI/css/components/right-sidebar.css
+          test -f dist/ChatUI/html/settings-modal.html
+          test -f dist/ChatUI/js/api/gemini-utility.js
+          test -f dist/ChatUI/js/api/text-api-profiles.js
+          test -f dist/ChatUI/js/chat/auto-title.js
