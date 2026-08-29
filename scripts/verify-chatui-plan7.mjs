@@ -77,7 +77,7 @@ const loadSource = fs.readFileSync('ChatUI/js/storage/load.js', 'utf8');
 const recoverySource = fs.readFileSync('ChatUI/js/api/gemini-file-recovery-wrapper.js', 'utf8');
 const cssIndex = fs.readFileSync('ChatUI/css/components.css', 'utf8');
 
-assert.match(apiConfig, /CHATUI_VERSION = '1\.9'/, 'ChatUI Settings version must be 1.9');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.0'/, 'ChatUI Settings version must be 2.0');
 assert.match(apiConfig, /normalizeMultilineApiKeyText/, 'text API key input must normalize mobile clipboard line endings');
 assert.match(apiConfig, /addEventListener\('paste'/, 'text API key textarea must explicitly preserve multiline paste');
 assert.match(settingsHtml, /<textarea[^>]+id="text-api-key-input"/, 'text API key control must be a native textarea in the settings markup');
