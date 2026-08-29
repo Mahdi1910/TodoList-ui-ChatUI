@@ -148,3 +148,10 @@
   border-color: var(--border-color);
   background: var(--bg-primary);
 }
+
+@media (max-width: 768px) {
+  .project-more-btn,
+  .tag-more-btn {
+    opacity: 1;
+  }
+}
