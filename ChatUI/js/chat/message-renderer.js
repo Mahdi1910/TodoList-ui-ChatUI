@@ -79,14 +79,25 @@ function appendUserContent(bubble, content) {
   // Markdown structure and wrapping determine the real visual height. Measure
   // after insertion so short messages never get a needless disclosure button.
   const measureOverflow = () => {
-    if (!collapsible.isConnected || !collapsible.classList.contains('is-collapsed')) return;
+    if (!collapsible.isConnected || !collapsible.classList.contains('is-collapsed')) return false;
     const visibleHeight = collapsible.clientHeight;
-    if (visibleHeight <= 0) return; // keep the heuristic while an iframe/view is hidden
+    if (visibleHeight <= 0) return false; // keep the heuristic while an iframe/view is hidden
     const hasOverflow = collapsible.scrollHeight > visibleHeight + 2;
     collapsible.classList.toggle('has-overflow', hasOverflow);
     toggle.hidden = !hasOverflow;
+    return true;
   };
   requestAnimationFrame(() => requestAnimationFrame(measureOverflow));
+
+  // The combined shell preloads ChatUI while its iframe can still be hidden.
+  // ResizeObserver gives that preloaded transcript one real measurement as soon
+  // as the frame becomes visible, then disconnects to avoid per-message churn.
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(() => {
+      if (measureOverflow()) observer.disconnect();
+    });
+    observer.observe(collapsible);
+  }
 }
 
 export function renderMessageDOM(msgInput, chatRef = null, onRegenerateCallback = null, onDeleteCallback = null, onEditSaveCallback = null) {
