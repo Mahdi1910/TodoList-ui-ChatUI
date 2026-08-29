@@ -5,7 +5,7 @@ const mainCss = fs.readFileSync('ChatUI/css/main.css', 'utf8');
 const modalCss = fs.readFileSync('ChatUI/css/components/modals.css', 'utf8');
 const settingsCss = fs.readFileSync('ChatUI/css/components/settings.css', 'utf8');
 const toolsCss = fs.readFileSync('ChatUI/css/chat/tools.css', 'utf8');
-const composerEditorCss = fs.readFileSync('ChatUI/css/chat/composer-editor.css', 'utf8');
+const composerCss = fs.readFileSync('ChatUI/css/chat/composer.css', 'utf8');
 const voiceCss = fs.readFileSync('ChatUI/css/components/voice.css', 'utf8');
 const shellCss = fs.readFileSync('shell/css/shell.css', 'utf8');
 const leftSidebarHtml = fs.readFileSync('ChatUI/html/left-sidebar.html', 'utf8');
@@ -22,7 +22,8 @@ assert.match(
 assert.match(modalCss, /\.input-with-icon:focus-within\s*\{[\s\S]*border-color:\s*var\(--accent-blue\)/, 'icon-wrapped modal inputs must expose a clear container focus treatment');
 assert.match(settingsCss, /\.switch input:focus-visible \+ \.slider\s*\{[\s\S]*outline:\s*2px solid var\(--accent-blue\)/, 'Settings switches must expose visible keyboard focus');
 assert.match(toolsCss, /\.toggle-switch input:focus-visible \+ \.toggle-slider\s*\{[\s\S]*outline:\s*2px solid var\(--accent-blue\)/, 'AI tool switches must expose visible keyboard focus');
-assert.match(composerEditorCss, /\.ProseMirror:focus-visible\s*\{[\s\S]*outline:\s*2px solid var\(--accent-blue\)/, 'rich composer surface must expose visible keyboard focus');
+assert.match(composerCss, /\.composer-bar:has\(\.ProseMirror:focus-visible\)\s*\{[\s\S]*border-color:\s*var\(--accent-blue\)/, 'rich composer keyboard focus must remain visible on the outer rounded composer');
+assert.match(composerCss, /\.composer-bar \.composer-editor-host \.ProseMirror:focus-visible\s*\{[\s\S]*outline:\s*none;/, 'rich composer must not show a second rectangular inner focus outline');
 
 assert.match(shellCss, /@media \(max-width: 768px\)[\s\S]*\.shell-nav-label\s*\{[\s\S]*font-size:\s*11px;[\s\S]*font-weight:\s*500;[\s\S]*line-height:\s*1\.1;/, 'mobile app-navigation labels must be readable without making the rail oversized');
 
@@ -36,6 +37,6 @@ assert.match(voiceCss, /\.voice-mode-overlay\s*\{[\s\S]*env\(safe-area-inset-top
 assert.match(modalCss, /@media \(max-width: 767px\)[\s\S]*\.modal-overlay\s*\{[\s\S]*env\(safe-area-inset-top,[\s\S]*env\(safe-area-inset-right,[\s\S]*env\(safe-area-inset-bottom,[\s\S]*env\(safe-area-inset-left,/, 'mobile dialogs must keep safe-area-aware margins on every screen edge');
 assert.match(modalCss, /#search-modal \.modal-card\s*\{\s*width:\s*100%;/, 'Search dialog must fit the padded mobile modal viewport rather than touching screen edges');
 
-assert.match(apiConfig, /CHATUI_VERSION = '1\.9'/, 'ChatUI Settings version must be 1.9');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.0'/, 'ChatUI Settings version must be 2.0');
 
 console.log('ChatUI Plan 11 UI consistency verification passed.');
