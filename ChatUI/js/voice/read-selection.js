@@ -4,6 +4,8 @@
 
 import { state } from '../state/store.js';
 
+export const READABLE_SELECTION_SELECTOR = '.message-text, .content-slot, .activity-item-text';
+
 let selectedText = '';
 let selectedChatId = null;
 let initialized = false;
@@ -19,14 +21,15 @@ function normalizeText(value) {
 
 function allowedRootFor(node) {
   const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-  return element?.closest?.('.message-text, .content-slot') || null;
+  return element?.closest?.(READABLE_SELECTION_SELECTOR) || null;
 }
 
 function selectedTextFromRange(range, thread) {
   const startRoot = allowedRootFor(range.startContainer);
   const endRoot = allowedRootFor(range.endContainer);
   if (!startRoot || !endRoot || !thread.contains(startRoot) || !thread.contains(endRoot)) return '';
-  const roots = [...thread.querySelectorAll('.message-text, .content-slot')]
+
+  const roots = [...thread.querySelectorAll(READABLE_SELECTION_SELECTOR)]
     .filter(root => {
       try { return range.intersectsNode(root); } catch (error) { return false; }
     });
@@ -38,7 +41,7 @@ function selectedTextFromRange(range, thread) {
     if (root.contains(range.endContainer)) part.setEnd(range.endContainer, range.endOffset);
     const holder = document.createElement('div');
     holder.appendChild(part.cloneContents());
-    holder.querySelectorAll('button, .code-block-header, svg, [aria-hidden="true"]').forEach(node => node.remove());
+    holder.querySelectorAll('button, .code-block-header, .streaming-cursor, svg, [aria-hidden="true"]').forEach(node => node.remove());
     const text = normalizeText(holder.innerText || holder.textContent || '');
     if (text) pieces.push(text);
   });
@@ -48,17 +51,29 @@ function selectedTextFromRange(range, thread) {
 export function captureSelectedReadText() {
   const selection = window.getSelection?.();
   const thread = document.getElementById('conversation-thread');
-  if (!selection || selection.rangeCount === 0 || selection.isCollapsed || !thread) return selectedText;
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed || !thread) return getSelectedReadText();
+
   const range = selection.getRangeAt(0);
   const text = selectedTextFromRange(range, thread);
-  if (!text) return selectedText;
+  if (!text) {
+    // A new non-collapsed selection exists but it is not readable conversation
+    // text. Never fall back to an older selection from this chat: that can make
+    // Read Selected Text speak stale words that are no longer selected.
+    clearSelectedReadText();
+    return '';
+  }
+
   selectedText = text;
   selectedChatId = state.activeChatId || null;
   return selectedText;
 }
+
 export function getSelectedReadText() {
   if (!selectedText) return '';
-  if (selectedChatId && selectedChatId !== state.activeChatId) return '';
+  if (selectedChatId && selectedChatId !== state.activeChatId) {
+    clearSelectedReadText();
+    return '';
+  }
   return selectedText;
 }
 

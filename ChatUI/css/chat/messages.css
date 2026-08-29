@@ -26,8 +26,8 @@
 }
 
 .user-bubble {
-  --user-bubble-bg: #173E76;
-  --user-bubble-text: #F8FAFC;
+  --user-bubble-bg: #2F6FBA;
+  --user-bubble-text: #FFFFFF;
   background-color: var(--user-bubble-bg);
   color: var(--user-bubble-text);
   border-bottom-right-radius: 4px;
@@ -97,7 +97,7 @@
   right: 0;
   bottom: 0;
   height: 2.6em;
-  background: linear-gradient(to bottom, rgba(23, 62, 118, 0), var(--user-bubble-bg));
+  background: linear-gradient(to bottom, rgba(47, 111, 186, 0), var(--user-bubble-bg));
   pointer-events: none;
 }
 
@@ -114,11 +114,11 @@
 
 .user-message-toggle:hover,
 .user-message-toggle:focus-visible {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .user-message-toggle:focus-visible {
-  outline: 1px solid rgba(255, 255, 255, 0.72);
+  outline: 1px solid rgba(255, 255, 255, 0.78);
   outline-offset: 1px;
 }
 

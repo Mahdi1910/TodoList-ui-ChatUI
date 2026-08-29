@@ -9,7 +9,6 @@ import { appendToolMetadata } from './message-tools.js';
 import { appendMessageToolbar } from './message-controls.js';
 
 export const USER_MESSAGE_COLLAPSE_LINES = 6;
-const USER_MESSAGE_COLLAPSE_CHAR_HINT = 360;
 
 function appendLegacyAssistantContent(bubble, msgObj, content, thinking) {
   const thinkingSlot = document.createElement('div');
@@ -40,13 +39,6 @@ function appendLegacyAssistantContent(bubble, msgObj, content, thinking) {
   bubble.append(thinkingSlot, contentSlot);
 }
 
-function likelyNeedsUserCollapse(content) {
-  const source = String(content || '').trim();
-  if (!source) return false;
-  if (source.split(/\r?\n/).length > USER_MESSAGE_COLLAPSE_LINES) return true;
-  return source.length > USER_MESSAGE_COLLAPSE_CHAR_HINT;
-}
-
 function appendUserContent(bubble, content) {
   const collapsible = document.createElement('div');
   collapsible.className = 'user-message-collapsible is-collapsed';
@@ -62,13 +54,39 @@ function appendUserContent(bubble, content) {
   toggle.className = 'user-message-toggle';
   toggle.textContent = 'Show more';
   toggle.setAttribute('aria-expanded', 'false');
-
-  const hintedOverflow = likelyNeedsUserCollapse(content);
-  toggle.hidden = !hintedOverflow;
-  collapsible.classList.toggle('has-overflow', hintedOverflow);
+  toggle.hidden = true;
   bubble.appendChild(toggle);
 
+  let hasMeasuredOverflow = false;
+
+  const measureOverflow = () => {
+    if (!collapsible.isConnected || !text.isConnected) return false;
+    const textWidth = text.getBoundingClientRect().width;
+    const naturalHeight = text.scrollHeight;
+    if (textWidth <= 0 || naturalHeight <= 0) return false;
+
+    const computed = window.getComputedStyle(text);
+    const lineHeight = Number.parseFloat(computed.lineHeight);
+    const fontSize = Number.parseFloat(computed.fontSize) || 16;
+    const effectiveLineHeight = Number.isFinite(lineHeight) && lineHeight > 0 ? lineHeight : fontSize * 1.6;
+    const collapsedHeight = effectiveLineHeight * USER_MESSAGE_COLLAPSE_LINES;
+    const hasOverflow = naturalHeight > collapsedHeight + 2;
+    hasMeasuredOverflow = hasOverflow;
+
+    toggle.hidden = !hasOverflow;
+    if (!hasOverflow) {
+      collapsible.classList.add('is-collapsed');
+      collapsible.classList.remove('has-overflow');
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.textContent = 'Show more';
+    } else {
+      collapsible.classList.toggle('has-overflow', collapsible.classList.contains('is-collapsed'));
+    }
+    return true;
+  };
+
   toggle.addEventListener('click', () => {
+    if (!hasMeasuredOverflow) return;
     const expanding = collapsible.classList.contains('is-collapsed');
     collapsible.classList.toggle('is-collapsed', !expanding);
     collapsible.classList.toggle('has-overflow', !expanding);
@@ -76,27 +94,19 @@ function appendUserContent(bubble, content) {
     toggle.textContent = expanding ? 'Show less' : 'Show more';
   });
 
-  // Markdown structure and wrapping determine the real visual height. Measure
-  // after insertion so short messages never get a needless disclosure button.
-  const measureOverflow = () => {
-    if (!collapsible.isConnected || !collapsible.classList.contains('is-collapsed')) return false;
-    const visibleHeight = collapsible.clientHeight;
-    if (visibleHeight <= 0) return false; // keep the heuristic while an iframe/view is hidden
-    const hasOverflow = collapsible.scrollHeight > visibleHeight + 2;
-    collapsible.classList.toggle('has-overflow', hasOverflow);
-    toggle.hidden = !hasOverflow;
-    return true;
-  };
+  // Start with no disclosure at all. Only a real rendered height beyond six
+  // lines is allowed to reveal Show more. This avoids short messages being
+  // misclassified by character/newline heuristics or by the fade pseudo-element.
   requestAnimationFrame(() => requestAnimationFrame(measureOverflow));
 
-  // The combined shell preloads ChatUI while its iframe can still be hidden.
-  // ResizeObserver gives that preloaded transcript one real measurement as soon
-  // as the frame becomes visible, then disconnects to avoid per-message churn.
+  // ChatUI can be preloaded in a hidden iframe and message width changes across
+  // responsive layouts. Keep measuring the natural text box when its size
+  // changes so the disclosure remains correct after visibility/width changes.
   if (typeof ResizeObserver !== 'undefined') {
     const observer = new ResizeObserver(() => {
-      if (measureOverflow()) observer.disconnect();
+      measureOverflow();
     });
-    observer.observe(collapsible);
+    observer.observe(text);
   }
 }
 
