@@ -215,6 +215,8 @@ export async function loadState(options = {}) {
       return {
         id: chat.id,
         title: chat.title,
+        titleSource: chat.titleSource || 'legacy',
+        autoTitleGeneratedAt: Number(chat.autoTitleGeneratedAt) || 0,
         projectId,
         pinned: !!chat.pinned,
         createdAt: chat.createdAt || 0,
@@ -238,6 +240,7 @@ export async function loadState(options = {}) {
     }
 
     const savedTools = settings.tools || {};
+    const savedApi = settings.api && typeof settings.api === 'object' ? settings.api : {};
     setState({
       projects: loadedProjects,
       chats: formattedChats,
@@ -258,14 +261,15 @@ export async function loadState(options = {}) {
         todo: !!savedTools.todo
       },
       api: {
-        textApiKey: settings.api?.textApiKey || '',
-        textApiKeys: Array.isArray(settings.api?.textApiKeys) ? settings.api.textApiKeys : [],
-        textApiKeyIndex: Number.isInteger(Number(settings.api?.textApiKeyIndex))
-          ? Number(settings.api.textApiKeyIndex)
-          : 0,
-        textBaseUrl: settings.api?.textBaseUrl || '',
-        voiceApiKey: settings.api?.voiceApiKey || '',
-        voiceBaseUrl: settings.api?.voiceBaseUrl || ''
+        ...savedApi,
+        textApiKey: savedApi.textApiKey || '',
+        textApiKeys: Array.isArray(savedApi.textApiKeys) ? savedApi.textApiKeys : [],
+        textApiKeyIndex: Number.isInteger(Number(savedApi.textApiKeyIndex)) ? Number(savedApi.textApiKeyIndex) : 0,
+        textBaseUrl: savedApi.textBaseUrl || '',
+        activeTextProfileId: savedApi.activeTextProfileId || 'mode-1',
+        textProfiles: Array.isArray(savedApi.textProfiles) ? savedApi.textProfiles : [],
+        voiceApiKey: savedApi.voiceApiKey || '',
+        voiceBaseUrl: savedApi.voiceBaseUrl || ''
       },
       audioRead: {
         voiceName: settings.audioRead?.voiceName || 'Zephyr',
