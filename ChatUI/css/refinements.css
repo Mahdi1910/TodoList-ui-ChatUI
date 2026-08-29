@@ -57,6 +57,14 @@
   background: transparent !important;
 }
 
+.action-menu-item.danger:hover,
+.action-menu-item.danger:focus-visible,
+.message-menu-item.danger:hover,
+.message-menu-item.danger:focus-visible {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #F87171 !important;
+}
+
 .action-menu-item:focus-visible {
   outline: 1px solid var(--focus-ring) !important;
   outline-offset: -2px;
