@@ -1,0 +1,42 @@
+name: ChatUI Plan 12 UI Refinement Check
+
+on:
+  pull_request:
+    paths:
+      - 'ChatUI/css/chat/composer.css'
+      - 'ChatUI/css/components/settings.css'
+      - 'ChatUI/css/chat/message-actions.css'
+      - 'ChatUI/css/sidebar/items.css'
+      - 'ChatUI/js/voice/read-settings.js'
+      - 'ChatUI/js/chat/message-controls.js'
+      - 'ChatUI/js/api/api-config.js'
+      - 'scripts/verify-chatui-plan12.mjs'
+      - '.github/workflows/chatui-plan12-ui-refinement-check.yml'
+      - 'implementation plan/Implementation Plan ID 12.md'
+
+jobs:
+  verify-ui-refinement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check ChatUI/js/voice/read-settings.js
+          node --check ChatUI/js/chat/message-controls.js
+          node --check ChatUI/js/api/api-config.js
+          node --check scripts/verify-chatui-plan12.mjs
+      - name: Verify Plan 12 UI refinement invariants
+        run: node scripts/verify-chatui-plan12.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify updated assets reached runtime bundle
+        run: |
+          test -f dist/ChatUI/css/chat/composer.css
+          test -f dist/ChatUI/css/components/settings.css
+          test -f dist/ChatUI/css/chat/message-actions.css
+          test -f dist/ChatUI/css/sidebar/items.css
+          test -f dist/ChatUI/js/voice/read-settings.js
+          test -f dist/ChatUI/js/chat/message-controls.js

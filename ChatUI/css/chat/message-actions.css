@@ -5,6 +5,8 @@
   gap: 4px;
   margin-top: 4px;
   position: relative;
+  width: max-content;
+  max-width: 100%;
 }
 
 .toolbar-btn {
@@ -14,7 +16,8 @@
   color: var(--text-muted);
 }
 
-.toolbar-btn:hover {
+.toolbar-btn:hover,
+.toolbar-btn[aria-expanded="true"] {
   background-color: var(--bg-hover);
   color: var(--text-primary);
 }
@@ -23,6 +26,63 @@
   width: 15px;
   height: 15px;
 }
+
+.message-more-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: 190px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: 11px;
+  background: #242424;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+  z-index: 150;
+}
+
+.message-row.user .message-more-menu {
+  left: auto;
+  right: 0;
+}
+
+.message-more-menu.hidden { display: none !important; }
+
+.message-menu-item {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  justify-content: initial;
+  gap: 9px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+}
+
+.message-menu-item:hover,
+.message-menu-item:focus-visible {
+  background: var(--bg-hover);
+}
+
+.message-menu-item svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+}
+
+.message-menu-item.danger {
+  color: #F87171;
+}
+
+.message-menu-item.danger svg { color: #F87171; }
+.message-menu-item.danger:hover,
+.message-menu-item.danger:focus-visible { background: rgba(239, 68, 68, 0.12); }
 
 .message-edit-container {
   width: 100%;
@@ -138,6 +198,17 @@
 @keyframes read-toolbar-pulse {
   from { opacity: 0.45; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .toolbar-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .message-menu-item {
+    min-height: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
