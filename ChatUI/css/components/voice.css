@@ -13,7 +13,13 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 24px;
+  /* Keep the visual 24px rhythm on ordinary screens, but add real breathing
+     room around notches, rounded corners, and gesture/home indicators. */
+  padding:
+    max(24px, calc(env(safe-area-inset-top, 0px) + 16px))
+    max(24px, calc(env(safe-area-inset-right, 0px) + 16px))
+    max(24px, calc(env(safe-area-inset-bottom, 0px) + 16px))
+    max(24px, calc(env(safe-area-inset-left, 0px) + 16px));
 }
 
 .voice-mode-center {

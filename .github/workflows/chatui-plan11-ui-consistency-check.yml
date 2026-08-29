@@ -1,0 +1,49 @@
+name: ChatUI Plan 11 UI Consistency Check
+
+on:
+  pull_request:
+    paths:
+      - 'ChatUI/css/main.css'
+      - 'ChatUI/css/components/modals.css'
+      - 'ChatUI/css/components/settings.css'
+      - 'ChatUI/css/components/voice.css'
+      - 'ChatUI/css/chat/tools.css'
+      - 'ChatUI/css/chat/composer-editor.css'
+      - 'ChatUI/html/main-chat.html'
+      - 'ChatUI/html/right-sidebar.html'
+      - 'ChatUI/html/left-sidebar.html'
+      - 'ChatUI/js/composer/composer.js'
+      - 'ChatUI/js/api/api-config.js'
+      - 'shell/css/shell.css'
+      - 'scripts/verify-chatui-plan11.mjs'
+      - '.github/workflows/chatui-plan11-ui-consistency-check.yml'
+      - 'implementation plan/Implementation Plan ID 11.md'
+
+jobs:
+  verify-ui-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check ChatUI/js/composer/composer.js
+          node --check ChatUI/js/api/api-config.js
+          node --check scripts/verify-chatui-plan11.mjs
+      - name: Verify Plan 11 UI consistency invariants
+        run: node scripts/verify-chatui-plan11.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify updated assets reached runtime bundle
+        run: |
+          test -f dist/ChatUI/css/main.css
+          test -f dist/ChatUI/css/components/modals.css
+          test -f dist/ChatUI/css/components/settings.css
+          test -f dist/ChatUI/css/components/voice.css
+          test -f dist/ChatUI/css/chat/tools.css
+          test -f dist/ChatUI/css/chat/composer-editor.css
+          test -f dist/ChatUI/html/main-chat.html
+          test -f dist/ChatUI/html/right-sidebar.html
+          test -f dist/shell/css/shell.css

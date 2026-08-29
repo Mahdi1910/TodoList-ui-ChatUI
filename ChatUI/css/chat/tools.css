@@ -193,6 +193,11 @@
   border-radius: 50%;
 }
 
+.toggle-switch input:focus-visible + .toggle-slider {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 3px;
+}
+
 .toggle-switch input:checked + .toggle-slider {
   background-color: var(--accent-blue);
 }

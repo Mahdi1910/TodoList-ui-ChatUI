@@ -173,6 +173,11 @@
   border-radius: 50%;
 }
 
+.switch input:focus-visible + .slider {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 3px;
+}
+
 input:checked + .slider { background-color: var(--accent-blue); }
 input:checked + .slider:before { transform: translateX(20px); }
 
