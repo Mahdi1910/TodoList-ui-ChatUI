@@ -1,4 +1,5 @@
 import { RepeatEngine } from '../repeat/repeat-engine.js';
+import { TaskAfter } from '../task-after.js';
 import { TaskModel } from '../task-model.js';
 import { AppState } from '../state.js';
 import { AppStateSync } from '../state-sync.js';
@@ -11,6 +12,7 @@ import { DataServiceReminderMethods } from './data-service-reminders.js';
 import { DataServiceTaxonomyDragMethods } from './data-service-taxonomy-drag.js';
 import { DataServiceDragMethods } from './data-service-drag.js';
 import { DataServiceHierarchyMethods } from './data-service-hierarchy.js';
+import { DataServiceAfterMethods } from './data-service-after.js';
 
 let AppDataService;
 
@@ -24,12 +26,17 @@ let AppDataService;
       reminders: [...(task.reminders || [])],
       repeat: task.repeat ? engine().clone(task.repeat) : null,
       repeatState: task.repeatState ? { ...task.repeatState } : null,
+      after: task.after ? TaskAfter.clone(task.after) : null,
       ...overrides
     };
   }
 
   function activeRepeat(task) {
     return Boolean(task?.repeat && task.repeat.mode !== 'none');
+  }
+
+  function completedAfterValue(task) {
+    return TaskAfter.isPending(task?.after) ? null : (task?.after ? TaskAfter.clone(task.after) : null);
   }
 
   function nextRepeatState(service, task) {
@@ -84,14 +91,24 @@ let AppDataService;
   }
 
   async function uncompleteTask(task) {
-    const updated = copyTask(task, { completed: false, updatedAt: TodoStorageMappers.nowIso() });
+    const updated = copyTask(task, {
+      completed: false,
+      completedAt: null,
+      updatedAt: TodoStorageMappers.nowIso()
+    });
     await persistTaskRows([updated]);
     replaceTaskMemory([updated]);
     return updated;
   }
 
   async function completePlainSubtask(task) {
-    const updated = copyTask(task, { completed: true, updatedAt: TodoStorageMappers.nowIso() });
+    const now = TodoStorageMappers.nowIso();
+    const updated = copyTask(task, {
+      completed: true,
+      completedAt: now,
+      after: completedAfterValue(task),
+      updatedAt: now
+    });
     await persistTaskRows([updated]);
     replaceTaskMemory([updated]);
     return updated;
@@ -103,9 +120,11 @@ let AppDataService;
     const nextDate = engine().calculateNextOccurrence(task.dueDate, task.repeat, task.repeatState || {});
     const oldTask = copyTask(task, {
       completed: true,
+      completedAt: now,
       familySlotId: slot,
       repeat: null,
       repeatState: null,
+      after: completedAfterValue(task),
       updatedAt: now
     });
 
@@ -118,8 +137,10 @@ let AppDataService;
     const nextTask = copyTask(task, {
       id: service.createId('task'),
       completed: false,
+      completedAt: null,
       familySlotId: slot,
       dueDate: nextDate,
+      after: null,
       repeat: engine().clone(task.repeat),
       repeatState: nextRepeatState(service, task),
       createdAt: now,
@@ -133,7 +154,12 @@ let AppDataService;
   async function completeNonRepeatingRoot(root) {
     const now = TodoStorageMappers.nowIso();
     const family = [root, ...AppState.getSubtasks(root.id)].map(task =>
-      copyTask(task, { completed: true, updatedAt: now }));
+      copyTask(task, {
+        completed: true,
+        completedAt: task.completedAt || now,
+        after: completedAfterValue(task),
+        updatedAt: now
+      }));
     await persistTaskRows(family);
     replaceTaskMemory(family);
     return family[0];
@@ -143,12 +169,16 @@ let AppDataService;
     const now = TodoStorageMappers.nowIso();
     const oldRoot = copyTask(root, {
       completed: true,
+      completedAt: now,
+      after: completedAfterValue(root),
       repeat: null,
       repeatState: null,
       updatedAt: now
     });
     const oldChildren = children.map(child => copyTask(child, {
       completed: true,
+      completedAt: child.completedAt || now,
+      after: completedAfterValue(child),
       familySlotId: child.familySlotId || service.createId('slot'),
       updatedAt: now
     }));
@@ -165,6 +195,8 @@ let AppDataService;
     const now = TodoStorageMappers.nowIso();
     const oldRoot = copyTask(root, {
       completed: true,
+      completedAt: now,
+      after: completedAfterValue(root),
       repeat: null,
       repeatState: null,
       updatedAt: now
@@ -174,6 +206,8 @@ let AppDataService;
       parentTaskId: null,
       familySlotId: null,
       completed: false,
+      completedAt: null,
+      after: null,
       dueDate: nextDate,
       repeat: engine().clone(root.repeat),
       repeatState: nextRepeatState(service, root),
@@ -187,6 +221,8 @@ let AppDataService;
       const transferRepeat = templateIds.has(child.id) && activeRepeat(child);
       return copyTask(child, {
         completed: true,
+        completedAt: child.completedAt || now,
+        after: completedAfterValue(child),
         repeat: transferRepeat ? null : child.repeat,
         repeatState: transferRepeat ? null : child.repeatState,
         updatedAt: now
@@ -199,6 +235,8 @@ let AppDataService;
       project: nextRoot.project || '',
       familySlotId: template.familySlotId,
       completed: false,
+      completedAt: null,
+      after: null,
       repeat: activeRepeat(template) ? engine().clone(template.repeat) : null,
       repeatState: activeRepeat(template) ? { ...template.repeatState } : null,
       createdAt: now,
@@ -268,12 +306,18 @@ let AppDataService;
       const priority = taskData.priority ?? existing?.priority ?? '';
       if (!['', 'low', 'medium', 'high'].includes(priority)) throw new Error('Invalid task priority.');
 
-      const selectedRepeat = taskData.repeat !== undefined ? taskData.repeat : existing?.repeat;
+      const taskId = existing?.id || this.createId('task');
+      const after = this.resolveTaskAfterInput(taskData, existing, taskId);
+      const pendingAfter = TaskAfter.isPending(after);
+      const selectedRepeat = pendingAfter ? null : (taskData.repeat !== undefined ? taskData.repeat : existing?.repeat);
       const normalizedRepeat = engine().normalizeRepeatRule(selectedRepeat);
-      const selectedDate = taskData.dueDate !== undefined ? taskData.dueDate : existing?.dueDate;
+      const selectedDate = pendingAfter ? null : (taskData.dueDate !== undefined ? taskData.dueDate : existing?.dueDate);
       const dueDate = normalizedRepeat.mode !== 'none' && !selectedDate ? engine().today() : (selectedDate || null);
+      const dueTime = pendingAfter
+        ? null
+        : (taskData.dueTime !== undefined ? taskData.dueTime : (existing?.dueTime || null));
       const task = TaskModel.normalizeTask({
-        id: existing?.id || this.createId('task'),
+        id: taskId,
         title,
         description: String(taskData.description ?? existing?.description ?? ''),
         project,
@@ -282,9 +326,11 @@ let AppDataService;
         tags,
         reminders: reminderData.ids.length ? reminderData.ids : ['none'],
         repeat: normalizedRepeat.mode === 'none' ? null : normalizedRepeat,
-        dueDate,
-        dueTime: taskData.dueTime !== undefined ? taskData.dueTime : (existing?.dueTime || null),
+        after,
+        dueDate: pendingAfter ? null : dueDate,
+        dueTime,
         completed: existing?.completed || false,
+        completedAt: existing?.completedAt || null,
         sortOrder: existing?.sortOrder ?? (parent
           ? this.nextSubtaskSortOrder(parent.id)
           : this.nextRootSortOrder()),
@@ -372,10 +418,15 @@ let AppDataService;
         const task = AppState.getTask(taskId);
         if (!task) throw new Error('Task not found.');
         if (task.completed) return uncompleteTask(task);
+
+        let result;
         if (task.parentTaskId) {
-          return activeRepeat(task) ? completeRepeatingSubtask(this, task) : completePlainSubtask(task);
+          result = activeRepeat(task) ? await completeRepeatingSubtask(this, task) : await completePlainSubtask(task);
+        } else {
+          result = activeRepeat(task) ? await completeRepeatingRoot(this, task) : await completeNonRepeatingRoot(task);
         }
-        return activeRepeat(task) ? completeRepeatingRoot(this, task) : completeNonRepeatingRoot(task);
+        await this.resolveAfterDependentsInternal();
+        return result;
       });
     },
 
@@ -389,7 +440,7 @@ let AppDataService;
             task.familySlotId = this.createId('slot');
             dirty = true;
           }
-          if (activeRepeat(task)) {
+          if (activeRepeat(task) && !TaskAfter.isPending(task.after)) {
             if (!task.dueDate) {
               task.dueDate = engine().today();
               dirty = true;
@@ -426,9 +477,11 @@ let AppDataService;
         if (!task) return false;
         const ids = task.parentTaskId ? [task.id] : [task.id, ...AppState.getSubtaskIds(task.id)];
         const S = TodoDbSchema.STORES;
+        let changedDependents = [];
         await TodoDb.withTransaction([
           S.TASKS, S.TASK_TAGS, S.TASK_REMINDERS, S.TASK_REPEAT_RULES
         ], 'readwrite', async tx => {
+          changedDependents = await this.clearAfterDependentsInTransaction(tx, ids);
           for (const id of ids) {
             await TodoRepositories.deleteByIndex(tx, S.TASK_TAGS, 'by_task_id', id);
             await TodoRepositories.deleteByIndex(tx, S.TASK_REMINDERS, 'by_task_id', id);
@@ -436,6 +489,7 @@ let AppDataService;
             await TodoRepositories.remove(tx, S.TASKS, id);
           }
         });
+        if (changedDependents.length) AppStateSync.replaceTasks(changedDependents);
         AppStateSync.removeTasks(ids);
         return true;
       });
@@ -455,6 +509,7 @@ let AppDataService;
 
   AppDataService = {
     ...AppDataServiceCore,
+    ...DataServiceAfterMethods,
     ...DataServiceTaxonomyMethods,
     ...DataServiceReminderMethods,
     ...DataServiceTaxonomyDragMethods,
