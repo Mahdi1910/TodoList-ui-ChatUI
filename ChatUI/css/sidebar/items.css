@@ -24,12 +24,16 @@
   border-radius: 6px;
 }
 
+/* Put the folder in the same leading icon lane as a normal chat and move the
+   collapse chevron to the trailing edge. This makes project titles align with
+   first-level chat titles instead of being pushed right by two leading icons. */
 .project-header-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 16px;
   align-items: center;
   width: 100%;
   min-width: 0;
-  gap: 8px;
+  column-gap: 8px;
   padding: 6px 8px;
   border-radius: 6px;
   cursor: pointer;
@@ -37,6 +41,26 @@
   -webkit-touch-callout: none;
   user-select: none;
   transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.project-header-item > svg:nth-of-type(2) {
+  grid-column: 1;
+  grid-row: 1;
+  width: 18px;
+  height: 18px;
+}
+
+.project-header-item > .chat-item-title {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.project-header-item > .project-collapse-icon {
+  grid-column: 3;
+  grid-row: 1;
+  width: 14px;
+  height: 14px;
+  justify-self: end;
 }
 
 .project-header-item:hover,
@@ -54,8 +78,11 @@
 .project-item.collapsed .project-collapse-icon { transform: rotate(-90deg); }
 .project-item.collapsed .nested-project-chats { display: none; }
 
-/* Chats inside a project are the only second-level sidebar rows. */
+/* Chats inside a project are the only second-level sidebar rows. The subtle
+   guide line makes the parent/child relationship visible without adding more
+   icons or controls. */
 .nested-project-chats {
+  position: relative;
   width: 100%;
   min-width: 0;
   list-style: none;
@@ -65,6 +92,18 @@
   margin-top: 2px;
   padding-left: 24px;
   border-left: 0;
+}
+
+.nested-project-chats::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  border-radius: 999px;
+  background: var(--border-color);
+  pointer-events: none;
 }
 
 .chat-item {
