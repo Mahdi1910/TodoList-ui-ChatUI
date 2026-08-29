@@ -1,4 +1,5 @@
 import { TaskFilter } from '../task-filter.js';
+import { TaskAfter } from '../task-after.js';
 import { AppPersistence } from '../storage/persistence.js';
 import { AppDataService } from '../storage/data-service.js';
 import { AppState } from '../state.js';
@@ -127,7 +128,11 @@ export const TaskRendererMethods = {
 
     const meta = document.createElement('div');
     meta.className = 'task-meta';
-    if (normalized.dueDate || normalized.dueTime) {
+    if (TaskAfter.isPending(normalized.after)) {
+      const source = AppState.getTask(normalized.after.taskId);
+      const sourceSuffix = source?.title ? ` · ${source.title}` : '';
+      meta.appendChild(this.createBadge(`After ${TaskAfter.formatDelay(normalized.after)}${sourceSuffix}`, 'after'));
+    } else if (normalized.dueDate || normalized.dueTime) {
       meta.appendChild(this.createBadge(this.formatScheduleLabel(normalized.dueDate, normalized.dueTime), 'due-date'));
     }
     if (normalized.repeat && normalized.repeat.mode !== 'none' && !compact) {
