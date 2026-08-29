@@ -16,7 +16,6 @@ export const DataServiceDragMethods = {
 
     const scopes = new Map();
     const seenTaskIds = new Set();
-
     orderSnapshot.forEach(rawScope => {
       const parentTaskId = rawScope?.parentTaskId || null;
       const key = this.customOrderScopeKey(parentTaskId);
@@ -140,6 +139,7 @@ export const DataServiceDragMethods = {
           moved.priority = key;
         } else if (destination.groupType === 'date') {
           moved.dueDate = key || null;
+          moved.after = null;
         } else if (destination.groupType === 'project') {
           moved.project = this.validateProjectId(key || '');
           projectChanged = moved.project !== task.project;
