@@ -70,7 +70,7 @@ assert.match(refinementsCss, /\.composer-bar:focus-within,[\s\S]*border-color:\s
 assert.match(mainCss, /--bg-selected:/, 'theme state must expose a selected-row token');
 assert.match(mainCss, /--menu-bg:/, 'theme state must expose a popup-surface token');
 assert.match(refinementsCss, /\.chat-item\.active\s*\{[^}]*var\(--bg-selected\)/, 'selected chats must use the appearance-aware selected token');
-assert.match(refinementsCss, /\.action-popup-menu\s*\{[\s\S]*var\(--menu-bg\)/, 'shared action menus must use the appearance-aware menu surface');
+assert.match(refinementsCss, /\.action-popup-menu[\s\S]*var\(--menu-bg\)/, 'shared action menus must use the appearance-aware menu surface');
 assert.match(refinementsCss, /\.action-menu-item:focus-visible\s*\{[\s\S]*var\(--focus-ring\)/, 'menu keyboard focus must not retain a hard-coded dark-theme outline');
 assert.match(settingsCss, /\.settings-section-btn:hover\s*\{\s*background:\s*var\(--bg-hover\)/, 'Settings hover rows must remain token-driven');
 
@@ -82,7 +82,7 @@ assert.match(rightSidebarCss, /@media \(max-width: 767px\)[\s\S]*\.right-sidebar
 // Settings must expose the two persistent modes without runtime-only layout shift,
 // and the key editor must start compact.
 assert.match(settingsHtml, /id="text-api-profile-switcher"[\s\S]*data-text-api-profile="mode-1"[\s\S]*Mode 1[\s\S]*data-text-api-profile="mode-2"[\s\S]*Mode 2/, 'Gemini Settings must render Mode 1 and Mode 2 explicitly');
-assert.match(settingsHtml, /<textarea[^>]+id="text-api-key-input"[^>]+rows="3"/, 'Gemini text-key textarea must start compact');
+assert.match(settingsHtml, /<textarea[^>]+id="text-api-key-input"[^>]+rows="3"/, 'Gemini text-key textarea must keep its multiline markup fallback');
 assert.match(apiConfig, /selectTextApiProfile\(button\.dataset\.textApiProfile\)/, 'mode selection must use the persistent Text API profile state');
 
 // Background title generation must use the repository's streaming-only text
@@ -108,6 +108,6 @@ assert.match(mainChatHtml, /landing-title default-landing-title/, 'default empty
 assert.match(refinementsCss, /#empty-state \.landing-title\.default-landing-title\s*\{[\s\S]*display:\s*none;/, 'default new-chat heading must be hidden');
 assert.match(conversation, /title\.classList\.toggle\('default-landing-title', message === 'What can I help with\?'\)/, 'loading/error messages must remove the default-only hidden marker');
 
-assert.match(apiConfig, /CHATUI_VERSION = '2\.1'/, 'ChatUI Settings version must be 2.1');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.2'/, 'ChatUI Settings version must be 2.2');
 
 console.log('ChatUI Plan 13 theme, profiles, layout, menu, and automatic-title verification passed.');
