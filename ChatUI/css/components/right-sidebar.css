@@ -6,24 +6,42 @@
 
 /* 7. RIGHT CONTROL SIDEBAR */
 .right-sidebar {
-  position: absolute;
-  inset: 0 0 0 auto;
-  width: min(var(--right-sidebar-width, 280px), calc(100vw - 24px));
   height: 100dvh;
   background-color: var(--bg-secondary);
   border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  transform: translateX(0);
-  transition: transform var(--transition-normal);
-  will-change: transform;
-  box-shadow: -18px 0 42px rgba(0, 0, 0, 0.34);
   z-index: 90;
 }
 
-.right-sidebar.collapsed {
-  transform: translateX(100%);
-  pointer-events: none;
+/* Desktop: the panel is a real flex column beside main-content. Its width is
+   part of layout, so opening it shrinks/pushes the chat rather than covering it. */
+@media (min-width: 768px) {
+  .right-sidebar {
+    position: relative;
+    inset: auto;
+    flex: 0 0 var(--right-sidebar-width, 280px);
+    width: var(--right-sidebar-width, 280px);
+    min-width: 0;
+    transform: translateX(0);
+    opacity: 1;
+    overflow: hidden;
+    box-shadow: none;
+    transition:
+      transform var(--transition-normal),
+      width var(--transition-normal),
+      flex-basis var(--transition-normal),
+      opacity var(--transition-fast);
+  }
+
+  .right-sidebar.collapsed {
+    flex-basis: 0;
+    width: 0;
+    border-left-width: 0;
+    transform: translateX(100%);
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 .right-sidebar-header {
@@ -32,6 +50,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex: 0 0 var(--header-height, 60px);
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -43,6 +62,7 @@
 
 .right-sidebar-scrollable {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
   display: flex;
@@ -128,6 +148,7 @@
   border-color: var(--border-color);
 }
 
+/* Phone/tablet: retain the overlay drawer behavior. */
 @media (max-width: 767px) {
   .app-container.right-sidebar-open::after {
     content: "";
@@ -138,8 +159,19 @@
   }
 
   .right-sidebar {
+    position: absolute;
+    inset: 0 0 0 auto;
     width: min(86vw, var(--right-sidebar-width, 280px));
+    flex: none;
+    transform: translateX(0);
+    transition: transform var(--transition-normal);
+    will-change: transform;
     box-shadow: -16px 0 34px rgba(0, 0, 0, 0.46);
+  }
+
+  .right-sidebar.collapsed {
+    transform: translateX(100%);
+    pointer-events: none;
   }
 }
 
