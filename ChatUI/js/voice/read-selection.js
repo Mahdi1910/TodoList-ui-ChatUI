@@ -70,7 +70,10 @@ export function captureSelectedReadText() {
 
 export function getSelectedReadText() {
   if (!selectedText) return '';
-  if (selectedChatId && selectedChatId !== state.activeChatId) return '';
+  if (selectedChatId && selectedChatId !== state.activeChatId) {
+    clearSelectedReadText();
+    return '';
+  }
   return selectedText;
 }
 
