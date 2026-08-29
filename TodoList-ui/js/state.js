@@ -1,28 +1,10 @@
 import { TaskRelationMethods } from './task-relations.js';
 import { TaskOrderMethods } from './task-order.js';
 
-const seedTime = new Date().toISOString();
 export const AppSeedData = {
-    projects: [
-      { id: 'personal', name: 'Personal', icon: '●', viewType: 'list', parentId: null },
-      { id: 'work', name: 'Work', icon: '◆', viewType: 'list', parentId: null }
-    ],
-    tags: [
-      { id: 'urgent', name: 'Urgent', icon: '!', viewType: 'list', parentId: null },
-      { id: 'design', name: 'Design', icon: '◆', viewType: 'list', parentId: null },
-      { id: 'personal', name: 'Personal', icon: '●', viewType: 'list', parentId: null },
-      { id: 'work', name: 'Work', icon: '◆', viewType: 'list', parentId: null }
-    ],
-    tasks: [
-      {
-        id: 'task-1', title: 'Design Apple-style UI layout for Todo app', description: '',
-        project: 'personal', priority: 'high', tags: ['design'], completed: false, createdAt: seedTime
-      },
-      {
-        id: 'task-2', title: 'Setup modular CSS variables and dark/light themes', description: '',
-        project: 'work', priority: 'medium', tags: ['urgent'], completed: true, createdAt: seedTime
-      }
-    ]
+  projects: [],
+  tags: [],
+  tasks: []
 };
 
 const AppStateCore = {
