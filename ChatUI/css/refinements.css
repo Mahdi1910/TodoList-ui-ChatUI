@@ -41,6 +41,11 @@
   color: var(--text-primary) !important;
 }
 
+.action-menu-item:focus-visible {
+  outline: 1px solid var(--focus-ring) !important;
+  outline-offset: -2px;
+}
+
 .action-menu-separator {
   background: var(--border-color) !important;
 }
@@ -111,6 +116,7 @@
 .chat-item.active { background: var(--bg-selected) !important; color: var(--text-primary); }
 .project-header-item:hover,
 .project-header-item:focus-visible { background: var(--bg-hover); }
+.project-header-item:focus-visible { outline-color: var(--focus-ring) !important; }
 
 /* Give quick navigation breathing room below the logo/search header. */
 .sidebar-nav {
