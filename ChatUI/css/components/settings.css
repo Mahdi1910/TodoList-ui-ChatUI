@@ -2,6 +2,7 @@
 .settings-home {
   width: 100%;
   padding: 24px;
+  overflow-y: auto;
 }
 
 .settings-home-title {
@@ -55,17 +56,71 @@
   position: relative;
 }
 
-.settings-close-btn {
+/* Keep the close button in a predictable chrome area instead of letting it sit
+   on top of the scroll rail. The stronger selector intentionally wins over the
+   older narrow-screen top/right override in responsive.css. */
+.settings-card .settings-close-btn {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 10;
+  top: 12px;
+  right: max(18px, calc(env(safe-area-inset-right, 0px) + 12px));
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  z-index: 20;
+  background: rgba(33, 33, 33, 0.92);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(8px);
+}
+
+.settings-card .settings-close-btn:hover {
+  background: var(--bg-hover);
 }
 
 .settings-content {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   padding: 24px;
   overflow-y: auto;
+}
+
+/* The browser's default dark-theme scrollbar can still render as a bright
+   white rail. Give Settings a quiet, application-colored scrollbar instead. */
+.settings-home,
+.settings-content,
+.audio-voice-menu {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.42) transparent;
+}
+
+.settings-home::-webkit-scrollbar,
+.settings-content::-webkit-scrollbar,
+.audio-voice-menu::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.settings-home::-webkit-scrollbar-track,
+.settings-content::-webkit-scrollbar-track,
+.audio-voice-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-home::-webkit-scrollbar-thumb,
+.settings-content::-webkit-scrollbar-thumb,
+.audio-voice-menu::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.42);
+  background-clip: padding-box;
+}
+
+.settings-home::-webkit-scrollbar-thumb:hover,
+.settings-content::-webkit-scrollbar-thumb:hover,
+.audio-voice-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.62);
+  background-clip: padding-box;
 }
 
 .tab-pane { display: none; }
@@ -204,4 +259,158 @@ input:checked + .slider:before { transform: translateX(20px); }
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
+}
+
+.audio-voice-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.audio-voice-picker {
+  position: relative;
+  width: 190px;
+  min-width: 0;
+}
+
+.audio-voice-trigger {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 14px;
+  text-align: left;
+}
+
+.audio-voice-trigger:hover,
+.audio-voice-trigger[aria-expanded="true"] {
+  border-color: var(--border-light);
+  background: var(--bg-hover);
+}
+
+.audio-voice-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-voice-trigger svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.audio-voice-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: min(240px, calc(100vw - 32px));
+  max-height: min(300px, 46dvh);
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: #1f1f1f;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.52);
+  z-index: 160;
+}
+
+.audio-voice-menu.hidden { display: none !important; }
+
+.audio-voice-option {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: 14px;
+}
+
+.audio-voice-option:hover,
+.audio-voice-option:focus-visible,
+.audio-voice-option[aria-selected="true"] {
+  background: var(--bg-hover);
+}
+
+.audio-voice-option[aria-selected="true"] {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.audio-voice-option svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent-blue);
+}
+
+.audio-voice-preview-btn {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.audio-voice-preview-btn:hover {
+  background: var(--bg-hover);
+}
+
+.audio-voice-preview-btn.is-playing {
+  border-color: rgba(37, 99, 235, 0.65);
+  background: rgba(37, 99, 235, 0.18);
+  color: #93C5FD;
+}
+
+.audio-voice-preview-btn.is-loading svg {
+  animation: audio-voice-preview-spin 850ms linear infinite;
+}
+
+.audio-voice-preview-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+@keyframes audio-voice-preview-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 560px) {
+  #tab-audio-read .setting-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .audio-voice-control {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .audio-voice-picker {
+    width: auto;
+    flex: 1 1 auto;
+  }
+
+  .audio-voice-menu {
+    left: 0;
+    right: auto;
+    width: min(260px, calc(100vw - 52px));
+  }
 }
