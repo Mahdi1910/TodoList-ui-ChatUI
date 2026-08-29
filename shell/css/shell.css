@@ -189,9 +189,18 @@ button { font: inherit; }
   }
   .shell-nav-main { flex: 1; flex-direction: row; justify-content: space-around; gap: 0; }
   .shell-nav-footer { width: auto; flex-direction: row; }
-  .shell-nav-item { width: min(58px, 18vw); height: 50px; flex-direction: column; gap: 2px; border-radius: 10px; }
+  .shell-nav-item { width: min(58px, 18vw); height: 50px; flex-direction: column; gap: 3px; border-radius: 10px; }
   .shell-nav-item svg { width: 22px; height: 22px; }
-  .shell-nav-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; font-size: 9px; line-height: 1; }
+  .shell-nav-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.1;
+  }
   .shell-nav-item[aria-current="page"]::before { left: 12px; right: 12px; top: -6px; bottom: auto; width: auto; height: 3px; border-radius: 0 0 4px 4px; }
   .shell-nav-status { top: 3px; right: 10px; }
   .shell-toast { bottom: calc(var(--shell-mobile-nav-size) + env(safe-area-inset-bottom, 0px) + 12px); }
