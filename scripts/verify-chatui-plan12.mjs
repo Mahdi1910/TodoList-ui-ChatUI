@@ -16,7 +16,7 @@ assert.match(readSettingsJs, /legacySelect\.replaceWith\(root\)/, 'native Audio 
 assert.match(readSettingsJs, /id="audio-read-voice-trigger"[\s\S]*id="audio-read-voice-menu"[\s\S]*id="audio-read-voice-preview-btn"/, 'custom voice picker must include trigger, listbox, and preview control');
 assert.match(readSettingsJs, /startGeminiLiveAudio\(/, 'voice preview must use the existing Gemini Live audio transport');
 assert.match(readSettingsJs, /new ReadAudioEngine\(/, 'voice preview must play through the existing PCM audio engine');
-assert.match(settingsCss, /\.audio-voice-menu\s*\{[\s\S]*background:\s*#1f1f1f;[\s\S]*max-height:/, 'voice choices must use a bounded dark application menu');
+assert.match(settingsCss, /\.audio-voice-menu\s*\{[\s\S]*max-height:[\s\S]*background:\s*#1f1f1f;/, 'voice choices must use a bounded dark application menu');
 assert.match(settingsCss, /\.audio-voice-preview-btn\s*\{[\s\S]*width:\s*40px;[\s\S]*height:\s*40px;/, 'voice preview must have a clear standalone play control');
 
 assert.match(settingsCss, /scrollbar-color:\s*rgba\(148, 163, 184, 0\.42\) transparent;/, 'Settings scrollbar must use a subtle dark-theme rail instead of browser white');
