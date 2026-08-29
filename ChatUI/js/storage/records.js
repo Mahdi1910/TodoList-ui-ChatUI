@@ -34,6 +34,8 @@ export function buildChatRecord(chat) {
     id: chat.id,
     projectId: chat.projectId || null,
     title: chat.title,
+    titleSource: chat.titleSource || 'legacy',
+    autoTitleGeneratedAt: Number(chat.autoTitleGeneratedAt) || 0,
     pinned: !!chat.pinned,
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt || chat.createdAt,
