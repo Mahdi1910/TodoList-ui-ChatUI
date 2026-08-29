@@ -1,0 +1,38 @@
+name: ChatUI Plan 16 Selection Wrap Check
+
+on:
+  pull_request:
+    paths:
+      - 'ChatUI/js/voice/read-selection.js'
+      - 'ChatUI/js/ui/chat-controls.js'
+      - 'ChatUI/js/voice/read-aloud.js'
+      - 'ChatUI/css/chat/messages.css'
+      - 'ChatUI/js/api/api-config.js'
+      - 'scripts/verify-chatui-plan16.mjs'
+      - '.github/workflows/chatui-plan16-selection-wrap-check.yml'
+      - 'implementation plan/Implementation Plan ID 16.md'
+
+jobs:
+  verify-selection-and-wrapping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check ChatUI/js/voice/read-selection.js
+          node --check ChatUI/js/api/api-config.js
+          node --check scripts/verify-chatui-plan16.mjs
+      - name: Verify Plan 16 invariants
+        run: node scripts/verify-chatui-plan16.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify updated assets reached runtime bundle
+        run: |
+          test -f dist/ChatUI/js/voice/read-selection.js
+          test -f dist/ChatUI/css/chat/messages.css
+          test -f dist/ChatUI/js/api/api-config.js
+          grep -q "rangeIntersectionWithRoot" dist/ChatUI/js/voice/read-selection.js
+          grep -q "overflow-x: hidden" dist/ChatUI/css/chat/messages.css
