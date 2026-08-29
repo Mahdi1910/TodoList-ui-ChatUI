@@ -37,6 +37,6 @@ assert.match(sidebarCss, /\.project-header-item > \.project-collapse-icon\s*\{[\
 assert.match(sidebarCss, /\.nested-project-chats::before\s*\{[\s\S]*background:\s*var\(--border-color\)/, 'nested project chats must retain the subtle hierarchy guide');
 assert.match(sidebarCss, /\.chat-item\.active\s*\{[\s\S]*font-weight:\s*500;/, 'selected chat state must remain intact');
 
-assert.match(apiConfig, /CHATUI_VERSION = '2\.3'/, 'ChatUI Settings version must be 2.3');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.4'/, 'ChatUI Settings version must be 2.4');
 
 console.log('ChatUI Plan 12 UI refinement verification passed.');

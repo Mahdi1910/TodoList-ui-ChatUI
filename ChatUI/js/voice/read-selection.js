@@ -19,26 +19,39 @@ function normalizeText(value) {
     .trim();
 }
 
-function allowedRootFor(node) {
-  const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-  return element?.closest?.(READABLE_SELECTION_SELECTOR) || null;
+function rangeIntersectionWithRoot(range, root) {
+  const rootRange = document.createRange();
+  rootRange.selectNodeContents(root);
+  const part = range.cloneRange();
+
+  // Browser word/paragraph selection (especially triple-click) can place a
+  // range boundary just outside the visible paragraph/list item. Clip the
+  // browser range to the readable message root instead of rejecting it merely
+  // because an endpoint lives in the parent container.
+  if (part.compareBoundaryPoints(Range.START_TO_START, rootRange) < 0) {
+    part.setStart(rootRange.startContainer, rootRange.startOffset);
+  }
+  if (part.compareBoundaryPoints(Range.END_TO_END, rootRange) > 0) {
+    part.setEnd(rootRange.endContainer, rootRange.endOffset);
+  }
+
+  return part.collapsed ? null : part;
 }
 
 function selectedTextFromRange(range, thread) {
-  const startRoot = allowedRootFor(range.startContainer);
-  const endRoot = allowedRootFor(range.endContainer);
-  if (!startRoot || !endRoot || !thread.contains(startRoot) || !thread.contains(endRoot)) return '';
-
   const roots = [...thread.querySelectorAll(READABLE_SELECTION_SELECTOR)]
     .filter(root => {
       try { return range.intersectsNode(root); } catch (error) { return false; }
     });
+  if (!roots.length) return '';
+
   const pieces = [];
   roots.forEach(root => {
-    const part = document.createRange();
-    part.selectNodeContents(root);
-    if (root.contains(range.startContainer)) part.setStart(range.startContainer, range.startOffset);
-    if (root.contains(range.endContainer)) part.setEnd(range.endContainer, range.endOffset);
+    let part;
+    try { part = rangeIntersectionWithRoot(range, root); }
+    catch (error) { part = null; }
+    if (!part) return;
+
     const holder = document.createElement('div');
     holder.appendChild(part.cloneContents());
     holder.querySelectorAll('button, .code-block-header, .streaming-cursor, svg, [aria-hidden="true"]').forEach(node => node.remove());

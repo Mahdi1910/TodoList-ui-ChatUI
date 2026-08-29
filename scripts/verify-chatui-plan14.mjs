@@ -58,6 +58,6 @@ assert.match(messageRenderer, /toggle\.textContent = expanding \? 'Show less' : 
 assert.match(messageRenderer, /observer\.observe\(text\)/, 'sent-message overflow must remeasure when responsive or iframe visibility changes affect text size');
 assert.match(messageRenderer, /else if \(content\) \{\s*appendUserContent\(bubble, content\);\s*\}/, 'assistant messages must not be routed through the sent-message collapse path');
 
-assert.match(apiConfig, /CHATUI_VERSION = '2\.3'/, 'ChatUI Settings version must be 2.3');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.4'/, 'ChatUI Settings version must be 2.4');
 
 console.log('ChatUI Plan 14 embedded light theme and sent-message compactness verification passed.');
