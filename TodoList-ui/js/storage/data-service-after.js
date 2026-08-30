@@ -67,7 +67,37 @@ export const DataServiceAfterMethods = {
     });
   },
 
+  async bypassCompletedPendingAfterSourcesInternal() {
+    const plan = TaskAfter.bypassCompletedPendingSources(AppState.tasks);
+    if (!plan.length) return [];
+
+    const now = TodoStorageMappers.nowIso();
+    const changed = plan.map(update => {
+      const current = AppState.getTask(update.id);
+      if (!current) return null;
+      return cloneTask(current, {
+        after: update.after ? TaskAfter.clone(update.after) : null,
+        updatedAt: now
+      });
+    }).filter(Boolean);
+    if (!changed.length) return [];
+
+    const S = TodoDbSchema.STORES;
+    await TodoDb.withTransaction(S.TASKS, 'readwrite', async tx => {
+      for (const task of changed) {
+        await TodoRepositories.put(tx, S.TASKS, TodoStorageMappers.taskToRow(task));
+      }
+    });
+    AppStateSync.replaceTasks(changed);
+    return changed;
+  },
+
   async resolveAfterDependentsInternal() {
+    // A task completed while it was still waiting on another task is a bypassed
+    // link. Rewire its pending downstream tasks first so its manual completion
+    // timestamp can never incorrectly resolve the next task in the chain.
+    await this.bypassCompletedPendingAfterSourcesInternal();
+
     const changed = [];
     const now = TodoStorageMappers.nowIso();
     for (const sourceTask of AppState.tasks) {
@@ -109,10 +139,10 @@ export const DataServiceAfterMethods = {
         const source = check.valid ? byId.get(check.after.taskId) : null;
         const cyclic = check.valid && TaskAfter.wouldCreateCycle(task.id, check.after.taskId, tasks);
         const impossiblePendingSource = Boolean(
-          check.valid && source && !check.after.resolvedAt && source.completed && !source.completedAt
+          check.valid && source && !check.after.resolvedAt && !task.completed &&
+          source.completed && !source.completedAt
         );
-        if (!check.valid || !source || source.id === task.id || cyclic ||
-            impossiblePendingSource || (task.completed && !task.after.resolvedAt)) {
+        if (!check.valid || !source || source.id === task.id || cyclic || impossiblePendingSource) {
           task.after = null;
           task.updatedAt = now;
           changed.set(task.id, task);
