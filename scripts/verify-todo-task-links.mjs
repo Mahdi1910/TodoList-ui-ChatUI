@@ -136,6 +136,35 @@ function createMockRuntime({ startFrom = 'task-a' } = {}) {
   assert.deepEqual(runtime.completionCalls, ['task-b', 'task-a']);
 }
 
+{
+  const tasks = [
+    { id: 'task-parent', title: 'Parent', completed: false },
+    { id: 'task-child', title: 'Child [[task:task-friend]]', completed: false, parentTaskId: 'task-parent' },
+    { id: 'task-friend', title: 'Friend', completed: false }
+  ];
+  const state = {
+    tasks,
+    getTask(id) { return tasks.find(task => task.id === id) || null; }
+  };
+  const completionCalls = [];
+  const service = {
+    async toggleTaskStatus(id) {
+      const task = state.getTask(id);
+      if (!task) throw new Error('Task not found.');
+      completionCalls.push(id);
+      task.completed = !task.completed;
+      if (id === 'task-parent' && task.completed) state.getTask('task-child').completed = true;
+      return task;
+    }
+  };
+  installTaskLinkCompletion(service, state);
+  await service.toggleTaskStatus('task-parent');
+  assert.equal(state.getTask('task-child').completed, true);
+  assert.equal(state.getTask('task-friend').completed, true,
+    'A subtask completed as a parent side effect must still propagate its task link');
+  assert.deepEqual(completionCalls, ['task-parent', 'task-friend']);
+}
+
 const actions = await read('TodoList-ui/js/components/task-actions.js');
 assert.match(actions, /data\.taskAction = 'copy-link'/);
 assert.match(actions, /TaskLinks\.tokenFor\(task\.id\)/);
@@ -148,7 +177,10 @@ assert.match(renderer, /openLinkedTask/);
 assert.doesNotMatch(renderer, /title\.innerHTML\s*=\s*normalized\.title/,
   'User task titles must never be injected as HTML');
 
+assert.match(completionSource, /const snapshotTasks =/);
+assert.match(completionSource, /discoverLinksFromNewCompletions/);
+
 const appMain = await read('TodoList-ui/js/app-main.js');
 assert.match(appMain, /installTaskLinkCompletion\(AppDataService, AppState\)/);
 
-console.log('Todo task-link token, rendering, and completion verification passed.');
+console.log('Todo task-link token, rendering, repeat-snapshot, and completion verification passed.');
