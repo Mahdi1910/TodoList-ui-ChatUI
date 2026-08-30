@@ -80,9 +80,43 @@
   line-height: 1.3;
 }
 
+.task-title-link {
+  color: var(--accent-color);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.task-title-link:hover,
+.task-title-link:focus-visible {
+  background: var(--accent-light);
+  outline: none;
+}
+
+.task-title-link:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+.task-title-link.missing-task-link {
+  color: var(--text-muted);
+  text-decoration-style: dashed;
+  cursor: default;
+}
+
+.task-title-link.missing-task-link:hover {
+  background: transparent;
+}
+
 .task-card.completed .task-title {
   color: var(--text-muted);
   text-decoration: line-through;
+}
+
+.task-card.completed .task-title-link {
+  color: var(--text-muted);
 }
 
 .task-meta {
