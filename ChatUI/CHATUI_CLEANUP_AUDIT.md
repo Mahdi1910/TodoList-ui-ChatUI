@@ -24,23 +24,14 @@ Status: **Audit complete. No fixes performed.**
 **Priority:** High
 
 **Locations:**
+- `ChatUI/js/ui/model-thinking-menu.js`, approximately lines 48–124.
+- `ChatUI/js/voice/read-settings.js`, approximately lines 192–310.
 
-- `ChatUI/js/ui/model-thinking-menu.js`, approximately lines 48–124 — Model selector and Thinking selector lifecycle.
-- `ChatUI/js/voice/read-settings.js`, approximately lines 192–310 — Audio Read voice selector lifecycle.
+**Finding:** Model selection, Thinking-level selection, and Audio Voice selection separately implement the same trigger/list/open-close/focus/keyboard/selection pattern. The implementations have already drifted; for example the Voice picker has richer Arrow/Home/End behavior.
 
-**What it is:**
+**Recommendation:** Introduce a reusable listbox-popover primitive and let Model, Thinking, and Voice supply only data/rendering/selection callbacks.
 
-Model selection, Thinking-level selection, and Audio Voice selection are all the same broad UI pattern: a trigger button opens a list of choices, one option is selected, keyboard/focus state is managed, outside clicks close the list, and `aria-expanded`/selection state is updated.
-
-**Why it is a cleanup candidate:**
-
-Each feature implements its own open/close, outside-click, focus, Escape, option rendering, and keyboard behavior. The implementations have already drifted: the Audio Voice picker supports Arrow/Home/End behavior that Model/Thinking do not implement in the same way.
-
-**Recommendation:**
-
-Create a reusable `listbox-popover.js`-style primitive. Model, Thinking, and Voice should provide data, rendering details, and selection callbacks while the primitive owns the shared lifecycle and keyboard behavior.
-
-**Action type:** Consolidate; do not simply delete one implementation.
+**Action type:** Consolidate, not blind deletion.
 
 ---
 
@@ -48,65 +39,36 @@ Create a reusable `listbox-popover.js`-style primitive. Model, Thinking, and Voi
 
 **Priority:** High
 
-**Canonical/shared implementation:**
-
-- `ChatUI/js/ui/action-menu.js`, approximately lines 20–160.
-
-**Parallel implementations:**
-
+**Locations:**
+- Canonical action menu: `ChatUI/js/ui/action-menu.js`, approximately lines 20–160.
 - `ChatUI/js/ui/model-thinking-menu.js`, approximately lines 48–124.
-- `ChatUI/js/composer/composer.js`, approximately lines 98–174 — Tools popup.
-- `ChatUI/js/voice/read-settings.js`, approximately lines 192–310 — Voice picker.
+- `ChatUI/js/composer/composer.js`, approximately lines 98–174.
+- `ChatUI/js/voice/read-settings.js`, approximately lines 192–310.
 
-**What it is:**
+**Finding:** Active anchor state, outside-click closing, Escape, focus restoration, positioning, and keyboard handling are repeated across several popup families.
 
-`action-menu.js` already owns common popup mechanics such as active anchor state, open/close behavior, outside interaction, Escape handling, focus restoration, positioning, and keyboard navigation. Other popup-like controls independently implement overlapping mechanics.
+**Recommendation:** Extract lower-level popover mechanics, then build semantic components such as `action-menu`, `listbox-popover`, and Tools on top of that primitive.
 
-**Why it is a cleanup candidate:**
-
-The application now has multiple sources of truth for popup lifecycle. Fixes to positioning, focus restoration, accessibility, or mobile behavior can therefore be applied to one popup family but not the others.
-
-**Recommendation:**
-
-Do **not** force every UI into `action-menu.js`, because action menus, listboxes, and the Tools panel have different semantics. Instead, extract a lower-level `popover-controller`/popover utility and let specialized components build on it:
-
-- `action-menu.js`
-- `listbox-popover.js`
-- Tools popup/dialog controller
-
-**Action type:** Refactor shared mechanics, preserving component semantics.
+**Action type:** Shared-infrastructure refactor.
 
 ---
 
-## 3. Modal lifecycle has multiple owners and the central registry is already incomplete
+## 3. Modal lifecycle has multiple owners and the central registry is incomplete
 
 **Priority:** High
 
 **Locations:**
-
 - `ChatUI/js/ui/modals.js`, approximately lines 8–112.
 - `ChatUI/html/chat-modals.html`, approximately lines 1–145.
-- `ChatUI/js/sidebar/projects.js` — project modal opening/closing and project-dialog actions.
-- `ChatUI/js/sidebar/search.js` — Search dialog open/close lifecycle.
-- `ChatUI/js/settings/settings.js`, approximately lines 107–145 and 220–227 — Settings modal lifecycle.
+- `ChatUI/js/sidebar/projects.js`.
+- `ChatUI/js/sidebar/search.js`.
+- `ChatUI/js/settings/settings.js`, approximately lines 107–145 and 220–227.
 
-**What it is:**
+**Finding:** `modals.js` presents itself as the generic modal manager but manually enumerates selected dialogs. Feature modules also independently open/close dialogs. Current HTML contains dialogs such as Manage Project Chats and Rename Chat that are not fully represented in the central active-dialog/Escape registry.
 
-`modals.js` presents itself as the generic modal manager, including Escape handling and focus trapping, but it manually enumerates selected modal IDs. Feature modules also independently open, close, and handle backdrop behavior for their own dialogs.
+**Recommendation:** One modal manager should own common open/close, focus trap/restoration, Escape, and backdrop behavior. Feature modules should own only feature content/actions.
 
-**Specific drift found:**
-
-`ChatUI/html/chat-modals.html` contains dialogs including **Manage Project Chats** and **Rename Chat**, while the central `getVisibleActiveDialog()` / Escape chain in `modals.js` does not enumerate all current dialogs.
-
-**Why it is a cleanup candidate:**
-
-Every new modal requires developers to remember several separate locations. Missing one location silently produces inconsistent Escape/focus behavior.
-
-**Recommendation:**
-
-Use one modal manager that discovers or registers dialogs generically rather than hard-coding every modal ID. Feature modules should own feature-specific content and actions, while the common manager owns open/close, focus restoration/trapping, Escape, and backdrop behavior.
-
-**Action type:** Consolidate modal infrastructure carefully.
+**Action type:** Consolidate carefully.
 
 ---
 
@@ -115,194 +77,329 @@ Use one modal manager that discovers or registers dialogs generically rather tha
 **Priority:** Medium/High
 
 **Locations:**
+- `ChatUI/html/settings-modal.html`, Audio Read Voice row.
+- `ChatUI/js/voice/read-settings.js`, `ensureVoicePicker()`, approximately lines 48–92.
 
-- `ChatUI/html/settings-modal.html`, approximately lines 41–49 — `<select id="audio-read-voice-select">`.
-- `ChatUI/js/voice/read-settings.js`, approximately lines 48–92 — `ensureVoicePicker()` finds the legacy select, builds an entirely different custom picker, then calls `legacySelect.replaceWith(root)`.
+**Finding:** Source HTML contains `<select id="audio-read-voice-select">`, while JavaScript replaces it with the actual custom voice picker. There are therefore two representations of the same setting.
 
-**What it is:**
-
-There are two representations of the same setting: a native select in source HTML and a custom listbox generated by JavaScript.
-
-**Why it is a cleanup candidate:**
-
-The HTML no longer describes the actual rendered component. It adds runtime transformation logic and a legacy branch that every future change has to understand. ChatUI is already JavaScript-dependent, so this does not provide a meaningful no-JavaScript fallback.
-
-**Recommendation:**
-
-Put the current custom voice picker markup directly in the Settings HTML (or generate it through one standard component system) and remove the legacy-select conversion path after confirming nothing relies on it.
+**Recommendation:** Put the final picker markup directly in Settings (or render it through one standard component system) and remove the legacy-select conversion path after verification.
 
 **Action type:** Remove legacy representation after verification.
 
 ---
 
-## 5. Old per-message popup-menu CSS appears to remain after migration to the shared action menu
+## 5. Old per-message popup-menu CSS remains after migration to the shared action menu
 
-**Priority:** High; likely safe removal after final reference verification
+**Priority:** High
 
 **Locations:**
+- `ChatUI/css/chat/message-actions.css`, approximately lines 30–88 — `.message-more-menu`, `.message-menu-item`, and related rules.
+- Current message implementation: `ChatUI/js/chat/message-controls.js`, approximately lines 82–174.
 
-- `ChatUI/css/chat/message-actions.css`, approximately lines 30–88 — `.message-more-menu`, `.message-menu-item`, danger/hover/touch rules.
-- Current implementation: `ChatUI/js/chat/message-controls.js`, approximately lines 82–174 — message More actions call `openActionMenu()`.
+**Finding:** Current message More actions call the shared `openActionMenu()`, but the stylesheet still describes the retired dedicated message popup.
 
-**What it is:**
+**Recommendation:** Remove the legacy selectors once their remaining override references are removed. Category 2 below confirms this migration residue.
 
-The stylesheet still defines an entire dedicated per-message popup menu system, including positioning and row styling. Current message controls use the shared global action menu instead.
-
-**Why it is a cleanup candidate:**
-
-If no remaining DOM creator uses `.message-more-menu` or `.message-menu-item`, this is discarded implementation code that increases CSS size and creates false architecture signals.
-
-**Recommendation:**
-
-During the dead-code category, perform a repository-wide reference check. If there are no live creators/references, remove these legacy selectors.
-
-**Action type:** Probable deletion, pending Category 2 verification.
+**Action type:** Delete obsolete CSS after final regression check.
 
 ---
 
 ## 6. `modals.js` still contains handling for an old message-context-menu system
 
-**Priority:** High; likely dead code
+**Priority:** High
 
-**Location:**
+**Location:** `ChatUI/js/ui/modals.js`, Escape handler around the `.message-context-menu.show` query.
 
-- `ChatUI/js/ui/modals.js`, approximately lines 42–47 — searches for `.message-context-menu.show` and removes `show` on Escape.
+**Finding:** The branch predates the shared action-menu lifecycle. Current message actions no longer create this menu type.
 
-**What it is:**
+**Recommendation:** Remove the obsolete branch. Category 2 below confirms it as migration residue.
 
-The code comments that the shared action menu owns its own Escape lifecycle, but still contains a branch for `.message-context-menu.show`.
-
-**Why it is a cleanup candidate:**
-
-Current message controls use `action-menu.js`. This looks like migration residue from an older message-menu implementation.
-
-**Recommendation:**
-
-Category 2 should verify there are no remaining creators or references to `.message-context-menu`. If none exist, remove this branch.
-
-**Action type:** Probable deletion, pending dead-reference verification.
+**Action type:** Delete dead branch.
 
 ---
 
-## 7. `refinements.css` acts as a second CSS architecture layered on top of component CSS
+## 7. `refinements.css` acts as a second CSS architecture
 
 **Priority:** Very High
 
-**Primary location:**
+**Primary location:** `ChatUI/css/refinements.css`.
 
-- `ChatUI/css/refinements.css`, approximately lines 1–215.
+**Related component files include:**
+- `ChatUI/css/components/model-menu.css`
+- `ChatUI/css/components/thinking-menu.css`
+- Composer, Tools, Settings, Sidebar, Message, and Voice component styles.
 
-**Related original component definitions include:**
+**Finding:** Final styles for many components live in a late override layer with many `!important` rules. Reading the owning component stylesheet does not reveal the final behavior.
 
-- `ChatUI/css/components/model-menu.css`, approximately lines 23–61.
-- `ChatUI/css/components/thinking-menu.css`, approximately lines 15–41.
-- Other Composer, Tools, Settings, Sidebar, Message, and Voice component styles.
+**Recommendation:** Move final component-specific rules back to their owning stylesheets. Keep only genuinely global rules in a global layer, with the goal of deleting or drastically shrinking `refinements.css`.
 
-**What it is:**
-
-`refinements.css` patches many unrelated components after their normal styles are loaded. It changes Composer focus, message menus, Model, Thinking, Tools, Settings, Voice, scrollbar styling, sidebar selection, API-profile controls, API-key sizing, light-mode Markdown surfaces, and the empty landing state. Many rules use `!important`.
-
-**Why it is a cleanup candidate:**
-
-Correct final appearance now depends on load order and override strength rather than component ownership. A developer reading `model-menu.css`, for example, cannot know the final Model menu styling without also finding later overrides in `refinements.css`.
-
-This is architecture drift rather than merely a large stylesheet.
-
-**Recommendation:**
-
-Move final component-specific rules back into the component stylesheet that owns each feature. Keep only genuinely application-global refinements in a global layer. The end goal should be to delete `refinements.css` or reduce it to a small set of truly cross-cutting rules.
-
-**Action type:** Gradual CSS consolidation; high regression risk if done as one blind deletion.
+**Action type:** Gradual consolidation; high visual-regression risk if done blindly.
 
 ---
 
-## 8. ChatUI uses both its custom modal framework and native browser dialogs for application workflows
+## 8. ChatUI uses both custom dialogs and native browser dialogs
 
 **Priority:** Medium/High
 
 **Locations:**
+- `ChatUI/js/workspace/workspace-ui.js` — `prompt()`/`confirm()` for Workspace CRUD.
+- `ChatUI/js/settings/settings.js` — `window.confirm()` for Remove Everything.
+- Additional `alert()` calls exist across feature modules.
 
-- `ChatUI/js/workspace/workspace-ui.js`, approximately lines 390–429 — `prompt()` for Rename/Move and `confirm()` for Delete.
-- `ChatUI/js/workspace/workspace-ui.js`, approximately lines 430–457 — `prompt()` for New Folder/New Page.
-- `ChatUI/js/settings/settings.js`, around the Remove Everything action — `window.confirm()`.
-- Additional `alert()` usage exists across feature modules and should be inventoried separately.
+**Finding:** Application flows are split between ChatUI's dialog framework and browser-native dialogs, producing two interaction architectures.
 
-**What it is:**
+**Recommendation:** After modal infrastructure is stabilized, add reusable promise-based application dialogs such as `promptDialog()` and `confirmDialog()` and migrate workflows gradually.
 
-Some application interactions use ChatUI dialogs, while Workspace CRUD and other operations use browser-native `prompt`, `confirm`, and `alert` dialogs.
-
-**Why it is a cleanup candidate:**
-
-Native dialogs bypass ChatUI theme/layout, mobile behavior, consistent focus management, and application-level accessibility/UI conventions. They also create two dialog architectures developers must maintain mentally.
-
-**Recommendation:**
-
-After the modal architecture is stabilized, add small reusable promise-based application dialogs such as:
-
-```js
-const name = await promptDialog(...);
-const confirmed = await confirmDialog(...);
-```
-
-Then migrate application workflows gradually. Error/toast handling should be considered separately rather than blindly converting every `alert()` at once.
-
-**Action type:** Replace parallel browser-dialog system gradually.
+**Action type:** Replace parallel dialog system gradually.
 
 ---
 
-## Category 1 architecture summary
+# Category 2 — Dead / obsolete / unused code and references
 
-Current shape observed:
+Status: **Audit complete. No fixes performed.**
 
-```text
-Popup behavior
-├── action-menu.js
-├── model dropdown logic
-├── thinking dropdown logic
-├── Tools popup logic
-└── Audio Voice popup logic
+For this category, a candidate was recorded only when the current source showed no live behavioral need, or when the current markup makes a compatibility branch unreachable in a normal same-version deployment. Active-but-temporary features were intentionally excluded.
 
-Dialog behavior
-├── modals.js
-├── Settings-specific lifecycle
-├── Search-specific lifecycle
-├── Project-specific lifecycle
-├── Workspace prompt()/confirm()
-└── various alert() calls
+## 1. Settings still contains handlers for Model and Thinking controls that no longer exist
 
-Final styling
-├── component CSS
-└── refinements.css overriding component CSS
-```
+**Priority:** High
 
-A cleaner future direction could be:
+**Locations:**
+- `ChatUI/js/settings/settings.js` — import of `syncModelDisplay` / `syncThinkingDisplay` near the top.
+- `ChatUI/js/settings/settings.js` — `settingsModelSelect` and `settingsThinkingLevel` lookups in `initSettingsUI()`.
+- `ChatUI/js/settings/settings.js` — guarded `if (settingsModelSelect)` and `if (settingsThinkingLevel)` event-handler blocks near the end of `initSettingsUI()`.
+- `ChatUI/html/settings-modal.html` — current Settings markup contains no `settings-model-select` or `settings-thinking-level` elements.
 
-```text
-UI primitives
-├── popover-controller.js
-│   ├── action-menu.js
-│   ├── listbox-popover.js
-│   └── tools-popover.js
-│
-├── modal-manager.js
-│   ├── promptDialog()
-│   └── confirmDialog()
-│
-└── component-owned CSS
-    ├── model-menu.css
-    ├── thinking-menu.css
-    ├── tools.css
-    ├── settings.css
-    └── ...
-```
+**What it is:**
 
-## Items intentionally not classified as cleanup problems in Category 1
+Settings used to own model/thinking selectors. The current UI moved those controls to the header Model/Thinking menus, but the old Settings lookup and event-handler paths remain. Because the elements are absent, these branches never execute.
 
-- Small facade files such as `sidebar/sidebar.js` and `chat/chat.js` can provide stable public entry points; small file size alone is not a reason to remove them.
-- Tool controls appearing in both the Composer and the Controls sidebar are multiple UI entry points backed by the same underlying state. That is not automatically harmful duplication and should not be removed solely to reduce line count.
+**Why it is dead/obsolete:**
+
+The guards make the stale code harmless, but they also hide the fact that an old feature path is still present. After removing those branches, the `syncModelDisplay`/`syncThinkingDisplay` import from `../ui/menus.js` is no longer needed by Settings.
+
+**Recommendation:**
+
+Delete the two missing-element lookups and their guarded handler blocks, then remove imports that become unused. Keep the current `getModelConfig()` thinking-level normalization because that is still active startup behavior.
+
+**Action type:** Safe dead-code removal after one regression check.
+
+---
+
+## 2. Obsolete `.message-context-menu.show` Escape branch remains in the global modal listener
+
+**Priority:** High
+
+**Location:**
+- `ChatUI/js/ui/modals.js`, Escape handler, approximately the block immediately before Model/Thinking menu handling.
+
+**Current replacement:**
+- `ChatUI/js/ui/action-menu.js` owns Escape for the shared action menu.
+- `ChatUI/js/chat/message-controls.js` uses `openActionMenu()` for message More actions.
+
+**What it is:**
+
+`modals.js` still queries `.message-context-menu.show`, removes the `show` class, and marks Escape as handled. Current message menus use the shared global `#action-menu` instead.
+
+**Why it is dead/obsolete:**
+
+There is no current message-menu producer for that legacy class in the reviewed message/sidebar/workspace menu paths. The comment in `modals.js` itself acknowledges that the shared action menu owns its own Escape lifecycle.
+
+**Recommendation:**
+
+Delete this legacy query/close block. Escape for the current shared menu should remain owned by `action-menu.js`.
+
+**Action type:** Dead migration residue; delete.
+
+---
+
+## 3. Dedicated message More-menu CSS is dead, including late overrides for it
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/css/chat/message-actions.css` — `.message-more-menu`, `.message-menu-item`, `.message-menu-item.danger`, and related hover/focus/mobile rules.
+- `ChatUI/css/refinements.css` — `.message-more-menu` in the shared-surface override group and `.message-menu-item*` hover/danger overrides.
+- Current implementation: `ChatUI/js/chat/message-controls.js` renders a `.message-more-btn` trigger but sends menu items to the shared `openActionMenu()` primitive.
+
+**What it is:**
+
+The old dedicated message popup was replaced by the global shared action popup, but both its base CSS and later theme-fix overrides survived.
+
+**Why it is dead/obsolete:**
+
+The current message controller does not create `.message-more-menu` or `.message-menu-item` elements. Keeping their styling creates a false impression that two message-menu systems still exist.
+
+**Recommendation:**
+
+Remove the old selector blocks from both `message-actions.css` and `refinements.css`. Preserve `.message-more-btn`, because that trigger is current and active.
+
+**Action type:** Dead CSS removal.
+
+---
+
+## 4. API Settings still contains runtime compatibility branches for markup that is now guaranteed by current fragments
+
+**Priority:** Medium/High
+
+**Locations:**
+- `ChatUI/js/api/api-config.js` — `ensureMultilineTextKeyInput()`.
+- `ChatUI/js/api/api-config.js` — `ensureTextProfileSwitcher()`.
+- `ChatUI/html/settings-modal.html` — already contains a `<textarea id="text-api-key-input">` and explicit `#text-api-profile-switcher` with Mode 1 / Mode 2 buttons.
+
+**What it is:**
+
+`ensureMultilineTextKeyInput()` still supports converting an old single-line input into a textarea. `ensureTextProfileSwitcher()` can dynamically create the Mode switcher if it is absent.
+
+**Why it is obsolete in the current architecture:**
+
+ChatUI's layout loader fetches the JavaScript and HTML fragments from the same deployed version. In the current fragments, both structures already exist before API Settings initializes, so the old-markup conversion/creation branches are not part of the normal current execution path.
+
+This is different from data migration: old IndexedDB data still needs migration support. These are DOM-markup compatibility fallbacks for an earlier code layout.
+
+**Recommendation:**
+
+Keep the configuration functions that apply current attributes/state, but remove the unreachable old-input conversion and missing-switcher creation branches once the supported deployment model is confirmed to always use same-version fragments.
+
+**Action type:** Remove obsolete DOM compatibility code; do not remove persisted-data migration.
+
+---
+
+## 5. `runtime.currentVoiceIndex` is an orphaned state field
+
+**Priority:** Medium
+
+**Location:**
+- `ChatUI/js/state/store.js`, `runtime` initial state — `currentVoiceIndex: 0`.
+
+**Current voice implementation reviewed:**
+- `ChatUI/js/voice/voice-ui.js`
+- `ChatUI/js/voice/live-voice-controller.js`
+- `ChatUI/js/voice/read-settings.js`
+- `ChatUI/js/voice/read-aloud.js`
+
+**What it is:**
+
+Runtime state still reserves an integer voice index, apparently from an older indexed voice-selection implementation.
+
+**Why it is unused now:**
+
+Current voice/read code uses the persisted voice **name** (`state.audioRead.voiceName`, e.g. `Zephyr`) rather than an index. The reviewed current voice modules do not consume `runtime.currentVoiceIndex`.
+
+**Recommendation:**
+
+Remove `currentVoiceIndex` from runtime state after a final repository-wide reference check at cleanup time.
+
+**Action type:** High-confidence orphaned state removal.
+
+---
+
+## 6. `runtime.activeChatForProjectAdd` is written but the Add-to-Project flow uses its closure instead
+
+**Priority:** Medium
+
+**Locations:**
+- `ChatUI/js/state/store.js` — runtime field `activeChatForProjectAdd`.
+- `ChatUI/js/sidebar/projects.js` — `openAddToProjectModal()` calls `setRuntime({ activeChatForProjectAdd: chat })`.
+
+**What it is:**
+
+The modal saves the active chat into global runtime state, but every action inside the current modal uses the `chat` variable captured by `openAddToProjectModal()`.
+
+**Why it is unused:**
+
+The field is not required to resolve the selected chat for the current Add-to-Project handlers. It is state left over from a design where modal actions likely needed to retrieve their target globally.
+
+**Recommendation:**
+
+Remove the runtime field and the write if no external consumer is found during the final pre-cleanup reference check.
+
+**Action type:** Orphaned runtime state cleanup.
+
+---
+
+## 7. `runtime.activeProjectForChatManagement` is effectively bookkeeping without a behavioral consumer
+
+**Priority:** Medium
+
+**Locations:**
+- `ChatUI/js/state/store.js` — runtime field `activeProjectForChatManagement`.
+- `ChatUI/js/sidebar/projects.js` — `openManageProjectChatsModal()` stores the project in this field.
+- `ChatUI/js/sidebar/projects.js` — `deleteProject()` contains cleanup logic to null the field if the project is deleted.
+
+**What it is:**
+
+The currently rendered Manage Project Chats modal uses the `project` function argument/closure throughout. The runtime field is set and later defensively cleaned up, but the modal behavior does not read it.
+
+**Why it is unnecessary:**
+
+It creates global state plus deletion bookkeeping for information already available in the active function closure.
+
+**Recommendation:**
+
+Remove the field, the write, and the associated delete-project cleanup after final reference verification. Do **not** remove `activeProjectForRename`; that separate field is actively consumed by the rename-confirm handler.
+
+**Action type:** Orphaned state and housekeeping removal.
+
+---
+
+## 8. Thinking-level definitions contain an unused `color` property
+
+**Priority:** Low
+
+**Location:**
+- `ChatUI/js/ui/model-thinking-menu.js` — `THINKING_LEVELS` objects define `{ id, label, color }`.
+
+**Current consumer behavior:**
+
+JavaScript uses the level `id` and `label`; visual colors are supplied by CSS classes such as `.thinking-high`, `.thinking-medium`, `.thinking-low`, and `.thinking-minimal` in `ChatUI/css/components/thinking-menu.css`.
+
+**Why it is unused:**
+
+The `color` metadata is not used to render or style the current selector. The color values therefore exist twice conceptually, but only the CSS copy drives the UI.
+
+**Recommendation:**
+
+Remove the unused `color` properties if CSS remains the chosen source of truth. If a later cleanup makes the data model own colors instead, do the opposite—but keep one source, not dead metadata.
+
+**Action type:** Small dead-data cleanup.
+
+---
+
+## 9. Manage-Project-Chats group objects carry unused `id` and `target` properties
+
+**Priority:** Low
+
+**Location:**
+- `ChatUI/js/sidebar/projects.js`, inside `openManageProjectChatsModal()` where the local `groups` array is constructed.
+
+**What it is:**
+
+Each group object contains `id` and `target`, but the current render loop only consumes fields such as `name`, `icon`, and `chats`.
+
+**Why it is unused:**
+
+These properties appear to be remnants of an earlier design for distinguishing the target project or routing assignment logic through the group object. Current checkbox behavior closes over the actual `project` argument instead.
+
+**Recommendation:**
+
+Remove `id` and `target` from these private local objects unless a forthcoming consolidation deliberately starts using them.
+
+**Action type:** Small dead-data cleanup.
+
+---
+
+## Category 2 items checked and intentionally NOT classified as dead
+
+- `ChatUI/js/chat/message-renderer.js` still has `appendLegacyAssistantContent()`. Despite the name, it remains necessary for stored chats/messages that do not have an `activityTimeline`; deleting it now could break historical chats.
+- The Text API profile module still mirrors legacy active aliases (`textApiKey`, `textApiKeys`, `textApiKeyIndex`, `textBaseUrl`). Those aliases are currently consumed by the existing request/failover code, so they are architectural debt rather than dead code.
+- `TEMP_PERF_DIAGNOSTICS` is explicitly temporary, but the standalone ChatUI loader still imports and initializes it. It belongs in a later **temporary/unrequested features** category, not dead code.
+- Small facade modules such as `ChatUI/js/ui/menus.js`, `ChatUI/js/chat/messages.js`, `ChatUI/js/sidebar/sidebar.js`, and `ChatUI/js/chat/chat.js` are still valid stable import boundaries; small size alone does not make them dead.
+- `activeProjectId` is active: new-chat/project routing sets it and sidebar rendering reads it.
+- `activeProjectForRename` is active and used when confirming a project rename.
 
 ---
 
 # Next category
 
-Not started yet in this document: **Category 2 — dead / obsolete / unused code and references.**
+Not started yet: **Category 3 — unnecessary / temporary / unrequested features and development-only functionality that may not belong in the production ChatUI.**
