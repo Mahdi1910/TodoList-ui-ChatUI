@@ -1,8 +1,23 @@
 import assert from 'node:assert/strict';
 
+if (typeof globalThis.CustomEvent === 'undefined') {
+  globalThis.CustomEvent = class CustomEvent extends Event {
+    constructor(type, options = {}) {
+      super(type);
+      this.detail = options.detail;
+    }
+  };
+}
+
 if (typeof globalThis.window === 'undefined') {
-  globalThis.window = { location: { search: '', origin: 'https://chatui.test' } };
-  globalThis.window.parent = globalThis.window;
+  class FakeWindow extends EventTarget {
+    constructor() {
+      super();
+      this.location = { search: '', origin: 'https://chatui.test' };
+      this.parent = this;
+    }
+  }
+  globalThis.window = new FakeWindow();
 }
 
 const { state, setState } = await import('../ChatUI/js/state/store.js');
