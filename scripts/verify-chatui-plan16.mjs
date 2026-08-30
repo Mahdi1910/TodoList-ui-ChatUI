@@ -44,6 +44,6 @@ assert.match(
 );
 assert.match(messagesCss, /\.user-bubble pre,[\s\S]*\.user-bubble table \{ max-width:\s*100%; overflow-x:\s*auto; \}/, 'specialized code/table surfaces may keep local horizontal overflow');
 
-assert.match(apiConfig, /CHATUI_VERSION = '2\.4'/, 'ChatUI Settings version must be 2.4');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.5'/, 'ChatUI Settings version must be 2.5');
 
 console.log('ChatUI Plan 16 triple-click selection and sent-message wrapping verification passed.');

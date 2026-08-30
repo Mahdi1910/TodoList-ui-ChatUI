@@ -1,0 +1,29 @@
+name: ChatUI Markdown Security Check
+
+on:
+  pull_request:
+    paths:
+      - 'ChatUI/js/chat/markdown.js'
+      - 'ChatUI/js/utils/dom.js'
+      - 'scripts/verify-chatui-markdown-security.mjs'
+      - 'scripts/build-static.mjs'
+      - '.github/workflows/chatui-markdown-security-check.yml'
+
+jobs:
+  verify-markdown-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: |
+          node --check ChatUI/js/chat/markdown.js
+          node --check scripts/verify-chatui-markdown-security.mjs
+      - name: Verify Markdown sanitizer behavior
+        run: node scripts/verify-chatui-markdown-security.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify Markdown asset reached runtime bundle
+        run: test -f dist/ChatUI/js/chat/markdown.js

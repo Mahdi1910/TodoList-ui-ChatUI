@@ -43,6 +43,6 @@ assert.match(voiceCss, /\.voice-mode-overlay\s*\{[\s\S]*env\(safe-area-inset-top
 assert.match(modalCss, /@media \(max-width: 767px\)[\s\S]*\.modal-overlay\s*\{[\s\S]*env\(safe-area-inset-top,[\s\S]*env\(safe-area-inset-right,[\s\S]*env\(safe-area-inset-bottom,[\s\S]*env\(safe-area-inset-left,/, 'mobile dialogs must keep safe-area-aware margins on every screen edge');
 assert.match(modalCss, /#search-modal \.modal-card\s*\{\s*width:\s*100%;/, 'Search dialog must fit the padded mobile modal viewport rather than touching screen edges');
 
-assert.match(apiConfig, /CHATUI_VERSION = '2\.4'/, 'ChatUI Settings version must be 2.4');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.5'/, 'ChatUI Settings version must be 2.5');
 
 console.log('ChatUI Plan 11 UI consistency verification passed.');
