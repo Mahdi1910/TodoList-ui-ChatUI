@@ -2,7 +2,8 @@ export const TaskLinks = (() => {
   const TASK_ID_PREFIX = 'task-';
   const TOKEN_PREFIX = '[[task:';
   const TOKEN_SUFFIX = ']]';
-  const TOKEN_PATTERN_SOURCE = String.raw`\[\[task:(task-[^\]\r\n]{1,512})\]\]`;
+  const TASK_ID_PATTERN = /^task-[A-Za-z0-9-]{1,507}$/;
+  const TOKEN_PATTERN_SOURCE = String.raw`\[\[task:(task-[A-Za-z0-9-]{1,507})\]\]`;
 
   function tokenPattern() {
     return new RegExp(TOKEN_PATTERN_SOURCE, 'g');
@@ -10,8 +11,7 @@ export const TaskLinks = (() => {
 
   function normalizeTaskId(value) {
     const id = typeof value === 'string' ? value.trim() : '';
-    if (!id.startsWith(TASK_ID_PREFIX) || id.length > 512 || /[\]\r\n]/.test(id)) return null;
-    return id;
+    return TASK_ID_PATTERN.test(id) ? id : null;
   }
 
   function tokenFor(taskId) {
