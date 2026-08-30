@@ -3,6 +3,7 @@ name: Todo After Duration Check
 on:
   pull_request:
     paths:
+      - 'TodoList-ui/css/components/schedule-wheels.css'
       - 'TodoList-ui/js/task-after.js'
       - 'TodoList-ui/js/components/schedule-after.js'
       - 'TodoList-ui/js/components/schedule.js'
@@ -35,7 +36,9 @@ jobs:
         run: node scripts/build-static.mjs
       - name: Verify updated assets reached runtime bundle
         run: |
+          test -f dist/TodoList-ui/css/components/schedule-wheels.css
           test -f dist/TodoList-ui/js/task-after.js
           test -f dist/TodoList-ui/js/components/schedule-after.js
           grep -q 'wheel-after-hours' dist/TodoList-ui/js/components/schedule-after.js
           grep -q 'wheel-after-minutes' dist/TodoList-ui/js/components/schedule-after.js
+          grep -q 'time-picker-container' dist/TodoList-ui/css/components/schedule-wheels.css

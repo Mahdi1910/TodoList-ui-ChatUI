@@ -64,6 +64,14 @@ assert.match(schedule, /draftAfter: null, \/\/ \{ taskId, hours, minutes, resolv
 assert.match(schedule, /wheelAfterHours/);
 assert.doesNotMatch(schedule, /wheelAfterAmount/);
 
+const wheelCss = await read('TodoList-ui/css/components/schedule-wheels.css');
+const timeContainerRule = wheelCss.match(/\.time-picker-container\s*\{([^}]*)\}/s)?.[1] || '';
+const afterContainerRule = wheelCss.match(/\.after-wheels-container\s*\{([^}]*)\}/s)?.[1] || '';
+assert.match(timeContainerRule, /height:\s*200px\s*;/);
+assert.match(wheelCss, /\.wheel-item\s*\{[^}]*height:\s*40px\s*;/s);
+assert.doesNotMatch(afterContainerRule, /height\s*:/, 'After must inherit the Time picker viewport height.');
+assert.doesNotMatch(wheelCss, /\.after-wheels-container\s*\{[^}]*height:\s*160px\s*;/s);
+
 const mappers = await read('TodoList-ui/js/storage/mappers.js');
 assert.match(mappers, /afterHours: after\?\.hours \?\? null/);
 assert.match(mappers, /afterMinutes: after\?\.minutes \?\? null/);
@@ -79,4 +87,4 @@ assert.match(backupValidation, /afterUnit/);
 const schema = await read('TodoList-ui/js/storage/db-schema.js');
 assert.match(schema, /const DATA_VERSION = 3;/);
 
-console.log('Todo After combined-duration verification passed.');
+console.log('Todo After combined-duration and wheel-alignment verification passed.');
