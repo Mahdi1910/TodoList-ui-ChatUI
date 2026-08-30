@@ -1,8 +1,39 @@
 export const TaskAfter = (() => {
-  const UNITS = new Set(['minute', 'hour']);
+  const LEGACY_UNITS = new Set(['minute', 'hour']);
+  const MAX_HOURS = 24;
+  const MAX_MINUTES = 59;
 
   function clone(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+
+  function readDuration(after) {
+    const hasCombinedDuration = Object.prototype.hasOwnProperty.call(after, 'hours') ||
+      Object.prototype.hasOwnProperty.call(after, 'minutes');
+
+    if (hasCombinedDuration) {
+      return {
+        hours: Number(after.hours ?? 0),
+        minutes: Number(after.minutes ?? 0),
+        legacyError: null
+      };
+    }
+
+    const unit = String(after.unit || '');
+    const amount = Number(after.amount);
+    if (!LEGACY_UNITS.has(unit)) {
+      return { hours: NaN, minutes: NaN, legacyError: 'After delay must use hours and minutes.' };
+    }
+    if (!Number.isInteger(amount) || amount < 0) {
+      return { hours: NaN, minutes: NaN, legacyError: 'After delay is invalid.' };
+    }
+
+    const totalMinutes = unit === 'hour' ? amount * 60 : amount;
+    return {
+      hours: Math.floor(totalMinutes / 60),
+      minutes: totalMinutes % 60,
+      legacyError: null
+    };
   }
 
   function validate(after) {
@@ -10,15 +41,23 @@ export const TaskAfter = (() => {
     if (!after || typeof after !== 'object' || Array.isArray(after)) {
       return { valid: false, message: 'After settings are invalid.' };
     }
+
     const taskId = typeof after.taskId === 'string' ? after.taskId.trim() : '';
-    const unit = String(after.unit || '');
-    const amount = Number(after.amount);
     if (!taskId) return { valid: false, message: 'Choose the task this task should follow.' };
-    if (!UNITS.has(unit)) return { valid: false, message: 'After delay must use minutes or hours.' };
-    const max = unit === 'hour' ? 24 : 60;
-    if (!Number.isInteger(amount) || amount < 1 || amount > max) {
-      return { valid: false, message: `After delay must be between 1 and ${max} ${unit}${max === 1 ? '' : 's'}.` };
+
+    const duration = readDuration(after);
+    if (duration.legacyError) return { valid: false, message: duration.legacyError };
+    const { hours, minutes } = duration;
+    if (!Number.isInteger(hours) || hours < 0 || hours > MAX_HOURS) {
+      return { valid: false, message: `After hours must be between 0 and ${MAX_HOURS}.` };
     }
+    if (!Number.isInteger(minutes) || minutes < 0 || minutes > MAX_MINUTES) {
+      return { valid: false, message: `After minutes must be between 0 and ${MAX_MINUTES}.` };
+    }
+    if (hours === 0 && minutes === 0) {
+      return { valid: false, message: 'Choose at least 1 minute of After delay.' };
+    }
+
     let resolvedAt = null;
     if (after.resolvedAt != null) {
       if (typeof after.resolvedAt !== 'string' || !Number.isFinite(Date.parse(after.resolvedAt))) {
@@ -26,7 +65,8 @@ export const TaskAfter = (() => {
       }
       resolvedAt = after.resolvedAt;
     }
-    return { valid: true, after: { taskId, amount, unit, resolvedAt } };
+
+    return { valid: true, after: { taskId, hours, minutes, resolvedAt } };
   }
 
   function normalize(after) {
@@ -43,13 +83,13 @@ export const TaskAfter = (() => {
     const left = normalize(a);
     const right = normalize(b);
     if (!left || !right) return left === right;
-    return left.taskId === right.taskId && left.amount === right.amount && left.unit === right.unit;
+    return left.taskId === right.taskId && left.hours === right.hours && left.minutes === right.minutes;
   }
 
   function delayMilliseconds(after) {
     const normalized = normalize(after);
     if (!normalized) return 0;
-    return normalized.amount * (normalized.unit === 'hour' ? 60 : 1) * 60 * 1000;
+    return (normalized.hours * 60 + normalized.minutes) * 60 * 1000;
   }
 
   function formatDate(date) {
@@ -106,12 +146,16 @@ export const TaskAfter = (() => {
   function formatDelay(after) {
     const normalized = normalize(after);
     if (!normalized) return '';
-    const label = normalized.amount === 1 ? normalized.unit : `${normalized.unit}s`;
-    return `${normalized.amount} ${label}`;
+    const parts = [];
+    if (normalized.hours) parts.push(`${normalized.hours} ${normalized.hours === 1 ? 'hour' : 'hours'}`);
+    if (normalized.minutes) parts.push(`${normalized.minutes} ${normalized.minutes === 1 ? 'minute' : 'minutes'}`);
+    return parts.join(' ');
   }
 
   return {
-    UNITS,
+    LEGACY_UNITS,
+    MAX_HOURS,
+    MAX_MINUTES,
     clone,
     validate,
     normalize,
