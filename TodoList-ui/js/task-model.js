@@ -1,3 +1,5 @@
+import { TaskAfter } from './task-after.js';
+
 export const TaskModel = (() => {
   function normalizeTask(task = {}) {
     const source = task && typeof task === 'object' ? task : {};
@@ -5,6 +7,9 @@ export const TaskModel = (() => {
     const legacyTags = Array.isArray(source.tags)
       ? source.tags
       : (source.tag ? String(source.tag).split(',') : []);
+    const completedAt = typeof source.completedAt === 'string' && Number.isFinite(Date.parse(source.completedAt))
+      ? source.completedAt
+      : null;
 
     return {
       ...source,
@@ -13,6 +18,8 @@ export const TaskModel = (() => {
       dueTime: typeof source.dueTime === 'string' && source.dueTime ? source.dueTime : null,
       reminders: Array.isArray(source.reminders) ? [...source.reminders] : [],
       repeat: typeof source.repeat === 'object' && source.repeat ? source.repeat : null,
+      after: TaskAfter.normalize(source.after),
+      completedAt,
       priority: ['low', 'medium', 'high'].includes(source.priority) ? source.priority : '',
       parentTaskId: typeof source.parentTaskId === 'string' && source.parentTaskId ? source.parentTaskId : null,
       project: typeof source.project === 'string' ? source.project : '',

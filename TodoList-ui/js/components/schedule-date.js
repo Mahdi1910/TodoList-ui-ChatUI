@@ -65,6 +65,7 @@ export const ScheduleDateMethods = {
   },
 
   selectDate(dateStr) {
+    if (this.draftAfter) this.clearAfterDraft?.();
     this.draftDate = dateStr;
     if (dateStr) {
       const parts = dateStr.split('-').map(Number);
@@ -106,6 +107,7 @@ export const ScheduleDateMethods = {
       const targetDate = new Date(targetYear, targetMonth, clampedDay);
       this.selectDate(this.formatDateStr(targetDate));
     } else if (actionType === 'clear') {
+      if (this.draftAfter) this.clearAfterDraft?.();
       this.draftDate = null;
       this.renderCalendar();
     }

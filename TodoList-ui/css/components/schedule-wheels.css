@@ -149,3 +149,226 @@
   height: 14px;
 }
 
+/* After scheduling */
+.after-panel-header {
+  text-align: center;
+  margin: 2px 0 8px;
+}
+
+.after-panel-title,
+.after-panel-subtitle {
+  display: block;
+}
+
+.after-panel-title {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.after-panel-subtitle {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.after-wheel-labels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 0 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.after-wheels-container {
+  height: 160px;
+  margin-top: 4px;
+}
+
+.after-wheels-container .time-wheel {
+  width: 82px;
+}
+
+.after-label-wheel {
+  pointer-events: none;
+}
+
+.after-task-section {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.after-task-trigger {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.after-task-trigger:hover,
+.after-task-trigger:focus-visible {
+  background: var(--bg-hover);
+  border-color: var(--text-muted);
+}
+
+.after-task-trigger-left,
+.after-task-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.after-task-trigger-left {
+  font-weight: 600;
+}
+
+.after-task-value {
+  color: var(--accent-color);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#after-task-value {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.after-task-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 1260;
+  display: none;
+  max-height: 230px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-lg);
+}
+
+.after-task-menu.open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.after-task-menu-item {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.after-task-menu-item:hover,
+.after-task-menu-item:focus-visible {
+  background: var(--bg-hover);
+}
+
+.after-task-menu-item.selected {
+  color: var(--accent-color);
+  background: var(--accent-light);
+}
+
+.after-task-menu-item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.after-task-menu-title {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.after-task-menu-meta,
+.after-task-menu-empty {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.after-task-menu-empty {
+  padding: 12px;
+  text-align: center;
+}
+
+.after-reminder-section {
+  margin-bottom: 10px;
+}
+
+.after-validation-message {
+  min-height: 18px;
+  color: var(--danger-color);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.after-actions-row {
+  display: flex;
+  justify-content: center;
+  min-height: 34px;
+}
+
+.btn-sched-clear-after {
+  padding: 7px 13px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.btn-sched-clear-after:hover,
+.btn-sched-clear-after:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+@media (max-width: 420px) {
+  .schedule-tab-btn {
+    gap: 4px;
+    padding-inline: 5px;
+    font-size: 12px;
+  }
+
+  .schedule-tab-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  #after-task-value {
+    max-width: 150px;
+  }
+}

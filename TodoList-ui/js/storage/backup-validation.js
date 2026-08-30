@@ -1,9 +1,10 @@
 import { TodoDbSchema } from './db-schema.js';
+import { TaskAfter } from '../task-after.js';
 
 export const AppBackupValidation = (() => {
   const FORMAT = 'TodoListBackup';
   const FORMAT_VERSION = 1;
-  const DATA_VERSION = 1;
+  const DATA_VERSION = TodoDbSchema.DATA_VERSION;
 
   const isObject = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
   const isId = value => typeof value === 'string' && value.length > 0;
@@ -61,6 +62,18 @@ export const AppBackupValidation = (() => {
     }
   }
 
+  function rowAfter(row) {
+    if (!row.afterTaskId) return null;
+    const check = TaskAfter.validate({
+      taskId: row.afterTaskId,
+      amount: row.afterAmount,
+      unit: row.afterUnit,
+      resolvedAt: row.afterResolvedAt || null
+    });
+    if (!check.valid) fail(`Task "${row.id}" has invalid After settings.`);
+    return check.after;
+  }
+
   function validateStores(stores) {
     const names = Object.values(TodoDbSchema.STORES);
     names.forEach(name => { if (!Array.isArray(stores[name])) fail(`Backup store "${name}" is missing or invalid.`); });
@@ -77,6 +90,10 @@ export const AppBackupValidation = (() => {
       if (row.parentTaskId !== null && row.parentTaskId !== undefined && !isId(row.parentTaskId)) fail('A Task has an invalid parent id.');
       if (!Number.isFinite(row.sortOrder)) fail('A Task has an invalid sort order.');
       if (![0, 1].includes(row.completed)) fail('A Task has an invalid completion value.');
+      if (row.completedAt != null && (typeof row.completedAt !== 'string' || !Number.isFinite(Date.parse(row.completedAt)))) {
+        fail('A Task has an invalid completion timestamp.');
+      }
+      if (row.afterTaskId != null) rowAfter(row);
     });
     taskTags.forEach(row => { if (!isObject(row) || !isId(row.taskId) || !isId(row.tagId)) fail('A Task-Tag relation is invalid.'); });
     definitions.forEach(row => { if (!isObject(row) || !isId(row.id)) fail('A reminder definition has an invalid id.'); });
@@ -109,14 +126,28 @@ export const AppBackupValidation = (() => {
     const tagIds = new Set(tags.map(row => row.id));
     const taskById = new Map(tasks.map(row => [row.id, row]));
     const reminderIds = new Set(definitions.map(row => row.id));
+    const repeatIds = new Set(repeatRules.map(row => row.taskId));
+    const afterGraph = tasks.map(row => ({ id: row.id, after: rowAfter(row) }));
 
     tasks.forEach(row => {
       if (row.projectId && !projectIds.has(row.projectId)) fail('A Task references a missing Project.');
-      if (!row.parentTaskId) return;
-      if (row.parentTaskId === row.id) fail('A Task cannot be its own parent.');
-      const parent = taskById.get(row.parentTaskId);
-      if (!parent) fail('A Subtask references a missing parent Task.');
-      if (parent.parentTaskId) fail('A Subtask cannot be nested below another Subtask.');
+      if (row.parentTaskId) {
+        if (row.parentTaskId === row.id) fail('A Task cannot be its own parent.');
+        const parent = taskById.get(row.parentTaskId);
+        if (!parent) fail('A Subtask references a missing parent Task.');
+        if (parent.parentTaskId) fail('A Subtask cannot be nested below another Subtask.');
+      }
+
+      const after = rowAfter(row);
+      if (!after) return;
+      if (after.taskId === row.id) fail('A Task cannot be scheduled After itself.');
+      if (!taskById.has(after.taskId)) fail('An After dependency references a missing Task.');
+      if (TaskAfter.wouldCreateCycle(row.id, after.taskId, afterGraph)) fail('After dependencies contain a cycle.');
+      if (!after.resolvedAt) {
+        if (Boolean(row.completed)) fail('A pending After task cannot already be completed.');
+        if (row.dueDate || row.dueTime) fail('A pending After task cannot already have a concrete date or time.');
+        if (repeatIds.has(row.id)) fail('A pending After task cannot have an active Repeat rule.');
+      }
     });
     taskTags.forEach(row => {
       if (!taskById.has(row.taskId) || !tagIds.has(row.tagId)) fail('A Task-Tag relation references missing data.');

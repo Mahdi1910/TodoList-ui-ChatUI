@@ -2,6 +2,7 @@ import { TodoDbSchema } from './db-schema.js';
 import { TodoDb } from './db.js';
 import { TodoRepositories } from './repositories.js';
 import { TodoStorageMappers } from './mappers.js';
+import { TaskAfter } from '../task-after.js';
 import { TaskModel } from '../task-model.js';
 import { AppSeedData, AppState } from '../state.js';
 import { AppStateSync } from '../state-sync.js';
@@ -18,6 +19,17 @@ export const AppPersistence = (() => {
       repo().get(tx, STORES.APP_META, 'initialized')
     );
     if (!initialized?.value) await seedFirstRun();
+    else await ensureDataVersion();
+  }
+
+  async function ensureDataVersion() {
+    const current = await TodoDb.withTransaction(STORES.APP_META, 'readonly', tx =>
+      repo().get(tx, STORES.APP_META, 'dataVersion')
+    );
+    if (Number(current?.value) === TodoDbSchema.DATA_VERSION) return;
+    await TodoDb.withTransaction(STORES.APP_META, 'readwrite', tx =>
+      repo().put(tx, STORES.APP_META, { key: 'dataVersion', value: TodoDbSchema.DATA_VERSION })
+    );
   }
 
   async function seedFirstRun() {
@@ -55,7 +67,7 @@ export const AppPersistence = (() => {
         { key: 'sortDirection', value: 'asc' },
         { key: 'groupKey', value: 'none' }
       ]);
-      await repo().put(tx, STORES.APP_META, { key: 'dataVersion', value: 1 });
+      await repo().put(tx, STORES.APP_META, { key: 'dataVersion', value: TodoDbSchema.DATA_VERSION });
       await repo().put(tx, STORES.APP_META, { key: 'initialized', value: true });
     });
   }
@@ -98,12 +110,31 @@ export const AppPersistence = (() => {
     return [...changed];
   }
 
+  function afterFromRow(row) {
+    if (!row?.afterTaskId) return null;
+    return TaskAfter.normalize({
+      taskId: row.afterTaskId,
+      amount: row.afterAmount,
+      unit: row.afterUnit,
+      resolvedAt: row.afterResolvedAt || null
+    });
+  }
+
+  function clearAfterRow(row) {
+    row.afterTaskId = null;
+    row.afterAmount = null;
+    row.afterUnit = null;
+    row.afterResolvedAt = null;
+  }
+
   function repairData(data) {
     const repairs = { projects: repairHierarchy(data.projects), tags: repairHierarchy(data.tags), tasks: [], taskTags: [], taskReminders: [], repeatRules: [] };
     const projectIds = new Set(data.projects.map(row => row.id));
     const taskById = new Map(data.tasks.map(row => [row.id, row]));
     const tagIds = new Set(data.tags.map(row => row.id));
     const reminderIds = new Set(data.reminderDefinitions.map(row => row.id));
+    const graph = data.tasks.map(row => ({ id: row.id, after: afterFromRow(row) }));
+    const pendingAfterIds = new Set();
 
     for (const task of data.tasks) {
       let changed = false;
@@ -116,6 +147,27 @@ export const AppPersistence = (() => {
         } else if ((task.projectId || null) !== (parent.projectId || null)) {
           task.projectId = parent.projectId || null;
           changed = true;
+        }
+      }
+      if (task.completedAt && !Number.isFinite(Date.parse(task.completedAt))) {
+        task.completedAt = null;
+        changed = true;
+      }
+
+      if (task.afterTaskId) {
+        const after = afterFromRow(task);
+        const source = after ? taskById.get(after.taskId) : null;
+        const cyclic = after ? TaskAfter.wouldCreateCycle(task.id, after.taskId, graph) : false;
+        if (!after || !source || source.id === task.id || cyclic || (Boolean(task.completed) && !after.resolvedAt)) {
+          clearAfterRow(task);
+          changed = true;
+        } else if (!after.resolvedAt) {
+          pendingAfterIds.add(task.id);
+          if (task.dueDate || task.dueTime) {
+            task.dueDate = null;
+            task.dueTime = null;
+            changed = true;
+          }
         }
       }
       if (changed) repairs.tasks.push(task);
@@ -132,7 +184,7 @@ export const AppPersistence = (() => {
       return valid;
     });
     data.repeatRules = data.repeatRules.filter(row => {
-      const valid = taskById.has(row.taskId);
+      const valid = taskById.has(row.taskId) && !pendingAfterIds.has(row.taskId);
       if (!valid) repairs.repeatRules.push(row);
       return valid;
     });

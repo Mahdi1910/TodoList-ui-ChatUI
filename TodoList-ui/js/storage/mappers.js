@@ -1,4 +1,5 @@
 import { RepeatEngine } from '../repeat/repeat-engine.js';
+import { TaskAfter } from '../task-after.js';
 
 export const TodoStorageMappers = (() => {
   const BUILTIN_REMINDERS = Object.freeze([
@@ -25,6 +26,7 @@ export const TodoStorageMappers = (() => {
   }
 
   function taskToRow(task) {
+    const after = TaskAfter.normalize(task.after);
     return {
       id: task.id,
       title: String(task.title || '').trim(),
@@ -34,8 +36,13 @@ export const TodoStorageMappers = (() => {
       familySlotId: task.familySlotId || null,
       priority: ['low', 'medium', 'high'].includes(task.priority) ? task.priority : '',
       completed: task.completed ? 1 : 0,
+      completedAt: task.completedAt || null,
       dueDate: task.dueDate || null,
       dueTime: task.dueTime || null,
+      afterTaskId: after?.taskId || null,
+      afterAmount: after?.amount || null,
+      afterUnit: after?.unit || null,
+      afterResolvedAt: after?.resolvedAt || null,
       sortOrder: Number.isFinite(task.sortOrder) ? task.sortOrder : 0,
       createdAt: task.createdAt || nowIso(),
       updatedAt: task.updatedAt || nowIso()
@@ -47,6 +54,12 @@ export const TodoStorageMappers = (() => {
     const storedState = repeatData?.repeatState || null;
     const activeRepeat = mappedRepeat && mappedRepeat.mode !== 'none';
     const dueDate = activeRepeat && !row.dueDate ? RepeatEngine.today() : (row.dueDate || null);
+    const after = row.afterTaskId ? TaskAfter.normalize({
+      taskId: row.afterTaskId,
+      amount: row.afterAmount,
+      unit: row.afterUnit,
+      resolvedAt: row.afterResolvedAt || null
+    }) : null;
     let repeat = null;
     let repeatState = null;
 
@@ -66,8 +79,10 @@ export const TodoStorageMappers = (() => {
       familySlotId: row.familySlotId || null,
       priority: row.priority || '',
       completed: Boolean(row.completed),
+      completedAt: row.completedAt || null,
       dueDate,
       dueTime: row.dueTime || null,
+      after,
       tags: [...tags],
       reminders: reminders.length ? [...reminders] : [],
       repeat,

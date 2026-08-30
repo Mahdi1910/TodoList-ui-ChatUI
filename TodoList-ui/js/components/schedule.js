@@ -1,5 +1,6 @@
 import { ModalFocusManager } from './modal-focus.js';
 import { RepeatEngine } from '../repeat/repeat-engine.js';
+import { TaskAfter } from '../task-after.js';
 import { ScheduleEventMethods } from './schedule-events.js';
 import { ScheduleDateMethods } from './schedule-date.js';
 import { ScheduleWheelMethods } from './schedule-wheels.js';
@@ -8,21 +9,24 @@ import { ScheduleRepeatMethods } from './schedule-repeat.js';
 import { ScheduleRepeatCalendarMethods } from './schedule-repeat-calendar.js';
 import { ScheduleRepeatEndMethods } from './schedule-repeat-end.js';
 import { ScheduleRepeatValidationMethods } from './schedule-repeat-validation.js';
+import { ScheduleAfterMethods } from './schedule-after.js';
 
 /**
  * Schedule Component Manager
- * Modal lifecycle, draft state (Date, Time, Reminders), calendar rendering engine,
- * 3-wheel time picker, upward reminder context menu, custom reminder dialog,
+ * Modal lifecycle, draft state (Date, Time, Reminders, Repeat, After), calendar rendering engine,
+ * wheel pickers, reminder context menus, custom reminder/repeat dialogs,
  * accessibility focus trap, and Apply/Cancel callbacks.
  */
 
 const ScheduleCore = {
-  activeTab: 'date', // 'date' | 'time' | 'repeat'
+  activeTab: 'date', // 'date' | 'time' | 'repeat' | 'after'
   currentViewDate: new Date(),
   draftDate: null, // "YYYY-MM-DD" string or null
   draftTime: null, // { hour: "10", minute: "30", period: "PM" } or null
   draftReminders: ['on_time'], // Array of reminder keys e.g. ["none"], ["on_time"], ["5_min"]
   draftRepeat: { mode: 'none', custom: { interval: 1, unit: 'day', weekdays: [], monthDays: [], yearDates: {} } },
+  draftAfter: null, // { taskId, amount, unit, resolvedAt } or null
+  scheduleTaskId: null,
   onApplyCallback: null,
   lastFocusedElement: null,
   afterCloseCallback: null,
@@ -102,14 +106,20 @@ const ScheduleCore = {
     this.btnApply = document.getElementById('btn-sched-apply');
 
     this.initWheels();
+    this.initAfterUi();
+    this.initReminderSurfaces();
     this.bindEvents();
+    this.bindAfterEvents();
   },
 
-  open(initialDueDateStr = null, initialTimeStr = null, initialReminders = null, initialRepeat = null, onApply = null, focusPolicy = null) {
+  open(initialDueDateStr = null, initialTimeStr = null, initialReminders = null, initialRepeat = null,
+       onApply = null, focusPolicy = null, initialAfter = null, taskContext = null) {
     const returnFocusTarget = focusPolicy?.returnFocusTarget;
     this.lastFocusedElement = returnFocusTarget?.isConnected ? returnFocusTarget : document.activeElement;
     this.afterCloseCallback = typeof focusPolicy?.afterClose === 'function' ? focusPolicy.afterClose : null;
+    this.scheduleTaskId = taskContext?.taskId || null;
     this.draftDate = initialDueDateStr || null;
+    this.draftAfter = TaskAfter.normalize(initialAfter);
     this.onApplyCallback = onApply;
 
     if (initialTimeStr) {
@@ -139,16 +149,27 @@ const ScheduleCore = {
       this.currentViewDate = new Date();
     }
 
-    this.switchTab('date');
+    this.activeTab = this.draftAfter && !this.draftAfter.resolvedAt ? 'after' : 'date';
+    ['date', 'time', 'repeat', 'after'].forEach(tabName => {
+      const tab = this[`tab${tabName[0].toUpperCase()}${tabName.slice(1)}`];
+      const panel = this[`panel${tabName[0].toUpperCase()}${tabName.slice(1)}`];
+      tab?.classList.toggle('active', tabName === this.activeTab);
+      tab?.setAttribute('aria-selected', tabName === this.activeTab ? 'true' : 'false');
+      panel?.classList.toggle('active', tabName === this.activeTab);
+    });
     this.renderCalendar();
     this.updateReminderUI();
     this.renderRepeatEndRow?.();
+    this.renderAfterPanel();
+    this.clearAfterValidationError();
 
     ModalFocusManager.open(this.modalEl, {
       trigger: this.lastFocusedElement,
-      initialFocus: () => this.gridEl?.querySelector('.calendar-day.selected') ||
-                          this.gridEl?.querySelector('.calendar-day.today') ||
-                          this.btnQuickToday,
+      initialFocus: () => this.activeTab === 'after'
+        ? (this.btnAfterTaskTrigger || this.wheelAfterAmount)
+        : (this.gridEl?.querySelector('.calendar-day.selected') ||
+           this.gridEl?.querySelector('.calendar-day.today') ||
+           this.btnQuickToday),
       fallbackFocus: this.lastFocusedElement
     });
   },
@@ -159,20 +180,38 @@ const ScheduleCore = {
       this.draftTime = null;
       this.draftReminders = ['on_time'];
       this.draftRepeat = { mode: 'none', custom: { interval: 1, unit: 'day', weekdays: [], monthDays: [], yearDates: {} } };
+      this.draftAfter = null;
     }
     this.closeReminderMenu();
+    this.closeAfterTaskMenu?.();
     const afterClose = this.afterCloseCallback;
     this.afterCloseCallback = null;
     const closed = ModalFocusManager.close(this.modalEl, {
       fallbackFocus: this.lastFocusedElement
     });
     this.lastFocusedElement = null;
+    this.scheduleTaskId = null;
     if (closed && typeof afterClose === 'function') afterClose();
   },
 
   apply() {
+    const afterCheck = this.validateAfterDraft();
+    if (!afterCheck.valid) {
+      this.switchTab('after');
+      return this.showAfterValidationError(afterCheck.message);
+    }
+    this.clearAfterValidationError();
+    const finalAfter = afterCheck.after ? TaskAfter.clone(afterCheck.after) : null;
+    const pendingAfter = Boolean(finalAfter && !finalAfter.resolvedAt);
+
+    if (pendingAfter) {
+      this.draftDate = null;
+      this.draftTime = null;
+      this.draftRepeat = { mode: 'none', custom: { interval: 1, unit: 'day', weekdays: [], monthDays: [], yearDates: {} } };
+    }
+
     this.draftRepeat = RepeatEngine.normalizeRepeatRule(this.draftRepeat);
-    if (this.draftRepeat.mode !== 'none' && !this.draftDate) this.selectDate(RepeatEngine.today());
+    if (!pendingAfter && this.draftRepeat.mode !== 'none' && !this.draftDate) this.selectDate(RepeatEngine.today());
     const check = RepeatEngine.validateRepeatRule(this.draftRepeat);
     if (!check.valid) {
       this.switchTab('repeat');
@@ -193,17 +232,21 @@ const ScheduleCore = {
         ? `${this.draftTime.hour}:${this.draftTime.minute} ${this.draftTime.period}`
         : null;
 
-      // If time is set without a specific date, automatically assign today's date
+      // If time is set without a specific date, automatically assign today's date.
+      // Pending After schedules intentionally remain without a concrete date/time.
       let finalDate = this.draftDate;
-      if (formattedTime && !finalDate) {
+      if (!pendingAfter && formattedTime && !finalDate) {
         finalDate = this.formatDateStr(new Date());
       }
 
       this.onApplyCallback({
-        dueDate: finalDate,
-        dueTime: formattedTime,
+        dueDate: pendingAfter ? null : finalDate,
+        dueTime: pendingAfter ? null : formattedTime,
         reminders: [...this.draftReminders],
-        repeat: JSON.parse(JSON.stringify(this.draftRepeat))
+        repeat: pendingAfter
+          ? { mode: 'none', custom: { interval: 1, unit: 'day', weekdays: [], monthDays: [], yearDates: {} }, end: { type: 'never', date: null, count: null } }
+          : JSON.parse(JSON.stringify(this.draftRepeat)),
+        after: finalAfter
       });
     }
     this.close(false);
@@ -223,7 +266,9 @@ const ScheduleCore = {
         this.closeCustomRepeatModal();
       } else if (this.customReminderModal?.classList.contains('active')) {
         this.closeCustomReminderModal();
-      } else if (this.menuReminder?.classList.contains('open')) {
+      } else if (this.menuAfterTask?.classList.contains('open')) {
+        this.closeAfterTaskMenu();
+      } else if (this.isAnyReminderMenuOpen?.()) {
         this.closeReminderMenu();
       } else {
         this.close(true);
@@ -268,7 +313,8 @@ export const ScheduleComponent = {
   ...ScheduleRepeatMethods,
   ...ScheduleRepeatCalendarMethods,
   ...ScheduleRepeatEndMethods,
-  ...ScheduleRepeatValidationMethods
+  ...ScheduleRepeatValidationMethods,
+  ...ScheduleAfterMethods
 };
 
 window.ScheduleComponent = ScheduleComponent;

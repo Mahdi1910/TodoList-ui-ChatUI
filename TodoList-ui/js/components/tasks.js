@@ -1,4 +1,5 @@
 import { ModalFocusManager } from './modal-focus.js';
+import { TaskAfter } from '../task-after.js';
 import { AppPersistence } from '../storage/persistence.js';
 import { AppDataService } from '../storage/data-service.js';
 import { AppState } from '../state.js';
@@ -23,6 +24,7 @@ const TasksCore = {
   selectedDueTime: null,
   selectedReminders: ['on_time'],
   selectedRepeat: null,
+  selectedAfter: null,
   lastFocusedElement: null,
   typingFocusTarget: null,
   pendingDateTypingSnapshot: null,
@@ -213,10 +215,12 @@ const TasksCore = {
       this.selectedRepeat,
       result => {
         if (typeof result === 'object' && result !== null) {
-          this.selectedDueDate = result.dueDate;
-          this.selectedDueTime = result.dueTime;
-          this.selectedReminders = result.reminders || ['on_time'];
-          this.selectedRepeat = result.repeat || null;
+          this.selectedDueDate = result.dueDate ?? null;
+          this.selectedDueTime = result.dueTime ?? null;
+          this.selectedReminders = Array.isArray(result.reminders) ? [...result.reminders] : ['on_time'];
+          this.selectedRepeat = result.repeat && result.repeat.mode !== 'none'
+            ? JSON.parse(JSON.stringify(result.repeat)) : null;
+          this.selectedAfter = result.after ? TaskAfter.clone(result.after) : null;
         } else {
           this.selectedDueDate = result;
         }
@@ -227,7 +231,9 @@ const TasksCore = {
         afterClose: () => {
           if (generation === this.dateOpenGeneration) this.restoreTypingSnapshot(snapshot);
         }
-      } : null
+      } : null,
+      this.selectedAfter,
+      { taskId: this.editingTaskId }
     );
   },
 
@@ -347,13 +353,21 @@ const TasksCore = {
   },
 
   syncDateButton() {
+    const pendingAfter = TaskAfter.isPending(this.selectedAfter);
     const hasSchedule = Boolean(
+      pendingAfter ||
       this.selectedDueDate ||
       this.selectedDueTime ||
       (this.selectedRepeat && this.selectedRepeat.mode !== 'none')
     );
     this.btnDate?.classList.toggle('active', hasSchedule);
     if (!this.btnDate) return;
+    if (pendingAfter) {
+      const source = AppState.getTask(this.selectedAfter.taskId);
+      const sourceLabel = source?.title ? ` · ${source.title}` : '';
+      this.btnDate.title = `After ${TaskAfter.formatDelay(this.selectedAfter)}${sourceLabel}`;
+      return;
+    }
     const datePart = this.selectedDueDate || 'No date';
     const timePart = this.selectedDueTime ? `, ${this.selectedDueTime}` : '';
     const repPart = this.selectedRepeat && this.selectedRepeat.mode !== 'none' ? ' 🔁' : '';
@@ -369,6 +383,7 @@ const TasksCore = {
       dueTime: this.selectedDueTime,
       reminders: [...this.selectedReminders],
       repeat: this.selectedRepeat ? JSON.parse(JSON.stringify(this.selectedRepeat)) : null,
+      after: this.selectedAfter ? TaskAfter.clone(this.selectedAfter) : null,
       project: this.selectedProject,
       priority: this.selectedPriority,
       tags: [...this.selectedTags]
@@ -401,6 +416,7 @@ const TasksCore = {
     this.selectedDueTime = null;
     this.selectedReminders = ['on_time'];
     this.selectedRepeat = null;
+    this.selectedAfter = null;
     this.syncUIFromState();
     this.closeAllContextMenus();
   },
@@ -424,6 +440,7 @@ const TasksCore = {
       this.selectedDueTime = normalized.dueTime;
       this.selectedReminders = Array.isArray(normalized.reminders) ? [...normalized.reminders] : ['on_time'];
       this.selectedRepeat = normalized.repeat ? JSON.parse(JSON.stringify(normalized.repeat)) : null;
+      this.selectedAfter = normalized.after ? TaskAfter.clone(normalized.after) : null;
       this.syncUIFromState();
       this.btnAddSubtask.hidden = false;
       this.renderParentEditSubtasks();

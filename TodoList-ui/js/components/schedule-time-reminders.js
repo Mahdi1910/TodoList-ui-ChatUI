@@ -3,6 +3,7 @@ import { ModalFocusManager } from './modal-focus.js';
 import { AppPersistence } from '../storage/persistence.js';
 import { AppDataService } from '../storage/data-service.js';
 import { AppState } from '../state.js';
+
 export const ScheduleTimeReminderMethods = {
   scrollWheelsToDraftTime() {
     if (!this.draftTime) this.draftTime = this.getCurrentTimeObj();
@@ -34,7 +35,7 @@ export const ScheduleTimeReminderMethods = {
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const period = hours >= 12 ? 'PM' : 'AM';
 
-    hours = hours % 12;
+    hours %= 12;
     if (hours === 0) hours = 12;
     const hourStr = String(hours).padStart(2, '0');
 
@@ -64,86 +65,164 @@ export const ScheduleTimeReminderMethods = {
     return definition?.label || reminderId;
   },
 
-  toggleReminderMenu() {
-    if (this.menuReminder?.classList.contains('open')) {
-      this.closeReminderMenu();
-    } else {
-      this.openReminderMenu();
-    }
+  initReminderSurfaces() {
+    const candidates = [
+      {
+        name: 'time',
+        trigger: this.btnReminderTrigger,
+        menu: this.menuReminder,
+        display: this.reminderValDisplay,
+        customContainer: this.customRemindersContainer,
+        customButton: this.btnOpenCustomReminder
+      },
+      {
+        name: 'after',
+        trigger: this.btnAfterReminderTrigger,
+        menu: this.menuAfterReminder,
+        display: this.afterReminderValDisplay,
+        customContainer: this.afterCustomRemindersContainer,
+        customButton: this.btnOpenCustomReminderAfter
+      }
+    ];
+    this.reminderSurfaces = candidates.filter(surface => surface.trigger && surface.menu);
+    this.activeReminderSurface = null;
+    this.customReminderReturnTrigger = null;
+
+    this.reminderSurfaces.forEach(surface => {
+      surface.trigger.addEventListener('click', event => {
+        event.stopPropagation();
+        this.closeAfterTaskMenu?.();
+        this.toggleReminderMenu(surface);
+      });
+
+      surface.menu.addEventListener('click', event => {
+        const item = event.target.closest('.reminder-menu-item');
+        if (!item || item === surface.customButton) return;
+
+        const deleteButton = event.target.closest('.btn-del-custom-rem');
+        if (deleteButton) {
+          event.stopPropagation();
+          this.deleteCustomReminder(deleteButton.dataset.id);
+          return;
+        }
+
+        const key = item.dataset.reminder;
+        if (!key) return;
+        event.stopPropagation();
+        this.toggleReminderSelection(key);
+      });
+
+      surface.customButton?.addEventListener('click', event => {
+        event.stopPropagation();
+        this.closeReminderMenu();
+        this.openCustomReminderModal(surface.customButton);
+      });
+    });
+
+    document.addEventListener('click', event => {
+      if (!this.isAnyReminderMenuOpen()) return;
+      const insideSurface = this.reminderSurfaces.some(surface =>
+        surface.menu.contains(event.target) || surface.trigger.contains(event.target));
+      if (!insideSurface) this.closeReminderMenu();
+    });
   },
 
-  openReminderMenu() {
-    this.renderReminderMenuContent();
-    this.menuReminder?.classList.add('open');
-    this.btnReminderTrigger?.setAttribute('aria-expanded', 'true');
+  toggleReminderMenu(surface = this.reminderSurfaces?.[0]) {
+    if (!surface) return;
+    if (surface.menu.classList.contains('open')) this.closeReminderMenu();
+    else this.openReminderMenu(surface);
+  },
+
+  openReminderMenu(surface = this.reminderSurfaces?.[0]) {
+    if (!surface) return;
+    this.closeReminderMenu();
+    this.activeReminderSurface = surface;
+    this.renderReminderMenuContent(surface);
+    surface.menu.classList.add('open');
+    surface.trigger.setAttribute('aria-expanded', 'true');
   },
 
   closeReminderMenu() {
-    this.menuReminder?.classList.remove('open');
-    this.btnReminderTrigger?.setAttribute('aria-expanded', 'false');
+    (this.reminderSurfaces || []).forEach(surface => {
+      surface.menu?.classList.remove('open');
+      surface.trigger?.setAttribute('aria-expanded', 'false');
+    });
+    this.activeReminderSurface = null;
+  },
+
+  isAnyReminderMenuOpen() {
+    return (this.reminderSurfaces || []).some(surface => surface.menu?.classList.contains('open'));
   },
 
   toggleReminderSelection(key) {
     if (key === 'none') {
       this.draftReminders = ['none'];
     } else {
-      this.draftReminders = this.draftReminders.filter(k => k !== 'none');
+      this.draftReminders = this.draftReminders.filter(item => item !== 'none');
       if (this.draftReminders.includes(key)) {
-        this.draftReminders = this.draftReminders.filter(k => k !== key);
+        this.draftReminders = this.draftReminders.filter(item => item !== key);
       } else {
         this.draftReminders.push(key);
       }
-      if (this.draftReminders.length === 0) {
-        this.draftReminders = ['none'];
-      }
+      if (this.draftReminders.length === 0) this.draftReminders = ['none'];
     }
     this.updateReminderUI();
     this.renderReminderMenuContent();
   },
 
-  renderReminderMenuContent() {
-    if (!this.menuReminder) return;
+  renderReminderMenuContent(targetSurface = null) {
+    const surfaces = targetSurface ? [targetSurface] : (this.reminderSurfaces || []);
+    surfaces.forEach(surface => {
+      if (!surface?.menu) return;
+      surface.menu.querySelectorAll('.reminder-menu-item').forEach(item => {
+        const key = item.dataset.reminder;
+        if (!key) return;
+        const isSelected = this.draftReminders.includes(key);
+        item.classList.toggle('selected', isSelected);
+        item.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+      });
 
-    this.menuReminder.querySelectorAll('.reminder-menu-item').forEach(item => {
-      const key = item.dataset.reminder;
-      if (!key) return;
-      const isSelected = this.draftReminders.includes(key);
-      item.classList.toggle('selected', isSelected);
-      item.setAttribute('aria-checked', isSelected ? 'true' : 'false');
-    });
-
-    if (this.customRemindersContainer) {
-      this.customRemindersContainer.innerHTML = '';
+      if (!surface.customContainer) return;
+      surface.customContainer.innerHTML = '';
       this.getCustomReminders().forEach(custom => {
         const isSelected = this.draftReminders.includes(custom.id);
-        const div = document.createElement('div');
-        div.className = `reminder-menu-item ${isSelected ? 'selected' : ''}`;
-        div.dataset.reminder = custom.id;
-        div.setAttribute('role', 'menuitemcheckbox');
-        div.setAttribute('aria-checked', isSelected ? 'true' : 'false');
-        div.innerHTML = `
-          <span>${this.escapeText(custom.label)}</span>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span class="rem-check-icon">✓</span>
-            <button type="button" class="btn-del-custom-rem" data-id="${custom.id}" title="Remove custom reminder">&times;</button>
-          </div>
-        `;
-        this.customRemindersContainer.appendChild(div);
+        const row = document.createElement('div');
+        row.className = `reminder-menu-item${isSelected ? ' selected' : ''}`;
+        row.dataset.reminder = custom.id;
+        row.setAttribute('role', 'menuitemcheckbox');
+        row.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+
+        const label = document.createElement('span');
+        label.textContent = custom.label;
+        const controls = document.createElement('div');
+        Object.assign(controls.style, { display: 'flex', alignItems: 'center', gap: '6px' });
+        const check = document.createElement('span');
+        check.className = 'rem-check-icon';
+        check.textContent = '✓';
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn-del-custom-rem';
+        remove.dataset.id = custom.id;
+        remove.title = 'Remove custom reminder';
+        remove.setAttribute('aria-label', `Remove reminder ${custom.label}`);
+        remove.textContent = '×';
+        controls.append(check, remove);
+        row.append(label, controls);
+        surface.customContainer.appendChild(row);
       });
-    }
+    });
   },
 
   updateReminderUI() {
-    if (!this.reminderValDisplay) return;
-
-    if (!this.draftReminders.length || this.draftReminders.includes('none')) {
-      this.reminderValDisplay.textContent = 'None';
-      return;
-    }
-
-    this.reminderValDisplay.textContent = this.draftReminders
-      .map(key => this.getReminderLabel(key))
-      .join(', ');
+    const value = !this.draftReminders.length || this.draftReminders.includes('none')
+      ? 'None'
+      : this.draftReminders.map(key => this.getReminderLabel(key)).join(', ');
+    (this.reminderSurfaces || []).forEach(surface => {
+      if (surface.display) surface.display.textContent = value;
+    });
+    // During early initialization, the legacy Time display can exist before
+    // reminderSurfaces is built.
+    if (!this.reminderSurfaces?.length && this.reminderValDisplay) this.reminderValDisplay.textContent = value;
   },
 
   async deleteCustomReminder(id) {
@@ -159,8 +238,9 @@ export const ScheduleTimeReminderMethods = {
     }
   },
 
-  openCustomReminderModal() {
+  openCustomReminderModal(trigger = this.activeReminderSurface?.customButton || this.btnOpenCustomReminder) {
     if (!this.customReminderModal) return;
+    this.customReminderReturnTrigger = trigger?.isConnected ? trigger : this.btnOpenCustomReminder;
     this.draftCustomWheel = { min: 0, hr: 0, day: 0 };
 
     requestAnimationFrame(() => {
@@ -170,17 +250,17 @@ export const ScheduleTimeReminderMethods = {
     });
 
     ModalFocusManager.open(this.customReminderModal, {
-      trigger: this.btnOpenCustomReminder,
+      trigger: this.customReminderReturnTrigger,
       initialFocus: this.wheelCustomMin,
-      fallbackFocus: this.btnOpenCustomReminder
+      fallbackFocus: this.customReminderReturnTrigger
     });
   },
 
   closeCustomReminderModal() {
     if (!this.customReminderModal) return;
-    ModalFocusManager.close(this.customReminderModal, {
-      fallbackFocus: this.btnOpenCustomReminder
-    });
+    const fallback = this.customReminderReturnTrigger || this.btnOpenCustomReminder;
+    ModalFocusManager.close(this.customReminderModal, { fallbackFocus: fallback });
+    this.customReminderReturnTrigger = null;
   },
 
   async submitCustomReminder() {
