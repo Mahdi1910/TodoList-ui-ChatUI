@@ -7,6 +7,8 @@ on:
       - 'TodoList-ui/js/task-after.js'
       - 'TodoList-ui/js/components/schedule-after.js'
       - 'TodoList-ui/js/components/schedule.js'
+      - 'TodoList-ui/js/storage/data-service.js'
+      - 'TodoList-ui/js/storage/data-service-after.js'
       - 'TodoList-ui/js/storage/mappers.js'
       - 'TodoList-ui/js/storage/backup-validation.js'
       - 'TodoList-ui/js/storage/db-schema.js'
@@ -26,6 +28,8 @@ jobs:
           node --check TodoList-ui/js/task-after.js
           node --check TodoList-ui/js/components/schedule-after.js
           node --check TodoList-ui/js/components/schedule.js
+          node --check TodoList-ui/js/storage/data-service.js
+          node --check TodoList-ui/js/storage/data-service-after.js
           node --check TodoList-ui/js/storage/mappers.js
           node --check TodoList-ui/js/storage/backup-validation.js
           node --check TodoList-ui/js/storage/db-schema.js
@@ -39,6 +43,9 @@ jobs:
           test -f dist/TodoList-ui/css/components/schedule-wheels.css
           test -f dist/TodoList-ui/js/task-after.js
           test -f dist/TodoList-ui/js/components/schedule-after.js
+          test -f dist/TodoList-ui/js/storage/data-service.js
+          test -f dist/TodoList-ui/js/storage/data-service-after.js
           grep -q 'wheel-after-hours' dist/TodoList-ui/js/components/schedule-after.js
           grep -q 'wheel-after-minutes' dist/TodoList-ui/js/components/schedule-after.js
+          grep -q 'bypassCompletedPendingAfterSourcesInternal' dist/TodoList-ui/js/storage/data-service-after.js
           grep -q 'time-picker-container' dist/TodoList-ui/css/components/schedule-wheels.css
