@@ -143,6 +143,60 @@ export const TaskAfter = (() => {
       });
   }
 
+  // A completed task that was still waiting on an unresolved After dependency
+  // is a bypassed link, not a valid timing source for its downstream tasks.
+  // Return the minimal After updates needed to remove those completed links and
+  // point every pending downstream task at the nearest non-bypassed ancestor.
+  function bypassCompletedPendingSources(tasks = []) {
+    const rows = (tasks || []).filter(task => task && typeof task.id === 'string');
+    const taskIds = new Set(rows.map(task => task.id));
+    const bypassSources = new Map();
+
+    rows.forEach(task => {
+      const after = normalize(task.after);
+      if (task.completed && after && !after.resolvedAt) {
+        bypassSources.set(task.id, after.taskId);
+      }
+    });
+
+    if (!bypassSources.size) return [];
+
+    const resolveTarget = sourceTaskId => {
+      let cursorId = sourceTaskId;
+      const seen = new Set();
+      while (bypassSources.has(cursorId)) {
+        if (seen.has(cursorId)) return null;
+        seen.add(cursorId);
+        cursorId = bypassSources.get(cursorId);
+      }
+      return cursorId && taskIds.has(cursorId) ? cursorId : null;
+    };
+
+    const updates = [];
+    rows.forEach(task => {
+      const after = normalize(task.after);
+      if (!after || after.resolvedAt) return;
+
+      // The completed bypass source itself no longer needs an unresolved After
+      // relationship once its downstream links have inherited the ancestor.
+      if (bypassSources.has(task.id)) {
+        updates.push({ id: task.id, after: null });
+        return;
+      }
+
+      if (!bypassSources.has(after.taskId)) return;
+      const inheritedTaskId = resolveTarget(after.taskId);
+      updates.push({
+        id: task.id,
+        after: inheritedTaskId && inheritedTaskId !== task.id
+          ? { ...after, taskId: inheritedTaskId, resolvedAt: null }
+          : null
+      });
+    });
+
+    return updates;
+  }
+
   function formatDelay(after) {
     const normalized = normalize(after);
     if (!normalized) return '';
@@ -165,6 +219,7 @@ export const TaskAfter = (() => {
     resolveSchedule,
     wouldCreateCycle,
     eligibleSources,
+    bypassCompletedPendingSources,
     formatDelay
   };
 })();
