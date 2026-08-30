@@ -4,6 +4,30 @@
 
 import { escapeHtml, copyTextToClipboard } from '../utils/dom.js';
 
+const BLOCKED_MARKDOWN_PROTOCOLS = new Set(['javascript:', 'vbscript:', 'data:', 'file:']);
+const URL_CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]+/g;
+
+/**
+ * Attribute values have already been HTML-decoded by the template parser when
+ * this helper runs. Normalize embedded ASCII control characters before parsing
+ * the URL so values such as `java&#x09;script:` cannot become `javascript:` only
+ * after the browser later activates the link.
+ */
+export function isUnsafeMarkdownUrl(value) {
+  const raw = String(value ?? '');
+  const normalized = raw.replace(URL_CONTROL_CHARACTERS, '').trim();
+  if (!normalized) return false;
+
+  try {
+    const parsed = new URL(normalized, 'https://chatui.invalid/');
+    return BLOCKED_MARKDOWN_PROTOCOLS.has(String(parsed.protocol || '').toLowerCase());
+  } catch (_) {
+    // If URL parsing fails, retain the existing conservative protocol check on
+    // the normalized value rather than treating malformed input as executable.
+    return /^(?:javascript|vbscript|data|file):/i.test(normalized);
+  }
+}
+
 function sanitizeHtml(html) {
   if (!html) return '';
   const template = document.createElement('template');
@@ -13,12 +37,11 @@ function sanitizeHtml(html) {
   template.content.querySelectorAll('*').forEach(el => {
     Array.from(el.attributes).forEach(attr => {
       const name = attr.name.toLowerCase();
-      const value = attr.value.trim().toLowerCase();
       if (name.startsWith('on') || name === 'srcdoc' || name === 'style') {
         el.removeAttribute(attr.name);
         return;
       }
-      if ((name === 'href' || name === 'src' || name === 'xlink:href') && /^(?:javascript|vbscript|data|file):/i.test(value)) {
+      if ((name === 'href' || name === 'src' || name === 'xlink:href') && isUnsafeMarkdownUrl(attr.value)) {
         el.removeAttribute(attr.name);
       }
     });
