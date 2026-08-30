@@ -1,0 +1,41 @@
+name: Todo After Duration Check
+
+on:
+  pull_request:
+    paths:
+      - 'TodoList-ui/js/task-after.js'
+      - 'TodoList-ui/js/components/schedule-after.js'
+      - 'TodoList-ui/js/components/schedule.js'
+      - 'TodoList-ui/js/storage/mappers.js'
+      - 'TodoList-ui/js/storage/backup-validation.js'
+      - 'TodoList-ui/js/storage/db-schema.js'
+      - 'scripts/verify-todo-after-duration.mjs'
+      - '.github/workflows/todo-after-duration-check.yml'
+
+jobs:
+  verify-after-duration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check TodoList-ui/js/task-after.js
+          node --check TodoList-ui/js/components/schedule-after.js
+          node --check TodoList-ui/js/components/schedule.js
+          node --check TodoList-ui/js/storage/mappers.js
+          node --check TodoList-ui/js/storage/backup-validation.js
+          node --check TodoList-ui/js/storage/db-schema.js
+          node --check scripts/verify-todo-after-duration.mjs
+      - name: Verify After duration invariants
+        run: node scripts/verify-todo-after-duration.mjs
+      - name: Build static runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify updated assets reached runtime bundle
+        run: |
+          test -f dist/TodoList-ui/js/task-after.js
+          test -f dist/TodoList-ui/js/components/schedule-after.js
+          grep -q 'wheel-after-hours' dist/TodoList-ui/js/components/schedule-after.js
+          grep -q 'wheel-after-minutes' dist/TodoList-ui/js/components/schedule-after.js

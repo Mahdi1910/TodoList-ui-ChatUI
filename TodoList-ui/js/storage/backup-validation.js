@@ -64,10 +64,12 @@ export const AppBackupValidation = (() => {
 
   function rowAfter(row) {
     if (!row.afterTaskId) return null;
+    const hasCombinedDuration = row.afterHours != null || row.afterMinutes != null;
     const check = TaskAfter.validate({
       taskId: row.afterTaskId,
-      amount: row.afterAmount,
-      unit: row.afterUnit,
+      ...(hasCombinedDuration
+        ? { hours: row.afterHours ?? 0, minutes: row.afterMinutes ?? 0 }
+        : { amount: row.afterAmount, unit: row.afterUnit }),
       resolvedAt: row.afterResolvedAt || null
     });
     if (!check.valid) fail(`Task "${row.id}" has invalid After settings.`);

@@ -1,7 +1,7 @@
 export const TodoDbSchema = (() => {
   const NAME = 'TodoListDB';
   const VERSION = 1;
-  const DATA_VERSION = 2;
+  const DATA_VERSION = 3;
   const STORES = Object.freeze({
     PROJECTS: 'projects',
     TAGS: 'tags',

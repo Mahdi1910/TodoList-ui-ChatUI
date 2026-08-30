@@ -40,8 +40,8 @@ export const TodoStorageMappers = (() => {
       dueDate: task.dueDate || null,
       dueTime: task.dueTime || null,
       afterTaskId: after?.taskId || null,
-      afterAmount: after?.amount || null,
-      afterUnit: after?.unit || null,
+      afterHours: after?.hours ?? null,
+      afterMinutes: after?.minutes ?? null,
       afterResolvedAt: after?.resolvedAt || null,
       sortOrder: Number.isFinite(task.sortOrder) ? task.sortOrder : 0,
       createdAt: task.createdAt || nowIso(),
@@ -54,10 +54,12 @@ export const TodoStorageMappers = (() => {
     const storedState = repeatData?.repeatState || null;
     const activeRepeat = mappedRepeat && mappedRepeat.mode !== 'none';
     const dueDate = activeRepeat && !row.dueDate ? RepeatEngine.today() : (row.dueDate || null);
+    const hasCombinedAfterDuration = row.afterHours != null || row.afterMinutes != null;
     const after = row.afterTaskId ? TaskAfter.normalize({
       taskId: row.afterTaskId,
-      amount: row.afterAmount,
-      unit: row.afterUnit,
+      ...(hasCombinedAfterDuration
+        ? { hours: row.afterHours ?? 0, minutes: row.afterMinutes ?? 0 }
+        : { amount: row.afterAmount, unit: row.afterUnit }),
       resolvedAt: row.afterResolvedAt || null
     }) : null;
     let repeat = null;

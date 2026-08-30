@@ -25,7 +25,7 @@ const ScheduleCore = {
   draftTime: null, // { hour: "10", minute: "30", period: "PM" } or null
   draftReminders: ['on_time'], // Array of reminder keys e.g. ["none"], ["on_time"], ["5_min"]
   draftRepeat: { mode: 'none', custom: { interval: 1, unit: 'day', weekdays: [], monthDays: [], yearDates: {} } },
-  draftAfter: null, // { taskId, amount, unit, resolvedAt } or null
+  draftAfter: null, // { taskId, hours, minutes, resolvedAt } or null
   scheduleTaskId: null,
   onApplyCallback: null,
   lastFocusedElement: null,
@@ -166,7 +166,7 @@ const ScheduleCore = {
     ModalFocusManager.open(this.modalEl, {
       trigger: this.lastFocusedElement,
       initialFocus: () => this.activeTab === 'after'
-        ? (this.btnAfterTaskTrigger || this.wheelAfterAmount)
+        ? (this.btnAfterTaskTrigger || this.wheelAfterHours || this.wheelAfterMinutes)
         : (this.gridEl?.querySelector('.calendar-day.selected') ||
            this.gridEl?.querySelector('.calendar-day.today') ||
            this.btnQuickToday),

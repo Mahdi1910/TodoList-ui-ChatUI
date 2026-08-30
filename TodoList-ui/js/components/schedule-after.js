@@ -34,15 +34,15 @@ export const ScheduleAfterMethods = {
       </div>
 
       <div class="after-wheel-labels" aria-hidden="true">
-        <span>Mode</span><span>Delay</span><span>Unit</span>
+        <span>Mode</span><span>Hours</span><span>Minutes</span>
       </div>
       <div class="time-picker-container after-wheels-container" role="group" aria-label="After delay selection">
         <div class="wheel-mask top" aria-hidden="true"></div>
         <div class="wheel-mask bottom" aria-hidden="true"></div>
         <div class="selection-highlight" aria-hidden="true"></div>
         <div class="time-wheel after-label-wheel" id="wheel-after-label" role="listbox" aria-label="After label"></div>
-        <div class="time-wheel" id="wheel-after-amount" role="listbox" aria-label="After delay amount" tabindex="0"></div>
-        <div class="time-wheel" id="wheel-after-unit" role="listbox" aria-label="After delay unit" tabindex="0"></div>
+        <div class="time-wheel" id="wheel-after-hours" role="listbox" aria-label="After delay hours" tabindex="0"></div>
+        <div class="time-wheel" id="wheel-after-minutes" role="listbox" aria-label="After delay minutes" tabindex="0"></div>
       </div>
 
       <div class="after-task-section">
@@ -78,8 +78,8 @@ export const ScheduleAfterMethods = {
     this.tabAfter = tab;
     this.panelAfter = panel;
     this.wheelAfterLabel = panel.querySelector('#wheel-after-label');
-    this.wheelAfterAmount = panel.querySelector('#wheel-after-amount');
-    this.wheelAfterUnit = panel.querySelector('#wheel-after-unit');
+    this.wheelAfterHours = panel.querySelector('#wheel-after-hours');
+    this.wheelAfterMinutes = panel.querySelector('#wheel-after-minutes');
     this.btnAfterTaskTrigger = panel.querySelector('#btn-after-task-trigger');
     this.afterTaskValue = panel.querySelector('#after-task-value');
     this.menuAfterTask = panel.querySelector('#menu-after-task');
@@ -92,12 +92,12 @@ export const ScheduleAfterMethods = {
     this.btnClearAfter = panel.querySelector('#btn-sched-clear-after');
 
     this.populateWheel(this.wheelAfterLabel, ['After']);
-    this.populateWheel(this.wheelAfterAmount, Array.from({ length: 60 }, (_, index) => String(index + 1)));
-    this.populateWheel(this.wheelAfterUnit, ['minutes', 'hours']);
-    this.bindWheelEngine(this.wheelAfterAmount, '');
-    this.bindWheelEngine(this.wheelAfterUnit, '');
-    this.bindAfterWheel(this.wheelAfterAmount, index => this.setAfterAmount(index + 1));
-    this.bindAfterWheel(this.wheelAfterUnit, index => this.setAfterUnit(index === 1 ? 'hour' : 'minute'));
+    this.populateWheel(this.wheelAfterHours, Array.from({ length: TaskAfter.MAX_HOURS + 1 }, (_, index) => String(index)));
+    this.populateWheel(this.wheelAfterMinutes, Array.from({ length: TaskAfter.MAX_MINUTES + 1 }, (_, index) => String(index)));
+    this.bindWheelEngine(this.wheelAfterHours, '');
+    this.bindWheelEngine(this.wheelAfterMinutes, '');
+    this.bindAfterWheel(this.wheelAfterHours, index => this.setAfterHours(index));
+    this.bindAfterWheel(this.wheelAfterMinutes, index => this.setAfterMinutes(index));
     this.scrollWheelToIndex(this.wheelAfterLabel, 0, false, '');
   },
 
@@ -128,13 +128,16 @@ export const ScheduleAfterMethods = {
     if (!wheel) return;
     let timer = null;
     wheel.addEventListener('scroll', () => {
+      if (this._syncingAfterWheels) return;
       clearTimeout(timer);
       timer = setTimeout(() => {
+        if (this._syncingAfterWheels) return;
         const index = Math.max(0, Math.min(wheel._maxIndex, Math.round(wheel.scrollTop / this.ITEM_HEIGHT)));
         onChange(index);
       }, 100);
     });
     wheel.addEventListener('click', event => {
+      if (this._syncingAfterWheels) return;
       const item = event.target.closest('.wheel-item');
       if (!item) return;
       const items = [...wheel.querySelectorAll('.wheel-item')];
@@ -145,7 +148,7 @@ export const ScheduleAfterMethods = {
 
   ensureAfterDraft() {
     if (!this.draftAfter) {
-      this.draftAfter = { taskId: null, amount: 1, unit: 'minute', resolvedAt: null };
+      this.draftAfter = { taskId: null, hours: 0, minutes: 0, resolvedAt: null };
     }
     return this.draftAfter;
   },
@@ -161,26 +164,21 @@ export const ScheduleAfterMethods = {
     this.renderRepeatEndRow?.();
   },
 
-  setAfterAmount(amount) {
+  setAfterHours(hours) {
     const draft = this.ensureAfterDraft();
-    const max = draft.unit === 'hour' ? 24 : 60;
-    const next = Math.max(1, Math.min(max, Number(amount) || 1));
-    if (draft.amount === next && !draft.resolvedAt) return;
-    draft.amount = next;
+    const next = Math.max(0, Math.min(TaskAfter.MAX_HOURS, Number(hours) || 0));
+    if (draft.hours === next && !draft.resolvedAt) return;
+    draft.hours = next;
     this.activatePendingAfter();
     this.clearAfterValidationError();
   },
 
-  setAfterUnit(unit) {
+  setAfterMinutes(minutes) {
     const draft = this.ensureAfterDraft();
-    const nextUnit = unit === 'hour' ? 'hour' : 'minute';
-    const changed = draft.unit !== nextUnit;
-    draft.unit = nextUnit;
-    const max = nextUnit === 'hour' ? 24 : 60;
-    draft.amount = Math.max(1, Math.min(max, Number(draft.amount) || 1));
-    if (changed || draft.resolvedAt) this.activatePendingAfter();
-    this.populateWheel(this.wheelAfterAmount, Array.from({ length: max }, (_, index) => String(index + 1)));
-    requestAnimationFrame(() => this.scrollWheelToIndex(this.wheelAfterAmount, draft.amount - 1, false, ''));
+    const next = Math.max(0, Math.min(TaskAfter.MAX_MINUTES, Number(minutes) || 0));
+    if (draft.minutes === next && !draft.resolvedAt) return;
+    draft.minutes = next;
+    this.activatePendingAfter();
     this.clearAfterValidationError();
   },
 
@@ -201,13 +199,18 @@ export const ScheduleAfterMethods = {
   },
 
   syncAfterWheels() {
-    const draft = this.draftAfter || { amount: 1, unit: 'minute' };
-    const max = draft.unit === 'hour' ? 24 : 60;
-    this.populateWheel(this.wheelAfterAmount, Array.from({ length: max }, (_, index) => String(index + 1)));
+    const draft = this.draftAfter || { hours: 0, minutes: 0 };
+    const hours = Math.max(0, Math.min(TaskAfter.MAX_HOURS, Number(draft.hours) || 0));
+    const minutes = Math.max(0, Math.min(TaskAfter.MAX_MINUTES, Number(draft.minutes) || 0));
+    this._syncingAfterWheels = true;
+    clearTimeout(this._afterWheelSyncTimer);
     requestAnimationFrame(() => {
       this.scrollWheelToIndex(this.wheelAfterLabel, 0, false, '');
-      this.scrollWheelToIndex(this.wheelAfterAmount, Math.max(0, Math.min(max - 1, (Number(draft.amount) || 1) - 1)), false, '');
-      this.scrollWheelToIndex(this.wheelAfterUnit, draft.unit === 'hour' ? 1 : 0, false, '');
+      this.scrollWheelToIndex(this.wheelAfterHours, hours, false, '');
+      this.scrollWheelToIndex(this.wheelAfterMinutes, minutes, false, '');
+      this._afterWheelSyncTimer = setTimeout(() => {
+        this._syncingAfterWheels = false;
+      }, 140);
     });
   },
 
