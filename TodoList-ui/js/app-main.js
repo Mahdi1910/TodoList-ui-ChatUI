@@ -3,6 +3,7 @@ import { AppStateSync } from './state-sync.js';
 import { TaxonomyOrder } from './taxonomy-order.js';
 import { TaskFilter } from './task-filter.js';
 import { RepeatEngine } from './repeat/repeat-engine.js';
+import { installTaskLinkCompletion } from './task-link-completion.js';
 import { ThemeManager } from './theme.js';
 import { ModalFocusManager } from './components/modal-focus.js';
 import { AppPersistence } from './storage/persistence.js';
@@ -52,6 +53,7 @@ export async function startApplication({ runStage, setStorageErrorReporter }) {
   await runStage('INTEGRATION', async () => {
     ThemeManager.init();
     assertIntegrations();
+    installTaskLinkCompletion(AppDataService, AppState);
     ModalFocusManager.init();
   });
   await runStage('DATABASE_OPEN', () => AppPersistence.initialize());
