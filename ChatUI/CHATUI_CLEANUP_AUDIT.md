@@ -378,7 +378,7 @@ When diagnostics is retired, remove these hooks and temporary helper functions f
 **Locations:**
 - `ChatUI/html/settings-modal.html` — diagnostics Settings button/tab are included unconditionally.
 - `ChatUI/js/settings/settings.js` — every `.settings-section-btn` is wired generically to `openSettingsSection(...)`, so the diagnostics section remains navigable.
-- `ChatUI/js/layout-loader.js` — diagnostics UI is dynamically imported and initialized only when `!IS_EMBEDDED`.
+- `ChatUI/js/layout-loader.js` — diagnostics UI is dynamically imported and initialized only when `!IS_EMEDDED`.
 - `shell/js/frame-manager.js` — the combined application loads ChatUI through `/ChatUI/embedded.html?embedded=1`.
 
 **What it is:**
@@ -1072,6 +1072,402 @@ Add a small store/event subscription for chat/project metadata changes or let th
 
 ---
 
+# Category 6 — Duplicated data representations, persistence/schema migration debt, and compatibility layers
+
+Status: **Audit complete. No fixes performed.**
+
+Category 6 was audited against current `main` at `2caf0577f97325e5797bb7b3906c55bb5ed0d893`. The goal here is not to remove deliberate caches or normalized IndexedDB stores. A finding is recorded when the same logical fact exists in overlapping representations that must be synchronized manually, or when compatibility/migration behavior has become a permanent maintenance obligation without a clear schema boundary.
+
+## 1. Text API profile data is persistently duplicated into legacy active aliases
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/js/state/store.js` — `state.api`, `DEFAULT_TEXT_PROFILES`, `synchronizeApiProfiles()`.
+- `ChatUI/js/api/text-api-profiles.js` — `profilesFromApi()`, `withActiveAliases()`, `ensureTextApiProfilesState()`, `commitActiveTextApiState()`.
+- `ChatUI/js/api/text-api-key-pool.js` — reads/writes `textApiKey`, `textApiKeys`, and `textApiKeyIndex` as the active pool.
+- `ChatUI/js/storage/records.js` — `buildSettingsRecord()` persists the entire duplicated `state.api` object.
+- `ChatUI/js/storage/load.js` — reconstructs both profile state and aliases at startup.
+
+**Finding:**
+
+Mode 1 / Mode 2 each contain `textApiKey`, `textApiKeys`, `textApiKeyIndex`, and `textBaseUrl`, while the same four values are also stored again at the top of `state.api` for the active profile. The top-level values are explicitly called “legacy active aliases.” The store, profile module, and key-pool module all contain synchronization logic to prevent the copies from drifting.
+
+The duplication includes not only key strings but key-pool health data such as validation state, cooldowns, failure history, and active index. `buildSettingsRecord()` writes both copies to IndexedDB.
+
+**Recommendation:**
+
+Make `textProfiles` plus `activeTextProfileId` the only persisted credential model. Expose a small active-profile accessor/adaptor to old request code during migration, but stop storing the aliases. Then migrate request/failover callers to the accessor and remove the mirror logic from the generic store.
+
+**Action type:** Very-high-value duplicate-source-of-truth removal; migrate carefully because credential failover depends on it.
+
+---
+
+## 2. Assistant messages carry overlapping protocol, presentation, and compatibility representations
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/js/storage/records.js` — `buildMessageRecord()` persists `content`, `thinking`, `thoughtSignature`, `modelResponseParts`, `toolMetadata`, and `activityTimeline` together.
+- `ChatUI/js/api/gemini.js` — `buildGeminiHistory()` prefers `modelResponseParts` for Gemini replay and falls back to `content`/`thoughtSignature`.
+- `ChatUI/js/chat/activity-timeline.js` — timeline text activities reference offsets into separate `content` and `thinking` strings.
+- `ChatUI/js/chat/message-renderer.js` — current timeline renderer versus legacy content/thinking renderer.
+
+**Finding:**
+
+One assistant turn can simultaneously contain a user-visible text projection (`content`), a thinking projection (`thinking`), the preserved Gemini protocol parts (`modelResponseParts`), a separate thought signature, tool metadata derived from those parts, and an activity timeline derived from the same streamed events. Some duplication is justified because exact Gemini protocol parts may be needed for future history, while UI rendering needs a stable projection. The problem is that these roles are not expressed as a clear persisted schema with one documented authority per concern.
+
+**Recommendation:**
+
+Define an explicit persisted assistant schema separating **protocol replay data** from **presentation projection**. Keep exact protocol data only where Gemini history requires it, derive normalized display/tool activity from one boundary, and document which fields may be reconstructed. Do not simply delete `modelResponseParts` or `content`; first remove the ambiguous ownership between them.
+
+**Action type:** Schema clarification/consolidation; protocol compatibility must be preserved.
+
+---
+
+## 3. Generated tool-file bytes can be persisted two or three times for one assistant turn
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/js/api/gemini.js` — `recordCandidateMetadata()` copies inline file data from Gemini parts into `toolMetadata.codeExecutions[].data` while complete response parts are also preserved.
+- `ChatUI/js/storage/records.js` — `cloneToolMetadata()` removes Blob objects but leaves Base64 `data`; `buildMessageAttachmentRecords()` separately converts that same `data` into a Blob attachment record.
+- `ChatUI/js/chat/message-tools.js` — file rendering supports either `exec.data` or `exec.blob`, confirming both representations remain live.
+- `ChatUI/js/storage/backup-restore.js` — full backup serializes all persisted records, amplifying duplicate binary storage in backups.
+
+**Finding:**
+
+For an inline generated file, the same binary payload can remain inside preserved `modelResponseParts`, be copied again into `toolMetadata.codeExecutions[].data`, and then be decoded into the dedicated `attachments` store. This is more than harmless metadata duplication: large Base64 payloads can multiply IndexedDB and backup size.
+
+**Recommendation:**
+
+Choose the attachments store as the durable binary owner. Persist lightweight file references/metadata from the assistant record and tool timeline, and strip duplicated Base64 payloads from presentation metadata after the attachment Blob has been durably written. If exact protocol replay truly requires a binary part, document that exception and avoid creating a third copy.
+
+**Action type:** Very-high-value storage reduction and schema normalization.
+
+---
+
+## 4. New assistant edits still deliberately create the “legacy” message representation
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/chat/message-actions.js` — `editMessageInChat()` sets an edited assistant's `activityTimeline` to `null` and clears thinking/protocol/tool fields.
+- `ChatUI/js/chat/message-renderer.js` — any assistant without an array `activityTimeline` is sent through `appendLegacyAssistantContent()`.
+
+**Finding:**
+
+The legacy renderer cannot be retired solely by waiting for historical chats to age out, because current application code actively creates new legacy-shaped assistant messages whenever an assistant answer is manually edited. The compatibility path has therefore become a second current message schema.
+
+**Recommendation:**
+
+When an assistant is manually edited, create a valid current fallback timeline containing the edited text rather than setting `activityTimeline: null`. Separately normalize old persisted messages on load/migration. Once the app stops producing the old shape and old data has a migration path, the legacy renderer can eventually be removed.
+
+**Action type:** High-priority compatibility-debt reduction; do not delete the legacy renderer before migration exists.
+
+---
+
+## 5. Record-field evolution is handled mostly as schema-on-read instead of explicit logical migrations
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/js/storage/database.js` — `DB_VERSION = 3`; upgrades create missing stores/indexes but do not version individual record shapes.
+- `ChatUI/js/storage/load.js` — defaults/repairs many later-added fields while loading chats/messages/settings.
+- `ChatUI/js/storage/migration.js` — only performs the old LocalStorage → IndexedDB migration.
+- `ChatUI/js/storage/records.js` — defines today's canonical record serialization.
+
+**Finding:**
+
+IndexedDB structural versioning exists, but logical record fields have evolved independently. Older records are made usable through fallback expressions such as `titleSource || 'legacy'`, missing `autoTitleGeneratedAt`, nullable `messageCount`, tool/API defaults, activity-timeline sanitization, project-reference repair, and model/thinking correction. Some repairs are persisted; others remain schema-on-read forever.
+
+**Why this becomes expensive:**
+
+Every reader must keep knowing old shapes. Backup validation and future refactors cannot determine a record's logical schema from `DB_VERSION` alone, because many field-level changes occurred without a distinct logical record version.
+
+**Recommendation:**
+
+Introduce a small logical data-schema version in the settings/database metadata and explicit idempotent migrations for persisted records. Keep tolerant readers at the outer boundary, but normalize old records once and persist the normalized shape so compatibility branches can eventually be retired.
+
+**Action type:** Foundational persistence migration cleanup.
+
+---
+
+## 6. Successful LocalStorage migration leaves the stale full legacy dataset behind
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/storage/migration.js` — reads `chat_app_data`, migrates it, and sets `chat_app_data_indexeddb_migrated=true`.
+- `ChatUI/js/storage/delete.js` and `ChatUI/js/storage/backup-restore.js` — later know how to remove the old legacy key.
+
+**Finding:**
+
+After a successful migration, the old `chat_app_data` value is not removed. The migration flag prevents it from being read again, so IndexedDB becomes canonical while a stale full copy of the user's old chats/settings can remain indefinitely in LocalStorage.
+
+**Recommendation:**
+
+After the IndexedDB transaction has committed and its result is verified, remove the legacy payload and retain only the small migration marker if still needed. If rollback safety requires temporary retention, make that retention explicit and time-limited rather than permanent.
+
+**Action type:** Safe stale-data cleanup after migration verification.
+
+---
+
+## 7. Full-backup format is coupled directly to the physical IndexedDB schema
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/js/storage/backup-restore.js` — `CHATUI_BACKUP_FORMAT_VERSION = 1`, snapshots every current object store verbatim, records `DB_VERSION`, and validates raw store relationships.
+- `ChatUI/js/storage/backup-restore-transaction.js` — clears every current store and writes prepared raw records back directly.
+- `ChatUI/js/storage/database.js` — physical database/store version `DB_VERSION = 3`.
+
+**Finding:**
+
+The “full backup” is effectively a portable serialization of the current physical database rather than a stable logical ChatUI data contract. Internal store names and record fields are therefore part of the long-term backup compatibility surface. At the same time, backup format version 1 and database version 3 do not identify later field-level schema changes described above.
+
+**Recommendation:**
+
+Introduce a logical backup DTO/schema version independent of IndexedDB's physical version. Export normalized application records into that format, provide format migrations on restore, and translate the normalized backup into today's storage repositories. This allows internal store refactors without permanently exposing every storage detail as backup API.
+
+**Action type:** Very-high-value long-term compatibility boundary.
+
+---
+
+## 8. Full backup and Workspace-only backup duplicate Workspace schema validation
+
+**Priority:** Medium/High
+
+**Locations:**
+- `ChatUI/js/storage/backup-restore.js` — `validateRelationships()` validates `workspaceNodes`/`workspaceFiles`, parent relationships, `parentKey`, `nameKey`, sibling uniqueness, cycles, and file-content ownership.
+- `ChatUI/js/workspace/workspace-backup.js` — independently validates hierarchy, duplicate siblings, path semantics, node/content relationships, archive paths, and reconstructs Workspace records.
+- `ChatUI/js/workspace/workspace-paths.js` — already contains canonical path/name semantics.
+
+**Finding:**
+
+Full-app backup and Workspace-only ZIP backup are valid separate user features, but each implements a substantial Workspace schema validator. A change to Workspace invariants can require coordinated edits in both backup systems plus the live Workspace service.
+
+**Recommendation:**
+
+Keep both backup scopes, but extract a canonical Workspace snapshot validator/normalizer used by the live service and both backup paths. Backup-specific code should validate envelope/archive concerns, not redefine Workspace hierarchy rules.
+
+**Action type:** Shared schema-validation consolidation; do not remove either backup feature merely because both exist.
+
+---
+
+## 9. Default state/settings shapes are repeated in many files and have already drifted
+
+**Priority:** High
+
+**Locations / examples:**
+- `ChatUI/js/state/store.js` — application defaults and `DEFAULT_TEXT_PROFILES`.
+- `ChatUI/js/storage/load.js` — independent fallback defaults during load.
+- `ChatUI/js/storage/records.js` — independent fallback objects while serializing settings.
+- `ChatUI/js/storage/migration.js` — legacy migration defaults.
+- `ChatUI/js/storage/delete.js` — another hand-written “empty app” state before reload.
+- `ChatUI/js/tools/custom-tool-limits.js` — canonical custom-tool default exists, while the store also hardcodes `24`.
+
+**Concrete drift already present:**
+- `state.accentColor` defaults to `#3B82F6`, while current Settings/load/reset blue is `#2563EB`.
+- `state.tools` includes `todo`, while some fallback/reset tool objects omit it.
+- `state.api` includes profiles plus aliases, while `removeAllData()` resets a much older minimal API shape before reloading.
+- Text profile definitions/default shapes exist in both `store.js` and `text-api-profiles.js`.
+
+**Recommendation:**
+
+Create canonical default factories/constants such as `createDefaultState()`, `createDefaultApiSettings()`, `createDefaultTools()`, and shared profile definitions. Load, reset, migration, serialization, tests, and UI initialization should consume those defaults rather than hand-copying object literals.
+
+**Action type:** High-confidence simplification with direct drift-prevention value.
+
+---
+
+## 10. Persisted model identity uses a display label instead of the stable model ID
+
+**Priority:** Medium/High
+
+**Locations:**
+- `ChatUI/js/models/models.js` — each model already has a stable `id`, display `name`/`shortName`, and `backendId`.
+- `ChatUI/js/state/store.js` — `currentModel` stores values such as `3.7 Flash`.
+- `ChatUI/js/storage/records.js` — persists `state.currentModel` directly.
+- `ChatUI/js/storage/load.js` — calls `getModelConfig()` to repair/normalize old saved names.
+
+**Finding:**
+
+The persisted setting uses a user-facing model label even though a stable semantic ID already exists. Renaming a label therefore becomes a data-compatibility change, requiring `getModelConfig()` to continue accepting old names forever or repair them after load.
+
+**Recommendation:**
+
+Persist the stable model `id`. Treat `name`, `shortName`, and `backendId` as derived configuration. Add a one-time migration from known legacy display names/IDs and keep aliases only at import boundaries.
+
+**Action type:** Stable-identity migration.
+
+---
+
+## 11. Accent-color persistence stores an implementation hex value rather than a semantic accent ID
+
+**Priority:** Medium/High
+
+**Locations:**
+- `ChatUI/js/settings/settings.js` — `ACCENTS`, `applyAccentColor()`, and startup mapping from raw hex back to `blue`/`purple`/default-green.
+- `ChatUI/js/state/store.js` and `ChatUI/js/storage/load.js` — raw hex accent defaults/persistence.
+- CSS still uses compatibility variable names such as `--accent-blue` even when the selected accent is green or purple.
+
+**Finding:**
+
+The persisted value is a concrete palette hex, while the Settings control is semantic (`blue`, `green`, `purple`). Startup must reverse-map specific historical hex values back to a semantic selection. The already-different `#3B82F6` versus `#2563EB` defaults demonstrate why raw design tokens make brittle persisted identities.
+
+**Recommendation:**
+
+Persist `accentId: 'blue' | 'green' | 'purple'` and derive current palette values from the theme system. Migrate known historical hex values once. Over time rename generic CSS variables to semantic names such as `--accent`/`--accent-hover` rather than keeping `--accent-blue` as a cross-color compatibility alias.
+
+**Action type:** Medium-risk settings-schema cleanup.
+
+---
+
+## 12. Attachments exist in several alias-heavy shapes across runtime, storage, legacy data, and Gemini protocol
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/storage/records.js` — runtime `blob/type` becomes storage `data/mimeType`; remote `fileApi*` metadata is copied separately.
+- `ChatUI/js/storage/load.js` — storage records are mapped back into runtime shape and legacy no-`kind` attachment records are interpreted heuristically.
+- `ChatUI/js/chat/attachment-transport.js` — consumers accept `fileApiMimeType || type || mimeType || blob.type`, plus `fileData`/`inlineData` transport forms.
+- `ChatUI/js/api/gemini.js` — still contains a compatibility path for attachment `inlineData`/Blob conversion.
+
+**Finding:**
+
+Different layers legitimately need different serialization formats, but those formats are not strongly isolated. Business/transport code repeatedly accepts several property aliases, so old storage shape, runtime shape, and Gemini wire shape leak into each other.
+
+**Recommendation:**
+
+Define one canonical internal Attachment model. Put explicit adapters at boundaries: `attachmentFromStorageRecord`, `attachmentToStorageRecord`, and `attachmentToGeminiPart`. Keep remote Gemini File metadata as a documented optional accelerator on the internal model, but stop making arbitrary consumers understand all historical aliases.
+
+**Action type:** High-value boundary normalization.
+
+---
+
+## 13. `messageCount` is a manually maintained denormalized cache of the Messages store
+
+**Priority:** Medium
+
+**Locations:**
+- `ChatUI/js/storage/records.js` — `buildChatRecord()` derives count from loaded messages but trusts `chat.messageCount` for unloaded chats.
+- `ChatUI/js/storage/load.js` — startup loads `messageCount` from the chat record without reading messages.
+- Send/delete/reconcile paths update the cached count separately from message persistence.
+
+**Finding:**
+
+The cache is useful for lazy startup and should not be removed casually. However, the same fact exists as both the actual number of message records and a number on the chat record. For unloaded chats, metadata writes can continue propagating a stale count because the real message store is intentionally not read.
+
+**Recommendation:**
+
+Keep it only as an explicitly named/owned cache. Centralize every mutation that changes message membership so the chat-count update happens in the same persistence transaction, and add repair/consistency logic for legacy or damaged records. Consider naming/documenting it as cached metadata rather than treating it as equal authority.
+
+**Action type:** Cache-invariant hardening, not blind deletion.
+
+---
+
+## 14. Workspace file revision is duplicated in both node metadata and file-content records
+
+**Priority:** Medium/High
+
+**Locations:**
+- `ChatUI/js/workspace/workspace-storage.js` — separate `workspaceNodes` and `workspaceFiles` records.
+- `ChatUI/js/workspace/workspace-service.js` — reads `file.revision ?? node.revision`; writes calculate the next revision with `Math.max(node.revision, file.revision) + 1` and update both.
+- `ChatUI/js/workspace/workspace-backup.js` — reconstructs identical revision values on both records.
+
+**Finding:**
+
+One logical file revision is stored twice. The write path updates both atomically, but read/update code still contains fallback/max logic to defend against the values diverging. This is a clear duplicated invariant.
+
+**Recommendation:**
+
+Choose one authoritative revision field—preferably on the record whose identity is used for file metadata/concurrency—and derive the joined view from it. If keeping both is required for query performance, formalize it as an indexed cache and validate/repair equality centrally instead of having every service call defend against drift.
+
+**Action type:** Duplicated-invariant simplification.
+
+---
+
+## 15. Loaded-chat reconciliation is implemented separately in targeted mutations and full-state save fallback
+
+**Priority:** Medium/High
+
+**Locations:**
+- `ChatUI/js/storage/mutations.js` — `readExistingChatScope()` and `reconcileLoadedChat()`.
+- `ChatUI/js/storage/save.js` — `readExistingLoadedChatScope()` and `persistSnapshot()`.
+
+**Finding:**
+
+Both paths independently read all existing messages for a loaded chat, collect attachment IDs, compare desired IDs, delete stale records, and put desired messages/attachments. One is used for targeted reconciliation and the other for the full-state safety-net save.
+
+**Why this matters:**
+
+Any future cascade rule or attachment schema change must be implemented consistently in both algorithms. The two functions are already near-duplicates with different names and call structures.
+
+**Recommendation:**
+
+Extract one repository-level loaded-chat scope reader/synchronizer and let both `reconcileLoadedChat()` and the full-state fallback compose it. Keep `saveState()` as a recovery safety net if desired; remove the duplicate persistence algorithm, not the safety capability.
+
+**Action type:** Persistence implementation consolidation.
+
+---
+
+## 16. Message/chat cascade deletion semantics are split across multiple storage and UI paths
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/storage/delete.js` — `deleteMessageRecord()` deletes message + attachments + Read Aloud audio; `deleteChatRecord()` deletes chat + messages + attachments + Read Aloud audio.
+- `ChatUI/js/storage/mutations.js` — `deleteChatMessages()` deletes message records and attachments but not Read Aloud cache records.
+- `ChatUI/js/chat/message-actions.js` — calls `deleteChatMessages()` first, then separately calls `invalidateReadAudioForMessages()` and only warns if cache cleanup fails.
+- `ChatUI/js/storage/read-audio.js` — additional standalone cache deletion APIs.
+
+**Finding:**
+
+There is no single repository-level definition of “delete this message scope.” Depending on the caller, Read Aloud data is deleted atomically with the message or as a later best-effort operation. This is a persistence cascade rule implemented in multiple ways.
+
+**Recommendation:**
+
+Define canonical storage cascade operations for deleting one message, a set of messages, and a chat. Include dependent attachment/read-audio ownership in the same IndexedDB transaction wherever possible. UI code should request a domain deletion rather than manually sequencing storage cleanup.
+
+**Action type:** High-confidence cascade consolidation and consistency fix.
+
+---
+
+## 17. Raw Gemini provider metadata variants leak through persistence into rendering code
+
+**Priority:** Medium/High
+
+**Locations:**
+- `ChatUI/js/api/gemini.js` — stores raw grounding/URL/code-execution response metadata and accepts camelCase/snake_case protocol variants.
+- `ChatUI/js/storage/records.js` — persists cloned `toolMetadata` largely as received.
+- `ChatUI/js/chat/message-tools.js` — renderer still understands variants such as `urlMetadata` vs `retrievedUrls`, `retrievedUrl` vs `url`, alternate status names, and raw Code Execution structures.
+
+**Finding:**
+
+The external provider's evolving wire-format alternatives are not normalized once at the API boundary. They become part of persisted message shape and therefore every renderer/backup/compatibility reader may need to understand them indefinitely.
+
+**Recommendation:**
+
+Normalize Gemini metadata into a stable ChatUI presentation/tool-metadata DTO immediately after parsing. If raw protocol metadata must be retained for debugging or replay, keep it in a clearly separate protocol field rather than making UI code inspect provider variants.
+
+**Action type:** External-schema isolation and long-term compatibility reduction.
+
+---
+
+## Category 6 representations checked and intentionally NOT classified as unnecessary duplication
+
+- Separate IndexedDB stores for chats, messages, attachments, Read Aloud audio, Workspace nodes, and Workspace file content are useful normalization/lazy-loading boundaries. The audit does not recommend flattening the database.
+- `readAudio.chatId` and `expiresAt` are intentional indexed fields that support cache cleanup queries; they are appropriate denormalized indexes as long as relationships are validated.
+- Workspace `parentKey` and `nameKey` are intentional derived values required by the unique sibling-name index; they should not be removed merely because they can be derived.
+- Workspace node `sizeBytes` and `lineCount` are useful lazy metadata caches. They should have centralized maintenance/invariant checks, but removing them would require performance evidence.
+- Runtime `URL.createObjectURL(...)` values are correctly ephemeral and are not persisted.
+- Local attachment Blobs plus remote Gemini File metadata are intentionally different things: the local Blob is durable ownership, while remote metadata is an expiring accelerator. The issue above is alias leakage, not the existence of remote metadata.
+- Model `id`, display label, and Gemini `backendId` are valid distinct concepts. The cleanup recommendation is only to persist the stable semantic ID.
+- Full-app backup and Workspace-only backup serve different user scopes. The cleanup recommendation is to share canonical Workspace schema validation, not remove either backup capability.
+
+---
+
 # Next category
 
-Not started yet: **Category 6 — duplicated data representations, persistence/schema migration debt, and compatibility layers that increase long-term maintenance cost.**
+Not started yet: **Category 7 — repeated validation/normalization/business rules, inconsistent error contracts, and unnecessary defensive complexity.**
