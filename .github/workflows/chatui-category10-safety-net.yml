@@ -1,0 +1,31 @@
+name: ChatUI Category 10 Safety Net
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify-chatui-safety-net:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install test-only IndexedDB implementation
+        run: npm install --no-save --ignore-scripts fake-indexeddb@6.0.0
+      - name: Run canonical ChatUI regression suite
+        run: node scripts/verify-chatui-regressions.mjs
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify combined-app runtime entry points
+        run: |
+          test -f dist/index.html
+          test -f dist/ChatUI/embedded.html
+          test -f dist/TodoList-ui/index.html
+          test -f dist/shell/js/frame-bridge.js
