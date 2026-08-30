@@ -1,5 +1,6 @@
 import { TaskFilter } from '../task-filter.js';
 import { TaskAfter } from '../task-after.js';
+import { TaskLinks } from '../task-links.js';
 import { AppPersistence } from '../storage/persistence.js';
 import { AppDataService } from '../storage/data-service.js';
 import { AppState } from '../state.js';
@@ -75,6 +76,62 @@ export const TaskRendererMethods = {
     if (this.completedSectionChevron) this.completedSectionChevron.textContent = expanded ? '▾' : '▸';
   },
 
+  taskDisplayTitle(task) {
+    return TaskLinks.displayTitleText(task?.title || '', AppState.tasks).trim() || 'Task';
+  },
+
+  openLinkedTask(taskId, trigger = null) {
+    const linked = AppState.getTask(taskId);
+    if (!linked) return;
+    this.closeTaskActionMenu(false);
+    if (linked.parentTaskId) window.SubtaskEditorComponent?.openEdit(linked.id, trigger);
+    else this.openModal(linked);
+  },
+
+  renderTaskTitle(container, task) {
+    container.replaceChildren();
+    const segments = TaskLinks.parseTitle(task?.title || '');
+    if (!segments.length) return;
+
+    segments.forEach(segment => {
+      if (segment.type === 'text') {
+        container.appendChild(document.createTextNode(segment.text));
+        return;
+      }
+
+      const linked = AppState.getTask(segment.taskId);
+      const selfReference = linked?.id === task.id;
+      const link = document.createElement('span');
+      link.className = 'task-title-link';
+      link.dataset.linkedTaskId = segment.taskId;
+
+      if (!linked || selfReference) {
+        link.classList.add('missing-task-link');
+        link.textContent = selfReference ? 'This task' : 'Missing task';
+        link.title = selfReference ? 'A task cannot link to itself' : `Missing task: ${segment.taskId}`;
+        link.setAttribute('aria-label', link.title);
+        container.appendChild(link);
+        return;
+      }
+
+      const label = TaskLinks.labelForTask(linked, AppState.tasks);
+      link.textContent = label;
+      link.tabIndex = 0;
+      link.setAttribute('role', 'link');
+      link.setAttribute('aria-label', `Open linked task: ${label}`);
+      link.title = `Open linked task: ${label}`;
+      const activate = event => {
+        if (event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') return;
+        if (event.type === 'keydown') event.preventDefault();
+        event.stopPropagation();
+        this.openLinkedTask(linked.id, link);
+      };
+      link.addEventListener('click', activate);
+      link.addEventListener('keydown', activate);
+      container.appendChild(link);
+    });
+  },
+
   createTaskCard(task, options = {}) {
     const {
       isSubtask = false,
@@ -85,6 +142,7 @@ export const TaskRendererMethods = {
     } = options;
     const normalized = task;
     const logicalIsSubtask = Boolean(normalized.parentTaskId);
+    const displayTitle = this.taskDisplayTitle(normalized);
     const card = document.createElement('div');
     card.className = `task-card${normalized.completed ? ' completed' : ''}${isSubtask ? ' subtask-card' : ''}${compact ? ' compact-subtask-card' : ''}`;
     card.dataset.id = normalized.id;
@@ -99,7 +157,7 @@ export const TaskRendererMethods = {
     checkbox.type = 'checkbox';
     checkbox.className = 'task-checkbox';
     checkbox.checked = normalized.completed;
-    checkbox.setAttribute('aria-label', `Mark ${normalized.title} as ${normalized.completed ? 'active' : 'completed'}`);
+    checkbox.setAttribute('aria-label', `Mark ${displayTitle} as ${normalized.completed ? 'active' : 'completed'}`);
     const checkIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     checkIcon.classList.add('check-icon');
     checkIcon.setAttribute('viewBox', '0 0 24 24');
@@ -111,12 +169,12 @@ export const TaskRendererMethods = {
     details.className = 'task-details';
     details.setAttribute('tabindex', '0');
     details.setAttribute('role', 'button');
-    details.setAttribute('aria-label', `Edit ${logicalIsSubtask ? 'subtask' : 'task'}: ${normalized.title}`);
+    details.setAttribute('aria-label', `Edit ${logicalIsSubtask ? 'subtask' : 'task'}: ${displayTitle}`);
     details.setAttribute('title',
       `Click or press Enter to edit ${logicalIsSubtask ? 'subtask' : 'task'}`);
     const title = document.createElement('span');
     title.className = 'task-title';
-    title.textContent = normalized.title;
+    this.renderTaskTitle(title, normalized);
     details.appendChild(title);
 
     if (normalized.description && !compact) {
@@ -130,7 +188,7 @@ export const TaskRendererMethods = {
     meta.className = 'task-meta';
     if (TaskAfter.isPending(normalized.after)) {
       const source = AppState.getTask(normalized.after.taskId);
-      const sourceSuffix = source?.title ? ` · ${source.title}` : '';
+      const sourceSuffix = source ? ` · ${this.taskDisplayTitle(source)}` : '';
       meta.appendChild(this.createBadge(`After ${TaskAfter.formatDelay(normalized.after)}${sourceSuffix}`, 'after'));
     } else if (normalized.dueDate || normalized.dueTime) {
       meta.appendChild(this.createBadge(this.formatScheduleLabel(normalized.dueDate, normalized.dueTime), 'due-date'));
