@@ -1,0 +1,44 @@
+name: Todo Task Links Check
+
+on:
+  pull_request:
+    paths:
+      - 'TodoList-ui/js/task-links.js'
+      - 'TodoList-ui/js/task-link-completion.js'
+      - 'TodoList-ui/js/app-main.js'
+      - 'TodoList-ui/js/components/task-actions.js'
+      - 'TodoList-ui/js/components/task-renderer.js'
+      - 'TodoList-ui/css/components/task-cards.css'
+      - 'scripts/verify-todo-task-links.mjs'
+      - '.github/workflows/todo-task-links-check.yml'
+
+jobs:
+  verify-task-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check task-link JavaScript syntax
+        run: |
+          node --check TodoList-ui/js/task-links.js
+          node --check TodoList-ui/js/task-link-completion.js
+          node --check TodoList-ui/js/app-main.js
+          node --check TodoList-ui/js/components/task-actions.js
+          node --check TodoList-ui/js/components/task-renderer.js
+          node --check scripts/verify-todo-task-links.mjs
+      - name: Verify task-link behavior
+        run: node scripts/verify-todo-task-links.mjs
+      - name: Build static runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify task-link assets reached runtime bundle
+        run: |
+          test -f dist/TodoList-ui/js/task-links.js
+          test -f dist/TodoList-ui/js/task-link-completion.js
+          test -f dist/TodoList-ui/js/components/task-actions.js
+          test -f dist/TodoList-ui/js/components/task-renderer.js
+          test -f dist/TodoList-ui/css/components/task-cards.css
+          grep -q 'copy-link' dist/TodoList-ui/js/components/task-actions.js
+          grep -q 'task-title-link' dist/TodoList-ui/js/components/task-renderer.js
+          grep -q 'installTaskLinkCompletion' dist/TodoList-ui/js/app-main.js

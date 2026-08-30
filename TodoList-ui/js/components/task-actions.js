@@ -1,3 +1,4 @@
+import { TaskLinks } from '../task-links.js';
 import { AppPersistence } from '../storage/persistence.js';
 import { AppDataService } from '../storage/data-service.js';
 import { AppState } from '../state.js';
@@ -8,6 +9,16 @@ export const TaskActionMethods = {
     this.taskActionLinkBtn = this.taskActionMenu?.querySelector('[data-task-action="link-parent"]');
     this.taskActionUnlinkBtn = this.taskActionMenu?.querySelector('[data-task-action="unlink"]');
     this.taskActionDeleteBtn = this.taskActionMenu?.querySelector('[data-task-action="delete"]');
+    this.taskActionCopyLinkBtn = this.taskActionMenu?.querySelector('[data-task-action="copy-link"]');
+    if (!this.taskActionCopyLinkBtn && this.taskActionMenu) {
+      const copyButton = document.createElement('button');
+      copyButton.type = 'button';
+      copyButton.dataset.taskAction = 'copy-link';
+      copyButton.setAttribute('role', 'menuitem');
+      copyButton.textContent = 'Copy Link';
+      this.taskActionMenu.insertBefore(copyButton, this.taskActionDeleteBtn || null);
+      this.taskActionCopyLinkBtn = copyButton;
+    }
     this.taskActionTargetId = null;
     this.taskActionAnchor = null;
     this.createTaskParentPicker();
@@ -20,6 +31,7 @@ export const TaskActionMethods = {
       if (action === 'add-subtask') this.handleTaskActionAddSubtask();
       if (action === 'link-parent') this.openTaskParentPicker();
       if (action === 'unlink') this.handleTaskActionUnlink();
+      if (action === 'copy-link') void this.handleTaskActionCopyLink();
       if (action === 'delete') this.handleTaskActionDelete();
     });
 
@@ -63,6 +75,11 @@ export const TaskActionMethods = {
     this.taskParentPicker = picker;
   },
 
+  getTaskDisplayTitle(task) {
+    if (!task) return 'task';
+    return TaskLinks.displayTitleText(task.title, AppState.tasks).trim() || 'task';
+  },
+
   createTaskMoreButton(task) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -71,7 +88,7 @@ export const TaskActionMethods = {
     button.title = 'Task actions';
     button.setAttribute('aria-haspopup', 'menu');
     button.setAttribute('aria-expanded', 'false');
-    button.setAttribute('aria-label', `More actions for ${task.title}`);
+    button.setAttribute('aria-label', `More actions for ${this.getTaskDisplayTitle(task)}`);
     button.addEventListener('click', e => {
       e.stopPropagation();
       this.openTaskActionMenu(task.id, button);
@@ -82,7 +99,7 @@ export const TaskActionMethods = {
   getEligibleParentTasks(taskId) {
     return AppState.getRootTasks()
       .filter(task => task.id !== taskId && !task.completed)
-      .sort((a, b) => (a.sortOrder - b.sortOrder) || String(a.title).localeCompare(String(b.title)));
+      .sort((a, b) => (a.sortOrder - b.sortOrder) || this.getTaskDisplayTitle(a).localeCompare(this.getTaskDisplayTitle(b)));
   },
 
   openTaskActionMenu(taskId, anchor) {
@@ -104,6 +121,7 @@ export const TaskActionMethods = {
     this.taskActionAddBtn.hidden = isSubtask;
     this.taskActionLinkBtn.hidden = isSubtask;
     this.taskActionUnlinkBtn.hidden = !isSubtask;
+    this.taskActionCopyLinkBtn.hidden = false;
     if (!isSubtask) {
       const disabled = hasChildren || eligibleParents.length === 0;
       this.taskActionLinkBtn.disabled = disabled;
@@ -144,7 +162,7 @@ export const TaskActionMethods = {
     if (!parents.length) return;
 
     this.taskParentPicker.innerHTML = parents.map(parent =>
-      `<button type="button" role="menuitem" data-parent-task-option="${this.escapeTaskActionText(parent.id)}">${this.escapeTaskActionText(parent.title)}</button>`
+      `<button type="button" role="menuitem" data-parent-task-option="${this.escapeTaskActionText(parent.id)}">${this.escapeTaskActionText(this.getTaskDisplayTitle(parent))}</button>`
     ).join('');
     this.taskParentPicker.hidden = false;
     this.taskActionLinkBtn?.setAttribute('aria-expanded', 'true');
@@ -221,12 +239,48 @@ export const TaskActionMethods = {
     }
   },
 
+  async copyTaskLinkText(text) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    textarea.style.pointerEvents = 'none';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    let copied = false;
+    try {
+      copied = Boolean(document.execCommand?.('copy'));
+    } finally {
+      textarea.remove();
+    }
+    if (!copied) throw new Error('Clipboard access is unavailable.');
+    return true;
+  },
+
+  async handleTaskActionCopyLink() {
+    const task = AppState.getTask(this.taskActionTargetId);
+    if (!task) return;
+    try {
+      await this.copyTaskLinkText(TaskLinks.tokenFor(task.id));
+      this.closeTaskActionMenu(false);
+    } catch (error) {
+      AppPersistence.reportError('Could not copy this task link.', error);
+    }
+  },
+
   async handleTaskActionDelete() {
     const task = AppState.getTask(this.taskActionTargetId);
     if (!task) return;
     const subtaskCount = AppState.getSubtasks(task.id).length;
     if (!task.parentTaskId && subtaskCount > 0) {
-      const ok = window.confirm(`Delete "${task.title}" and its ${subtaskCount} ${subtaskCount === 1 ? 'subtask' : 'subtasks'}?`);
+      const ok = window.confirm(`Delete "${this.getTaskDisplayTitle(task)}" and its ${subtaskCount} ${subtaskCount === 1 ? 'subtask' : 'subtasks'}?`);
       if (!ok) return;
     }
     this.closeTaskActionMenu(false);
