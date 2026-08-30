@@ -184,8 +184,8 @@
   text-align: center;
 }
 
+/* Keep the After picker on the exact same 200px / five-row geometry as Time. */
 .after-wheels-container {
-  height: 160px;
   margin-top: 4px;
 }
 
