@@ -166,7 +166,7 @@ function createMockRuntime({ startFrom = 'task-a' } = {}) {
 }
 
 const actions = await read('TodoList-ui/js/components/task-actions.js');
-assert.match(actions, /data\.taskAction = 'copy-link'/);
+assert.match(actions, /copyButton\.dataset\.taskAction = 'copy-link'/);
 assert.match(actions, /TaskLinks\.tokenFor\(task\.id\)/);
 assert.match(actions, /navigator\.clipboard\?\.writeText/);
 
