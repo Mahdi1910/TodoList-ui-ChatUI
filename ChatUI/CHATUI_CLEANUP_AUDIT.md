@@ -170,17 +170,9 @@ For this category, a candidate was recorded only when the current source showed 
 - `ChatUI/js/settings/settings.js` — guarded `if (settingsModelSelect)` and `if (settingsThinkingLevel)` event-handler blocks near the end of `initSettingsUI()`.
 - `ChatUI/html/settings-modal.html` — current Settings markup contains no `settings-model-select` or `settings-thinking-level` elements.
 
-**What it is:**
+**What it is:** Settings used to own model/thinking selectors. The current UI moved those controls to the header Model/Thinking menus, but the old Settings lookup and event-handler paths remain. Because the elements are absent, these branches never execute.
 
-Settings used to own model/thinking selectors. The current UI moved those controls to the header Model/Thinking menus, but the old Settings lookup and event-handler paths remain. Because the elements are absent, these branches never execute.
-
-**Why it is dead/obsolete:**
-
-The guards make the stale code harmless, but they also hide the fact that an old feature path is still present. After removing those branches, the `syncModelDisplay`/`syncThinkingDisplay` import from `../ui/menus.js` is no longer needed by Settings.
-
-**Recommendation:**
-
-Delete the two missing-element lookups and their guarded handler blocks, then remove imports that become unused. Keep the current `getModelConfig()` thinking-level normalization because that is still active startup behavior.
+**Recommendation:** Delete the two missing-element lookups and their guarded handler blocks, then remove imports that become unused. Keep the active `getModelConfig()` thinking-level normalization.
 
 **Action type:** Safe dead-code removal after one regression check.
 
@@ -190,24 +182,13 @@ Delete the two missing-element lookups and their guarded handler blocks, then re
 
 **Priority:** High
 
-**Location:**
-- `ChatUI/js/ui/modals.js`, Escape handler, approximately the block immediately before Model/Thinking menu handling.
+**Location:** `ChatUI/js/ui/modals.js`, Escape handler immediately before Model/Thinking menu handling.
 
-**Current replacement:**
-- `ChatUI/js/ui/action-menu.js` owns Escape for the shared action menu.
-- `ChatUI/js/chat/message-controls.js` uses `openActionMenu()` for message More actions.
+**Current replacement:** `ChatUI/js/ui/action-menu.js` owns Escape for the shared action menu, and `ChatUI/js/chat/message-controls.js` uses `openActionMenu()` for message More actions.
 
-**What it is:**
+**Finding:** No current message-menu producer creates the legacy `.message-context-menu.show` structure. The branch is migration residue.
 
-`modals.js` still queries `.message-context-menu.show`, removes the `show` class, and marks Escape as handled. Current message menus use the shared global `#action-menu` instead.
-
-**Why it is dead/obsolete:**
-
-There is no current message-menu producer for that legacy class in the reviewed message/sidebar/workspace menu paths. The comment in `modals.js` itself acknowledges that the shared action menu owns its own Escape lifecycle.
-
-**Recommendation:**
-
-Delete this legacy query/close block. Escape for the current shared menu should remain owned by `action-menu.js`.
+**Recommendation:** Delete the legacy query/close block. Keep Escape ownership in `action-menu.js`.
 
 **Action type:** Dead migration residue; delete.
 
@@ -219,171 +200,101 @@ Delete this legacy query/close block. Escape for the current shared menu should 
 
 **Locations:**
 - `ChatUI/css/chat/message-actions.css` — `.message-more-menu`, `.message-menu-item`, `.message-menu-item.danger`, and related hover/focus/mobile rules.
-- `ChatUI/css/refinements.css` — `.message-more-menu` in the shared-surface override group and `.message-menu-item*` hover/danger overrides.
-- Current implementation: `ChatUI/js/chat/message-controls.js` renders a `.message-more-btn` trigger but sends menu items to the shared `openActionMenu()` primitive.
+- `ChatUI/css/refinements.css` — surviving overrides for those same retired selectors.
+- Current implementation: `ChatUI/js/chat/message-controls.js` renders `.message-more-btn` but sends menu items to shared `openActionMenu()`.
 
-**What it is:**
-
-The old dedicated message popup was replaced by the global shared action popup, but both its base CSS and later theme-fix overrides survived.
-
-**Why it is dead/obsolete:**
-
-The current message controller does not create `.message-more-menu` or `.message-menu-item` elements. Keeping their styling creates a false impression that two message-menu systems still exist.
-
-**Recommendation:**
-
-Remove the old selector blocks from both `message-actions.css` and `refinements.css`. Preserve `.message-more-btn`, because that trigger is current and active.
+**Recommendation:** Remove the retired popup selectors from both stylesheets. Preserve `.message-more-btn`, which is active.
 
 **Action type:** Dead CSS removal.
 
 ---
 
-## 4. API Settings still contains runtime compatibility branches for markup that is now guaranteed by current fragments
+## 4. API Settings contains DOM compatibility branches for markup already guaranteed by current fragments
 
 **Priority:** Medium/High
 
 **Locations:**
 - `ChatUI/js/api/api-config.js` — `ensureMultilineTextKeyInput()`.
 - `ChatUI/js/api/api-config.js` — `ensureTextProfileSwitcher()`.
-- `ChatUI/html/settings-modal.html` — already contains a `<textarea id="text-api-key-input">` and explicit `#text-api-profile-switcher` with Mode 1 / Mode 2 buttons.
+- `ChatUI/html/settings-modal.html` — already contains the Text API textarea and Mode 1 / Mode 2 switcher.
 
-**What it is:**
+**Finding:** The JavaScript still supports converting an older single-line key input and dynamically creating a missing profile switcher, even though current same-version fragments already contain both structures.
 
-`ensureMultilineTextKeyInput()` still supports converting an old single-line input into a textarea. `ensureTextProfileSwitcher()` can dynamically create the Mode switcher if it is absent.
+**Recommendation:** Keep current configuration/state setup, but remove the old-markup conversion/creation branches once the deployment assumption of same-version fragments is reconfirmed. Do not remove persisted-data migration.
 
-**Why it is obsolete in the current architecture:**
-
-ChatUI's layout loader fetches the JavaScript and HTML fragments from the same deployed version. In the current fragments, both structures already exist before API Settings initializes, so the old-markup conversion/creation branches are not part of the normal current execution path.
-
-This is different from data migration: old IndexedDB data still needs migration support. These are DOM-markup compatibility fallbacks for an earlier code layout.
-
-**Recommendation:**
-
-Keep the configuration functions that apply current attributes/state, but remove the unreachable old-input conversion and missing-switcher creation branches once the supported deployment model is confirmed to always use same-version fragments.
-
-**Action type:** Remove obsolete DOM compatibility code; do not remove persisted-data migration.
+**Action type:** Obsolete DOM compatibility cleanup.
 
 ---
 
-## 5. `runtime.currentVoiceIndex` is an orphaned state field
+## 5. `runtime.currentVoiceIndex` is orphaned state
 
 **Priority:** Medium
 
-**Location:**
-- `ChatUI/js/state/store.js`, `runtime` initial state — `currentVoiceIndex: 0`.
+**Location:** `ChatUI/js/state/store.js`.
 
-**Current voice implementation reviewed:**
-- `ChatUI/js/voice/voice-ui.js`
-- `ChatUI/js/voice/live-voice-controller.js`
-- `ChatUI/js/voice/read-settings.js`
-- `ChatUI/js/voice/read-aloud.js`
+**Finding:** Current Live Voice/Audio Read code uses persisted voice names, not an integer runtime voice index. The reviewed voice modules do not consume `runtime.currentVoiceIndex`.
 
-**What it is:**
+**Recommendation:** Remove the field after one final repository-wide reference check.
 
-Runtime state still reserves an integer voice index, apparently from an older indexed voice-selection implementation.
-
-**Why it is unused now:**
-
-Current voice/read code uses the persisted voice **name** (`state.audioRead.voiceName`, e.g. `Zephyr`) rather than an index. The reviewed current voice modules do not consume `runtime.currentVoiceIndex`.
-
-**Recommendation:**
-
-Remove `currentVoiceIndex` from runtime state after a final repository-wide reference check at cleanup time.
-
-**Action type:** High-confidence orphaned state removal.
+**Action type:** Orphaned state removal.
 
 ---
 
-## 6. `runtime.activeChatForProjectAdd` is written but the Add-to-Project flow uses its closure instead
+## 6. `runtime.activeChatForProjectAdd` is written but current Add-to-Project behavior uses its closure
 
 **Priority:** Medium
 
 **Locations:**
-- `ChatUI/js/state/store.js` — runtime field `activeChatForProjectAdd`.
-- `ChatUI/js/sidebar/projects.js` — `openAddToProjectModal()` calls `setRuntime({ activeChatForProjectAdd: chat })`.
+- `ChatUI/js/state/store.js`.
+- `ChatUI/js/sidebar/projects.js`, `openAddToProjectModal()`.
 
-**What it is:**
+**Finding:** The modal stores the chat globally, but its handlers use the `chat` function variable directly. No reviewed behavioral consumer needs the runtime field.
 
-The modal saves the active chat into global runtime state, but every action inside the current modal uses the `chat` variable captured by `openAddToProjectModal()`.
+**Recommendation:** Remove the runtime field and write after final reference verification.
 
-**Why it is unused:**
-
-The field is not required to resolve the selected chat for the current Add-to-Project handlers. It is state left over from a design where modal actions likely needed to retrieve their target globally.
-
-**Recommendation:**
-
-Remove the runtime field and the write if no external consumer is found during the final pre-cleanup reference check.
-
-**Action type:** Orphaned runtime state cleanup.
+**Action type:** Orphaned runtime-state cleanup.
 
 ---
 
-## 7. `runtime.activeProjectForChatManagement` is effectively bookkeeping without a behavioral consumer
+## 7. `runtime.activeProjectForChatManagement` is bookkeeping without a behavioral consumer
 
 **Priority:** Medium
 
 **Locations:**
-- `ChatUI/js/state/store.js` — runtime field `activeProjectForChatManagement`.
-- `ChatUI/js/sidebar/projects.js` — `openManageProjectChatsModal()` stores the project in this field.
-- `ChatUI/js/sidebar/projects.js` — `deleteProject()` contains cleanup logic to null the field if the project is deleted.
+- `ChatUI/js/state/store.js`.
+- `ChatUI/js/sidebar/projects.js`, `openManageProjectChatsModal()` and `deleteProject()` cleanup.
 
-**What it is:**
+**Finding:** The Manage Project Chats UI uses the `project` function argument/closure. The runtime field is set and defensively cleared on project deletion but is not read by the current modal behavior.
 
-The currently rendered Manage Project Chats modal uses the `project` function argument/closure throughout. The runtime field is set and later defensively cleaned up, but the modal behavior does not read it.
-
-**Why it is unnecessary:**
-
-It creates global state plus deletion bookkeeping for information already available in the active function closure.
-
-**Recommendation:**
-
-Remove the field, the write, and the associated delete-project cleanup after final reference verification. Do **not** remove `activeProjectForRename`; that separate field is actively consumed by the rename-confirm handler.
+**Recommendation:** Remove the field, write, and associated deletion bookkeeping after final reference verification. Do not remove `activeProjectForRename`, which is active.
 
 **Action type:** Orphaned state and housekeeping removal.
 
 ---
 
-## 8. Thinking-level definitions contain an unused `color` property
+## 8. Thinking-level definitions contain unused `color` metadata
 
 **Priority:** Low
 
-**Location:**
-- `ChatUI/js/ui/model-thinking-menu.js` — `THINKING_LEVELS` objects define `{ id, label, color }`.
+**Location:** `ChatUI/js/ui/model-thinking-menu.js`, `THINKING_LEVELS`.
 
-**Current consumer behavior:**
+**Finding:** JavaScript consumes level IDs and labels while visual color comes from CSS classes in `thinking-menu.css`; the `color` property does not drive the current UI.
 
-JavaScript uses the level `id` and `label`; visual colors are supplied by CSS classes such as `.thinking-high`, `.thinking-medium`, `.thinking-low`, and `.thinking-minimal` in `ChatUI/css/components/thinking-menu.css`.
-
-**Why it is unused:**
-
-The `color` metadata is not used to render or style the current selector. The color values therefore exist twice conceptually, but only the CSS copy drives the UI.
-
-**Recommendation:**
-
-Remove the unused `color` properties if CSS remains the chosen source of truth. If a later cleanup makes the data model own colors instead, do the opposite—but keep one source, not dead metadata.
+**Recommendation:** If CSS remains the color source of truth, remove the unused data property. If future refactoring makes data own colors, remove the duplicate CSS source instead.
 
 **Action type:** Small dead-data cleanup.
 
 ---
 
-## 9. Manage-Project-Chats group objects carry unused `id` and `target` properties
+## 9. Manage-Project-Chats local group objects carry unused `id` and `target` properties
 
 **Priority:** Low
 
-**Location:**
-- `ChatUI/js/sidebar/projects.js`, inside `openManageProjectChatsModal()` where the local `groups` array is constructed.
+**Location:** `ChatUI/js/sidebar/projects.js`, inside `openManageProjectChatsModal()`.
 
-**What it is:**
+**Finding:** The current render loop consumes fields such as `name`, `icon`, and `chats`; `id` and `target` are not used by the present checkbox/render behavior.
 
-Each group object contains `id` and `target`, but the current render loop only consumes fields such as `name`, `icon`, and `chats`.
-
-**Why it is unused:**
-
-These properties appear to be remnants of an earlier design for distinguishing the target project or routing assignment logic through the group object. Current checkbox behavior closes over the actual `project` argument instead.
-
-**Recommendation:**
-
-Remove `id` and `target` from these private local objects unless a forthcoming consolidation deliberately starts using them.
+**Recommendation:** Remove those private-object properties unless a future consolidation deliberately starts consuming them.
 
 **Action type:** Small dead-data cleanup.
 
@@ -391,15 +302,133 @@ Remove `id` and `target` from these private local objects unless a forthcoming c
 
 ## Category 2 items checked and intentionally NOT classified as dead
 
-- `ChatUI/js/chat/message-renderer.js` still has `appendLegacyAssistantContent()`. Despite the name, it remains necessary for stored chats/messages that do not have an `activityTimeline`; deleting it now could break historical chats.
-- The Text API profile module still mirrors legacy active aliases (`textApiKey`, `textApiKeys`, `textApiKeyIndex`, `textBaseUrl`). Those aliases are currently consumed by the existing request/failover code, so they are architectural debt rather than dead code.
-- `TEMP_PERF_DIAGNOSTICS` is explicitly temporary, but the standalone ChatUI loader still imports and initializes it. It belongs in a later **temporary/unrequested features** category, not dead code.
-- Small facade modules such as `ChatUI/js/ui/menus.js`, `ChatUI/js/chat/messages.js`, `ChatUI/js/sidebar/sidebar.js`, and `ChatUI/js/chat/chat.js` are still valid stable import boundaries; small size alone does not make them dead.
-- `activeProjectId` is active: new-chat/project routing sets it and sidebar rendering reads it.
-- `activeProjectForRename` is active and used when confirming a project rename.
+- `appendLegacyAssistantContent()` remains necessary for stored messages without an `activityTimeline`.
+- Text API active aliases (`textApiKey`, `textApiKeys`, `textApiKeyIndex`, `textBaseUrl`) are still consumed by existing request/failover code.
+- `TEMP_PERF_DIAGNOSTICS` is active even though it is explicitly temporary; it belongs in Category 3 below.
+- Small facade modules such as `menus.js`, `messages.js`, `sidebar.js`, and `chat.js` remain valid stable import boundaries.
+- `activeProjectId` is active.
+- `activeProjectForRename` is active.
+
+---
+
+# Category 3 — Temporary / development-only / likely-unnecessary production functionality
+
+Status: **Audit complete. No fixes performed.**
+
+This category is intentionally conservative. A normal advanced feature is not classified as “unrequested” merely because it is complex. The findings below are based on explicit source markers showing that the functionality is temporary/profiling-only, plus evidence that it is still shipped or reachable in the production runtime.
+
+## 1. The full Performance Diagnostics feature is explicitly temporary but still ships as a normal Settings feature
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/html/settings-modal.html` — unconditional “Performance Diagnostics” Settings entry and full diagnostics tab, both marked `TEMP_PERF_DIAGNOSTICS`.
+- `ChatUI/js/diagnostics/performance-diagnostics.js` — core recorder; source header says `TEMPORARY PERFORMANCE DIAGNOSTICS — remove after profiling is complete.`
+- `ChatUI/js/diagnostics/performance-diagnostics-ui.js` — Settings UI for enabling/copying/clearing diagnostics; same explicit temporary marker.
+- `ChatUI/js/diagnostics/performance-report.js` — report construction.
+- `ChatUI/css/components/performance-diagnostics.css` — dedicated diagnostics styling; same explicit temporary marker.
+- `ChatUI/css/components.css` — always imports `performance-diagnostics.css` under `TEMP_PERF_DIAGNOSTICS`.
+
+**What it is:**
+
+A profiling utility has become a visible application feature. It records timing/size metadata, keeps captured runs in browser storage, shows run counts/status, can copy a diagnostic report, and can clear its temporary data. The Settings copy itself describes it as a “Temporary measurement tool.”
+
+**Why it is a cleanup candidate:**
+
+The source does not merely look debug-like; it explicitly says it should be removed after profiling. Leaving it in the normal Settings hierarchy expands production UI, maintenance, persistence, accessibility, and support surface for a tool whose own lifecycle says it is temporary.
+
+**Recommendation:**
+
+If the profiling task is complete, remove the entire subsystem as one coordinated cleanup: Settings markup, diagnostics UI/core/report modules, diagnostics CSS/import, and all call-site instrumentation. If profiling is still occasionally needed, do not expose it as a normal production setting; gate it behind an explicit development/profile build or similarly deliberate developer-only mechanism.
+
+**Action type:** Remove or properly dev-gate an explicitly temporary feature.
+
+---
+
+## 2. Temporary diagnostics instrumentation is woven through core Send / Generation / Streaming hot paths
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/js/chat/send-message.js` — `TEMP_PERF_DIAGNOSTICS` imports plus request-kind, attachment-summary, phase, and metadata instrumentation.
+- `ChatUI/js/chat/generation-runner.js` — `TEMP_PERF_DIAGNOSTICS` imports and generation lifecycle timing.
+- `ChatUI/js/chat/streaming.js` — `TEMP_PERF_DIAGNOSTICS` imports plus network-round, SSE/chunk, activity, render, history, and tool timing instrumentation.
+- `ChatUI/js/diagnostics/performance-diagnostics.js` — shared state/recording implementation.
+
+**What it is:**
+
+The temporary profiler is not isolated to a developer screen. Core request modules import it directly and execute diagnostic guards/hooks around normal user operations.
+
+**Why it matters even when diagnostic mode is off:**
+
+The profiler is part of the production module graph and the hot-path source architecture. Disabled mode limits recording, but the application still carries imports, helper functions, conditional checks, and additional coupling in the code that handles ordinary Send and streaming responses.
+
+**Recommendation:**
+
+When diagnostics is retired, remove these hooks and temporary helper functions from the hot paths instead of leaving no-op scaffolding behind. If diagnostics must remain available for future profiling, isolate it behind a single instrumentation interface or build-time boundary so normal production modules do not permanently depend on a temporary subsystem.
+
+**Action type:** Cross-cutting temporary-instrumentation removal/isolation.
+
+---
+
+## 3. Embedded ChatUI can expose the diagnostics Settings page without initializing its diagnostics UI behavior
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/html/settings-modal.html` — diagnostics Settings button/tab are included unconditionally.
+- `ChatUI/js/settings/settings.js` — every `.settings-section-btn` is wired generically to `openSettingsSection(...)`, so the diagnostics section remains navigable.
+- `ChatUI/js/layout-loader.js` — diagnostics UI is dynamically imported and initialized only when `!IS_EMBEDDED`.
+- `shell/js/frame-manager.js` — the combined application loads ChatUI through `/ChatUI/embedded.html?embedded=1`.
+
+**What it is:**
+
+The combined app uses embedded ChatUI. Embedded mode deliberately skips `performance-diagnostics-ui.js` initialization to avoid extra listener/UI cost, but the Settings fragment still contains the diagnostics navigation button and controls and generic Settings navigation can open them.
+
+**Why it is a cleanup candidate:**
+
+A temporary feature is only half-gated: its UI can remain visible/reachable while its feature-specific event handlers are not initialized. Toggle/copy/clear controls can therefore be presented in an environment where the corresponding diagnostics Settings controller was intentionally not loaded.
+
+**Recommendation:**
+
+Prefer removing the temporary feature entirely. If it must remain, use one consistent availability gate controlling markup visibility, UI initialization, CSS, and core instrumentation together. Do not gate only the Settings controller.
+
+**Action type:** Fix temporary-feature leakage/inconsistent environment gating.
+
+---
+
+## 4. The production static build has no boundary that excludes the temporary diagnostics subsystem
+
+**Priority:** High
+
+**Location:**
+- `scripts/build-static.mjs` — production combined build recursively copies `ChatUI/css`, `ChatUI/html`, and `ChatUI/js` into `dist/`.
+
+**What it is:**
+
+All diagnostics JavaScript, CSS, and Settings markup are part of directories copied wholesale into the production static build.
+
+**Why it is a cleanup candidate:**
+
+Even if the standalone diagnostics UI is conditionally initialized at runtime, the current build architecture packages the temporary subsystem by default. There is no production/development asset boundary for it.
+
+**Recommendation:**
+
+If diagnostics is retained for development, create an explicit mechanism that keeps it out of normal production assets or loads it only through a deliberate profiling build. If diagnostics is no longer needed, deleting the subsystem is simpler and safer than adding a permanent build exception for temporary code.
+
+**Action type:** Production-boundary cleanup for development-only tooling.
+
+---
+
+## Category 3 items checked and intentionally NOT classified as unnecessary/unrequested
+
+- Workspace, Workspace AI tools, To-Do integration, Google Search, URL Context, Code Execution, attachments, Live Voice, Audio Read, Backup & Restore, Text API profiles, automatic chat titles, and custom-tool round limits are implemented as intentional product capabilities. Complexity alone is not evidence that they should be removed.
+- `scripts/verify-*.mjs`, GitHub Actions workflows, implementation plans/reviews, and local development helpers are development assets, but they are not ordinary ChatUI production UI and should be evaluated under repository/CI hygiene rather than deleted merely for being developer-facing.
+- Console `warn`/`error` logging used for real failure reporting is normal operational diagnostics and is not equivalent to the temporary performance profiler.
+- The legacy assistant renderer is compatibility behavior, not a temporary feature.
 
 ---
 
 # Next category
 
-Not started yet: **Category 3 — unnecessary / temporary / unrequested features and development-only functionality that may not belong in the production ChatUI.**
+Not started yet: **Category 4 — oversized / over-coupled modules, mixed responsibilities, and difficult-to-maintain architecture boundaries.**
