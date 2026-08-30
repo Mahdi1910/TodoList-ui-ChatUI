@@ -55,44 +55,6 @@ export const state = {
   }
 };
 
-export function normalizeProjectId(projectId, projects = state.projects) {
-  if (!projectId) return null;
-  return (projects || []).some(project => project?.id === projectId) ? projectId : null;
-}
-
-function synchronizeApiProfiles(apiPatch) {
-  if (!apiPatch || !Array.isArray(apiPatch.textProfiles) || !apiPatch.activeTextProfileId) return apiPatch;
-  const activeId = apiPatch.activeTextProfileId;
-  const activeProfile = apiPatch.textProfiles.find(profile => profile?.id === activeId);
-  if (!activeProfile) return apiPatch;
-  const fields = ['textApiKey', 'textApiKeys', 'textApiKeyIndex', 'textBaseUrl'];
-  const nextActive = { ...activeProfile };
-  fields.forEach(field => {
-    if (apiPatch[field] !== undefined) nextActive[field] = apiPatch[field];
-  });
-  return {
-    ...apiPatch,
-    textProfiles: apiPatch.textProfiles.map(profile => profile?.id === activeId ? nextActive : profile)
-  };
-}
-
-export function setState(patch) {
-  if (patch?.api) patch = { ...patch, api: synchronizeApiProfiles(patch.api) };
-  Object.assign(state, patch);
-}
-
-export function setRuntime(patch) {
-  Object.assign(runtime, patch);
-}
-
-export function updateChat(chatId, updater) {
-  const index = state.chats.findIndex(chat => chat.id === chatId);
-  if (index === -1) return null;
-  const updatedChat = updater({ ...state.chats[index] });
-  state.chats = state.chats.map((chat, i) => i === index ? updatedChat : chat);
-  return updatedChat;
-}
-
 export const runtime = {
   isGenerating: false,
   currentGenerationId: null,
@@ -116,3 +78,109 @@ export const runtime = {
   isVoiceMuted: false,
   isVoiceModeActive: false
 };
+
+const stateListeners = new Set();
+const runtimeListeners = new Set();
+let stateRevision = 0;
+let runtimeRevision = 0;
+
+function notifyListeners(listeners, change, label) {
+  for (const listener of [...listeners]) {
+    try { listener(change); }
+    catch (error) { console.error(`${label} listener failed:`, error); }
+  }
+}
+
+export function getStateRevision() {
+  return stateRevision;
+}
+
+export function getRuntimeRevision() {
+  return runtimeRevision;
+}
+
+export function subscribeStateChanges(listener) {
+  if (typeof listener !== 'function') return () => {};
+  stateListeners.add(listener);
+  return () => stateListeners.delete(listener);
+}
+
+export function subscribeRuntimeChanges(listener) {
+  if (typeof listener !== 'function') return () => {};
+  runtimeListeners.add(listener);
+  return () => runtimeListeners.delete(listener);
+}
+
+export function normalizeProjectId(projectId, projects = state.projects) {
+  if (!projectId) return null;
+  return (projects || []).some(project => project?.id === projectId) ? projectId : null;
+}
+
+/**
+ * Generic state assignment only. Feature-specific business rules belong in
+ * their feature/domain modules so callers do not trigger hidden mutations.
+ */
+export function setState(patch, meta = {}) {
+  if (!patch || typeof patch !== 'object') return stateRevision;
+  const previous = {};
+  Object.keys(patch).forEach(key => { previous[key] = state[key]; });
+  Object.assign(state, patch);
+  stateRevision += 1;
+  notifyListeners(stateListeners, Object.freeze({
+    kind: 'state',
+    revision: stateRevision,
+    source: meta.source || 'setState',
+    keys: Object.freeze(Object.keys(patch)),
+    patch,
+    previous
+  }), 'State change');
+  return stateRevision;
+}
+
+export function setRuntime(patch, meta = {}) {
+  if (!patch || typeof patch !== 'object') return runtimeRevision;
+  const previous = {};
+  Object.keys(patch).forEach(key => { previous[key] = runtime[key]; });
+  Object.assign(runtime, patch);
+  runtimeRevision += 1;
+  notifyListeners(runtimeListeners, Object.freeze({
+    kind: 'runtime',
+    revision: runtimeRevision,
+    source: meta.source || 'setRuntime',
+    keys: Object.freeze(Object.keys(patch)),
+    patch,
+    previous
+  }), 'Runtime change');
+  return runtimeRevision;
+}
+
+export function updateChat(chatId, updater, meta = {}) {
+  const index = state.chats.findIndex(chat => chat.id === chatId);
+  if (index === -1 || typeof updater !== 'function') return null;
+  const previousChat = state.chats[index];
+  const updatedChat = updater({ ...previousChat });
+  if (!updatedChat) return null;
+  state.chats = state.chats.map((chat, i) => i === index ? updatedChat : chat);
+  stateRevision += 1;
+  notifyListeners(stateListeners, Object.freeze({
+    kind: 'chat',
+    revision: stateRevision,
+    source: meta.source || 'updateChat',
+    keys: Object.freeze(['chats']),
+    chatId,
+    previousChat,
+    chat: updatedChat
+  }), 'State change');
+  return updatedChat;
+}
+
+/**
+ * Compare-before-update helper for asynchronous rollback paths. A stale async
+ * operation can change a chat only while the predicate still proves that the
+ * chat is in the state owned by that operation.
+ */
+export function updateChatIf(chatId, predicate, updater, meta = {}) {
+  const current = state.chats.find(chat => chat.id === chatId);
+  if (!current || typeof predicate !== 'function' || !predicate(current)) return null;
+  return updateChat(chatId, updater, meta);
+}
