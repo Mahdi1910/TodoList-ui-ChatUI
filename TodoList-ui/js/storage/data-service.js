@@ -36,7 +36,7 @@ let AppDataService;
   }
 
   function completedAfterValue(task) {
-    return TaskAfter.isPending(task?.after) ? null : (task?.after ? TaskAfter.clone(task.after) : null);
+    return task?.after ? TaskAfter.clone(task.after) : null;
   }
 
   function nextRepeatState(service, task) {
