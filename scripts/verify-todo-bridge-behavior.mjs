@@ -97,6 +97,10 @@ await assert.rejects(
 );
 collisionController.abort();
 await assert.rejects(firstCollision, error => error?.name === 'AbortError');
+shellMessage('shell:todo-tool-response', {
+  requestId: 'rpc-collision',
+  result: { ok: false, error: { code: 'CANCELLED', message: 'Cancelled fixture.' }, meta: { mutationOccurred: false } }
+});
 
 let lateResult = null;
 fakeWindow.addEventListener('todo-tool-late-result', event => { lateResult = event.detail; }, { once: true });
