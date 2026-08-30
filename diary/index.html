@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="description"
+        content="Aura Diary — An AI-powered voice and text diary with smart transcriptions, tags, and daily summaries. Capture your thoughts beautifully.">
+    <title>Aura Diary — AI-Powered Voice Diary</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components/diary-cards.css">
+    <link rel="stylesheet" href="css/features/calendar.css">
+    <link rel="stylesheet" href="css/features/ai-notes.css">
+    <link rel="stylesheet" href="css/features/settings.css">
+
+    <link rel="stylesheet" href="css/components/toast.css">
+    <link rel="stylesheet" href="css/features/summaries.css">
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📓</text></svg>">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Flatpickr for Minimalist Date Selection -->
+    <link rel="stylesheet" href="css/flatpickr.min.css">
+    <link rel="stylesheet" href="css/flatpickr-dark.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- ======================== SIDEBAR ======================== -->
+        <aside class="sidebar" id="left-sidebar">
+            <div class="brand">
+                <h1 class="brand-title">
+                    <i class="fa-solid fa-book" aria-hidden="true"></i>
+                    <span class="brand-text">Aura Diary</span>
+                </h1>
+                <button class="icon-btn sidebar-toggle-btn" id="toggle-left-sidebar"
+                    aria-label="Toggle sidebar navigation">
+                    <i class="fa-solid fa-bars-staggered"></i>
+                </button>
+            </div>
+            <nav class="nav-menu" aria-label="Main navigation">
+                <a href="#" class="nav-item active" data-target="view-today" id="nav-today">
+                    <i class="fa-solid fa-sun"></i> <span class="nav-text">Today</span>
+                </a>
+                <a href="#" class="nav-item" data-target="view-calendar" id="nav-calendar">
+                    <i class="fa-solid fa-calendar-days"></i> <span class="nav-text">Calendar</span>
+                </a>
+                <a href="#" class="nav-item" data-target="view-search" id="nav-search">
+                    <i class="fa-solid fa-magnifying-glass"></i> <span class="nav-text">Search</span>
+                </a>
+                <a href="#" class="nav-item" data-target="view-notes" id="nav-notes">
+                    <i class="fa-solid fa-address-book"></i> <span class="nav-text">AI Notes</span>
+                </a>
+                <a href="#" class="nav-item" data-target="view-summaries" id="nav-summaries">
+                    <i class="fa-solid fa-layer-group"></i> <span class="nav-text">Summaries</span>
+                </a>
+                <a href="#" class="nav-item" data-target="view-settings" id="nav-settings">
+                    <i class="fa-solid fa-gear"></i> <span class="nav-text">Settings</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- ======================== MAIN CONTENT ======================== -->
+        <main class="main-content">
+
+            <!-- ================= VIEW: TODAY ================= -->
+            <section id="view-today" class="view-section active">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <div class="date-navigator">
+                            <button class="nav-btn" id="prev-day" aria-label="Go to previous day">
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </button>
+                            <div class="date-display">
+                                <h2 id="current-date" class="view-title">Today</h2>
+                                <p class="subtitle">Capture your thoughts instantly</p>
+                            </div>
+                            <button class="nav-btn" id="next-day" aria-label="Go to next day">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </header>
+
+                    <!-- Recording Area -->
+                    <section class="record-section">
+                        <div class="mic-container">
+                            <button id="mic-btn" class="state-blue" aria-label="Start voice recording">
+                                <i class="fa-solid fa-microphone"></i>
+                            </button>
+                            <div id="mic-status" class="status-text">Ready to record</div>
+                        </div>
+                        <button class="manual-entry-btn" id="manual-entry-btn"
+                            aria-label="Add manual text entry">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </section>
+
+                    <!-- Diary Entries -->
+                    <section class="entries-container" id="entries-container">                        <!-- Empty State (hidden by default when entries exist) -->
+                        <div class="empty-state" id="empty-state" style="display: none;">
+                            <i class="fa-solid fa-feather-pointed"></i>
+                            <p style="margin-bottom: 8px;">Start recording or type your first thought of the day.</p>
+                            <h3>No entries yet</h3>
+                        </div>
+
+                    </section>
+                </div>
+            </section>
+
+            <!-- ================= VIEW: CALENDAR ================= -->
+            <section id="view-calendar" class="view-section">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <h3 class="view-title">Calendar</h3>
+                    </header>
+                    <div class="calendar-container">
+                        <div class="cal-month-header">
+                            <button class="icon-btn" id="cal-prev-month" aria-label="Previous month">
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </button>
+                            <h2 id="cal-month-title">June 2026</h2>
+                            <button class="icon-btn" id="cal-next-month" aria-label="Next month">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        <div class="cal-grid" id="cal-grid">
+                            <div class="cal-day-name">Sun</div>
+                            <div class="cal-day-name">Mon</div>
+                            <div class="cal-day-name">Tue</div>
+                            <div class="cal-day-name">Wed</div>
+                            <div class="cal-day-name">Thu</div>
+                            <div class="cal-day-name">Fri</div>
+                            <div class="cal-day-name">Sat</div>
+                            <!-- Days populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= VIEW: SEARCH ================= -->
+            <section id="view-search" class="view-section">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <h2 class="view-title">Search</h2>
+                        <p class="subtitle">Find past thoughts instantly</p>
+                    </header>
+                    <div class="search-container">
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <input type="text" id="search-input" placeholder="Search by text, tags, or titles..."
+                                aria-label="Search diary entries">
+                            <button class="ai-search-btn" id="ai-search-btn" aria-label="Perform AI Search"><i
+                                    class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> AI Search</button>
+                        </div>
+
+                        <div class="entries-container" id="search-results-container">
+                            <!-- Search results will be dynamically injected here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= VIEW: AI NOTES ================= -->
+            <section id="view-notes" class="view-section">
+                <div class="scrollable-content">
+                    
+                    <!-- Main Grid View -->
+                    <div id="notes-main-view">
+                        <header class="top-header" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h2 class="view-title">AI Notes</h2>
+                                <p class="subtitle">Auto-generated profiles and entities extracted by Gemma</p>
+                            </div>
+                            <button id="add-ai-note-btn" class="action-btn" style="background: var(--brand-color); color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-plus"></i> Add Note</button>
+                        </header>
+
+                        <!-- Add Note Modal -->
+                        <div id="add-note-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+                            <div style="background: var(--surface-light); padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid var(--border-color);">
+                                <h3 style="margin-top: 0; color: var(--text-light);">Create AI Note Entity</h3>
+                                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">The AI will automatically categorize your diary entries into this folder based on its description.</p>
+                                
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px; color: var(--text-body); font-size: 0.9rem;">Entity Title</label>
+                                    <input type="text" id="new-note-title" placeholder="e.g., Startup Ideas" style="width: 100%; padding: 10px; background: var(--surface-dark); border: 1px solid var(--border-color); color: var(--text-light); border-radius: 6px; box-sizing: border-box;">
+                                </div>
+                                
+                                <div style="margin-bottom: 20px;">
+                                    <label style="display: block; margin-bottom: 5px; color: var(--text-body); font-size: 0.9rem;">Description (Instructions for AI)</label>
+                                    <textarea id="new-note-desc" placeholder="What kind of entries should be linked here?" rows="3" style="width: 100%; padding: 10px; background: var(--surface-dark); border: 1px solid var(--border-color); color: var(--text-light); border-radius: 6px; box-sizing: border-box; resize: vertical;"></textarea>
+                                </div>
+                                
+                                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                                    <button id="cancel-add-note" style="background: transparent; color: var(--text-body); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer;">Cancel</button>
+                                    <button id="save-add-note" style="background: var(--brand-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">Create</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="notes-grid" id="notes-grid-container">
+                            <!-- Dynamic Note Cards Injected Here -->
+                        </div>
+                    </div>
+
+                    <!-- Detailed Note View (Hidden by default) -->
+                    <div id="note-detail-view" class="hidden" style="display: none;">
+                        <header class="detail-header" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <button class="icon-btn back-btn" id="back-to-notes" aria-label="Go back to AI Notes">
+                                    <i class="fa-solid fa-arrow-left"></i>
+                                </button>
+                                <div class="detail-title-wrapper" style="margin: 0; padding: 0;">
+                                    <div class="profile-icon" id="detail-icon"><i class="fa-solid fa-brain"></i></div>
+                                    <h2 id="detail-title-text" class="view-title" style="margin: 0;">My ADHD</h2>
+                                </div>
+                            </div>
+                            <button id="ai-refresh-note-btn" class="action-btn" style="background: var(--brand-color); color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 500;"><i class="fa-solid fa-rotate-right"></i> AI Refresh</button>
+                        </header>
+                        
+                        <div class="detail-summary">
+                            <p id="detail-desc">Insights and patterns regarding your focus, energy levels, and daily habits automatically linked from your entries.</p>
+                        </div>
+                        
+                        <div class="entries-container" id="note-entries-container">
+                            <h4 class="search-results-label">Linked Entries</h4>
+                            <!-- Render dynamic cards here -->
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- ================= VIEW: SUMMARIES ================= -->
+            <section id="view-summaries" class="view-section">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <div class="date-navigator" style="justify-content: flex-start; padding-bottom: 8px;">
+                            <h2 class="view-title">Summaries Dashboard</h2>
+                        </div>
+                        <p class="subtitle" style="margin-bottom: 24px;">AI-generated hierarchical reflections</p>
+                        
+                        <!-- 4-Button Filter Tabs -->
+                        <div class="summary-tabs" style="display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 8px;">
+                            <button class="action-btn active" data-summary-type="daily" style="flex: 1; border-radius: 8px; min-width: 80px;">Daily</button>
+                            <button class="action-btn" data-summary-type="weekly" style="flex: 1; border-radius: 8px; min-width: 80px;">Weekly</button>
+                            <button class="action-btn" data-summary-type="monthly" style="flex: 1; border-radius: 8px; min-width: 80px;">Monthly</button>
+                            <button class="action-btn" data-summary-type="yearly" style="flex: 1; border-radius: 8px; min-width: 80px;">Yearly</button>
+                        </div>
+                    </header>
+
+                    <div id="summaries-container" style="display: flex; flex-direction: column; gap: 16px;">
+                        <!-- dynamic summary cards injected here -->
+                    </div>
+                </div>
+            </section>
+            <!-- ================= VIEW: SETTINGS (MAIN) ================= -->
+            <section id="view-settings" class="view-section">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <div class="date-navigator" style="justify-content: flex-start; padding-bottom: 8px;">
+                            <div style="text-align: left;">
+                                <h2 class="view-title" style="margin: 0;">Settings</h2>
+                                <p class="subtitle" style="margin-top: 4px;">Manage your diary preferences</p>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="settings-container">
+                        <!-- ================= CATEGORY LINKS ================= -->
+                        <div class="setting-item category-link" data-subview="view-settings-appearance" style="cursor: pointer;">
+                            <div class="setting-info" style="flex-grow: 1;">
+                                <h3><i class="fa-solid fa-palette" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Appearance & UI</h3>
+                                <p>Theme, Colors, and Navigation</p>
+                            </div>
+                            <div style="display: flex; align-items: center; color: var(--text-muted);">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </div>
+                        </div>
+
+                        <div class="setting-item category-link" data-subview="view-settings-ai" style="cursor: pointer;">
+                            <div class="setting-info" style="flex-grow: 1;">
+                                <h3><i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>AI & Integrations</h3>
+                                <p>Gemini API, Auto-Enhance, Auto-Retry</p>
+                            </div>
+                            <div style="display: flex; align-items: center; color: var(--text-muted);">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </div>
+                        </div>
+
+                        <div class="setting-item category-link" data-subview="view-settings-summaries" style="cursor: pointer;">
+                            <div class="setting-info" style="flex-grow: 1;">
+                                <h3><i class="fa-solid fa-layer-group" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Auto-Summarization</h3>
+                                <p>Summary Prompts, Schedules</p>
+                            </div>
+                            <div style="display: flex; align-items: center; color: var(--text-muted);">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </div>
+                        </div>
+
+                        <div class="setting-item category-link" data-subview="view-settings-data" style="cursor: pointer;">
+                            <div class="setting-info" style="flex-grow: 1;">
+                                <h3><i class="fa-solid fa-database" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Data & Backup</h3>
+                                <p>Export, Import</p>
+                            </div>
+                            <div style="display: flex; align-items: center; color: var(--text-muted);">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </div>
+                        </div>
+
+                        <div class="setting-item category-link" data-subview="view-settings-privacy" style="cursor: pointer;">
+                            <div class="setting-info" style="flex-grow: 1;">
+                                <h3><i class="fa-solid fa-shield-halved" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Privacy & Storage</h3>
+                                <p>Location Tracking, Audio Retention</p>
+                            </div>
+                            <div style="display: flex; align-items: center; color: var(--text-muted);">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </div>
+                        </div>
+
+                        <!-- ================= APP VERSION ================= -->
+                        <div class="setting-item" id="app-version-item" style="cursor: pointer; user-select: none; margin-top: 12px; border-top: 1px solid var(--card-border); padding-top: 24px;">
+                            <div class="setting-info" style="flex-grow: 1;">
+                                <h3><i class="fa-solid fa-code-branch" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>App Version</h3>
+                                <p id="app-version-text">Test update</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= SUBVIEW: APPEARANCE ================= -->
+            <section id="view-settings-appearance" class="view-section subview-section">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <div class="date-navigator" style="justify-content: flex-start; padding-bottom: 8px;">
+                            <button class="icon-btn back-to-settings-btn" aria-label="Go back" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; margin-right: 16px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fa-solid fa-arrow-left"></i>
+                            </button>
+                            <div style="text-align: left;">
+                                <h2 class="view-title" style="margin: 0;">Appearance</h2>
+                                <p class="subtitle" style="margin-top: 4px;">Theme, Colors, and Navigation</p>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="settings-container">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-moon" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Dark Theme</h3>
+                                <p>Toggle between Light and Dark mode.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" checked id="toggle-dark-theme" aria-label="Toggle Dark Theme">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-palette" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Accent Color</h3>
+                                <p>Choose your application's primary brand color.</p>
+                            </div>
+                            <div id="accent-color-swatches" style="display: flex; gap: 12px; align-items: center;">
+                                <div class="color-swatch" data-value="default" style="width: 32px; height: 32px; border-radius: 50%; background-color: #6366f1; cursor: pointer; border: 2px solid transparent; transition: all var(--transition-fast);" title="Indigo (Default)"></div>
+                                <div class="color-swatch" data-value="ocean" style="width: 32px; height: 32px; border-radius: 50%; background-color: #0ea5e9; cursor: pointer; border: 2px solid transparent; transition: all var(--transition-fast);" title="Ocean Blue"></div>
+                                <div class="color-swatch" data-value="purple" style="width: 32px; height: 32px; border-radius: 50%; background-color: #a855f7; cursor: pointer; border: 2px solid transparent; transition: all var(--transition-fast);" title="Neon Purple"></div>
+                                <div class="color-swatch" data-value="emerald" style="width: 32px; height: 32px; border-radius: 50%; background-color: #10b981; cursor: pointer; border: 2px solid transparent; transition: all var(--transition-fast);" title="Emerald Green"></div>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-door-open" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Default Launch View</h3>
+                                <p>Select which screen the app opens to automatically.</p>
+                            </div>
+                            <select id="select-launch-view" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 8px 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none;">
+                                <option value="today">Today (Main Diary)</option>
+                                <option value="calendar">Calendar</option>
+                                <option value="search">Search</option>
+                                <option value="notes">AI Notes</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 16px;">
+                            <div class="setting-info" style="width: 100%;">
+                                <h3><i class="fa-solid fa-eye-slash" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Sidebar Link Visibility</h3>
+                                <p>Hide or show navigation tabs in your sidebar to keep your UI clean.</p>
+                            </div>
+                            <div style="display: flex; gap: 24px; flex-wrap: wrap; width: 100%; padding: 12px; background: rgb(0 0 0 / 10%); border-radius: 8px; border: 1px solid var(--card-border);">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <label class="switch" style="transform: scale(0.8);"><input type="checkbox" checked id="toggle-sidebar-today"><span class="slider round"></span></label>
+                                    <span style="font-size: 14px;">Today</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <label class="switch" style="transform: scale(0.8);"><input type="checkbox" checked id="toggle-sidebar-calendar"><span class="slider round"></span></label>
+                                    <span style="font-size: 14px;">Calendar</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <label class="switch" style="transform: scale(0.8);"><input type="checkbox" checked id="toggle-sidebar-search"><span class="slider round"></span></label>
+                                    <span style="font-size: 14px;">Search</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <label class="switch" style="transform: scale(0.8);"><input type="checkbox" checked id="toggle-sidebar-notes"><span class="slider round"></span></label>
+                                    <span style="font-size: 14px;">AI Notes</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <label class="switch" style="transform: scale(0.8);"><input type="checkbox" checked id="toggle-sidebar-summaries"><span class="slider round"></span></label>
+                                    <span style="font-size: 14px;">Summaries</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= SUBVIEW: AI & INTEGRATIONS ================= -->
+            <section id="view-settings-ai" class="view-section subview-section">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <div class="date-navigator" style="justify-content: flex-start; padding-bottom: 8px;">
+                            <button class="icon-btn back-to-settings-btn" aria-label="Go back" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; margin-right: 16px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fa-solid fa-arrow-left"></i>
+                            </button>
+                            <div style="text-align: left;">
+                                <h2 class="view-title" style="margin: 0;">AI & Integrations</h2>
+                                <p class="subtitle" style="margin-top: 4px;">Gemini API and Enhancements</p>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="settings-container">
+                        <div class="setting-item">
+                            <div class="setting-info" style="flex-grow: 1;">
+                                <h3><i class="fa-solid fa-key" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Gemini API Key</h3>
+                                <p>Required for transcription and AI enhancements.</p>
+                                <div class="api-key-input-wrapper" style="margin-top: 12px; display: flex; gap: 8px; max-width: 400px;">
+                                    <div style="position: relative; flex-grow: 1;">
+                                        <input type="password" id="api-key-input" placeholder="Paste your API key here..." style="width: 100%; padding: 10px 36px 10px 12px; border-radius: 8px; border: 1px solid var(--card-border); background: var(--input-bg); color: var(--text-main); font-family: inherit; font-size: 14px; outline: none; transition: border-color var(--transition-normal);">
+                                        <button id="toggle-api-key-visibility" class="icon-btn" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 14px; padding: 6px;"><i class="fa-solid fa-eye"></i></button>
+                                    </div>
+                                    <button class="settings-btn" id="save-api-key-btn" style="background: var(--accent); color: white; border: none; padding: 10px 24px;">Save</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 16px;">
+                            <div style="display: flex; width: 100%; justify-content: space-between; align-items: center;">
+                                <div class="setting-info">
+                                    <h3><i class="fa-solid fa-microphone" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Quick Capture Notification</h3>
+                                    <p>Enable a persistent notification to record audio directly from anywhere.</p>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-quick-capture" aria-label="Toggle Quick Capture Notification">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                            <button id="test-notification-btn" style="background: var(--surface-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px;">Test Notification</button>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-rotate" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Auto-Retry Failed Transcriptions</h3>
+                                <p>Automatically retry failed audios when a successful one occurs.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" checked id="toggle-auto-retry" aria-label="Toggle Auto-Retry Failed Transcriptions">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 16px;">
+                            <div class="setting-info" style="width: 100%;">
+                                <h3><i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Custom Enhancement Prompt</h3>
+                                <p>Instruct the Gemini AI on how to rewrite or process your daily transcriptions.</p>
+                            </div>
+                            <div style="display: flex; gap: 8px; width: 100%;">
+                                <textarea id="custom-prompt-input" rows="3" placeholder="e.g. Make it sound poetic, fix my grammar but keep my tone, translate to English..." style="width: 100%; background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; resize: vertical;"></textarea>
+                                <button class="settings-btn" id="save-custom-prompt-btn" style="background: var(--accent); color: white; border: none; height: fit-content; padding: 10px 20px;">Save</button>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-ban" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Disable Auto-Enhance</h3>
+                                <p>Skip the AI rewriting phase. Transcripts will be saved exactly as spoken.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-disable-enhance">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-heading" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Disable Title Generation</h3>
+                                <p>Stop the AI from generating automatic titles for entries.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-disable-title">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-tags" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Disable Tag Generation</h3>
+                                <p>Stop the AI from extracting tags from your entries.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-disable-tags">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= SUBVIEW: SUMMARIES ================= -->
+            <section id="view-settings-summaries" class="view-section subview-section">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <div class="date-navigator" style="justify-content: flex-start; padding-bottom: 8px;">
+                            <button class="icon-btn back-to-settings-btn" aria-label="Go back" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; margin-right: 16px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fa-solid fa-arrow-left"></i>
+                            </button>
+                            <div style="text-align: left;">
+                                <h2 class="view-title" style="margin: 0;">Auto-Summarization</h2>
+                                <p class="subtitle" style="margin-top: 4px;">Summary Prompts and Schedules</p>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="settings-container">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-layer-group" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Enable Auto-Summaries</h3>
+                                <p>Automatically generate hierarchical summaries using Gemini.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-enable-summaries">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-regular fa-calendar-check" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>End of Week Day</h3>
+                                <p>Choose which day triggers the Weekly Summary generation.</p>
+                            </div>
+                            <select id="select-end-of-week" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 8px 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none;">
+                                <option value="5">Friday</option>
+                                <option value="6">Saturday</option>
+                                <option value="0">Sunday</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 16px;">
+                            <div class="setting-info" style="width: 100%;">
+                                <h3><i class="fa-solid fa-pen-nib" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Custom Summary Prompts</h3>
+                                <p>Instruct the AI on exactly how to write your summaries. Using bullet points or specific metrics works great! Leave blank to use the default.</p>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label for="custom-prompt-daily" style="font-size: 13px; color: var(--text-muted); font-weight: 500;">Daily Reflection Prompt</label>
+                                    <textarea id="custom-prompt-daily" rows="3" placeholder="Daily Prompt: e.g. Write a 3-sentence objective summary." style="width: 100%; background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; resize: vertical;"></textarea>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label for="custom-prompt-weekly" style="font-size: 13px; color: var(--text-muted); font-weight: 500;">Weekly Synthesis Prompt</label>
+                                    <textarea id="custom-prompt-weekly" rows="3" placeholder="Weekly Prompt: e.g. Focus on emotional growth and key challenges." style="width: 100%; background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; resize: vertical;"></textarea>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label for="custom-prompt-monthly" style="font-size: 13px; color: var(--text-muted); font-weight: 500;">Monthly Summary Prompt</label>
+                                    <textarea id="custom-prompt-monthly" rows="3" placeholder="Monthly Prompt: e.g. What were my major goals this month?" style="width: 100%; background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; resize: vertical;"></textarea>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <label for="custom-prompt-yearly" style="font-size: 13px; color: var(--text-muted); font-weight: 500;">Yearly Narrative Prompt</label>
+                                    <textarea id="custom-prompt-yearly" rows="3" placeholder="Yearly Prompt: e.g. Summarize the overarching narrative." style="width: 100%; background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; resize: vertical;"></textarea>
+                                </div>
+                                <button class="settings-btn" id="save-summary-prompts-btn" style="background: var(--accent); color: white; border: none; padding: 10px 20px; align-self: flex-start; margin-top: 8px; border-radius: 6px;">Save Summary Prompts</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= SUBVIEW: DATA & BACKUP ================= -->
+            <section id="view-settings-data" class="view-section subview-section">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <div class="date-navigator" style="justify-content: flex-start; padding-bottom: 8px;">
+                            <button class="icon-btn back-to-settings-btn" aria-label="Go back" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; margin-right: 16px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fa-solid fa-arrow-left"></i>
+                            </button>
+                            <div style="text-align: left;">
+                                <h2 class="view-title" style="margin: 0;">Data & Backup</h2>
+                                <p class="subtitle" style="margin-top: 4px;">Export and Import Entries</p>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="settings-container">
+                        <!-- Auto-Backup Settings -->
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-clock-rotate-left" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Auto-Backup Frequency</h3>
+                                <p>Automatically export all entries locally.</p>
+                            </div>
+                            <select id="auto-backup-frequency" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 8px 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none;">
+                                <option value="never">Never</option>
+                                <option value="10s_after_transcription">10 seconds after transcription</option>
+                                <option value="every_open">Every time I open the application</option>
+                                <option value="every_day">Every day</option>
+                                <option value="every_week">Every week</option>
+                            </select>
+                        </div>
+                        <div class="setting-item" id="auto-backup-day-container" style="display: none;">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-calendar-day" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Weekly Backup Day</h3>
+                                <p>Select the day for your weekly backup.</p>
+                            </div>
+                            <select id="auto-backup-day" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 8px 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none;">
+                                <option value="0">Sunday</option>
+                                <option value="1">Monday</option>
+                                <option value="2">Tuesday</option>
+                                <option value="3">Wednesday</option>
+                                <option value="4">Thursday</option>
+                                <option value="5">Friday</option>
+                                <option value="6">Saturday</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-download" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Export Diary</h3>
+                                <p>Download all your entries as a JSON file.</p>
+                            </div>
+                            <button class="settings-btn" id="export-btn"><i class="fa-solid fa-download"></i> Export</button>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-upload" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Import Diary</h3>
+                                <p>Restore your entries from a previous backup.</p>
+                            </div>
+                            <button class="settings-btn" id="import-btn"><i class="fa-solid fa-upload"></i> Import</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= SUBVIEW: PRIVACY & STORAGE ================= -->
+            <section id="view-settings-privacy" class="view-section subview-section">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <div class="date-navigator" style="justify-content: flex-start; padding-bottom: 8px;">
+                            <button class="icon-btn back-to-settings-btn" aria-label="Go back" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; margin-right: 16px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fa-solid fa-arrow-left"></i>
+                            </button>
+                            <div style="text-align: left;">
+                                <h2 class="view-title" style="margin: 0;">Privacy & Storage</h2>
+                                <p class="subtitle" style="margin-top: 4px;">Location Tracking & Audio Retention</p>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="settings-container">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-location-dot" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Disable Location & Weather</h3>
+                                <p>Stop tracking GPS and weather context when saving new entries.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-disable-location">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-hard-drive" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Audio Retention Policy</h3>
+                                <p>Automatically delete heavy raw audio recordings after a certain period to save disk space. Transcribed text is kept forever.</p>
+                            </div>
+                            <select id="select-audio-retention" style="background: var(--input-bg); border: 1px solid var(--card-border); color: var(--text-main); padding: 8px 12px; border-radius: 8px; font-family: inherit; font-size: 14px; outline: none;">
+                                <option value="forever">Keep Forever</option>
+                                <option value="1">Delete after 1 day</option>
+                                <option value="7">Delete after 7 days</option>
+                                <option value="30">Delete after 30 days</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h3><i class="fa-solid fa-folder-open" style="margin-right: 8px; color: var(--accent-light); opacity: 0.7;"></i>Save Audio Externally</h3>
+                                <p>Instead of hiding audio in the app's internal database, save raw `.webm` audio files to the public <b>Music/AuraDiary</b> folder on your phone's main storage so you can easily access them.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-save-audio-externally">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= VIEW: CHANGELOG ================= -->
+            <section id="view-changelog" class="view-section subview-section">
+                <div class="scrollable-content">
+                    <header class="top-header">
+                        <div class="date-navigator" style="justify-content: flex-start; padding-bottom: 8px;">
+                            <button class="icon-btn back-to-settings-btn" id="exit-changelog-btn" aria-label="Go back" style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text-main); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; margin-right: 16px; display: flex; align-items: center; justify-content: center;">
+                                <i class="fa-solid fa-arrow-left"></i>
+                            </button>
+                            <div style="text-align: left;">
+                                <h2 class="view-title" style="margin: 0;">Changelog</h2>
+                                <p class="subtitle" style="margin-top: 4px;">Recent updates and improvements</p>
+                            </div>
+                        </div>
+                    </header>
+                    <div class="settings-container">
+                        <div class="setting-item" style="flex-direction: column; align-items: flex-start;">
+                            <h3 style="margin-bottom: 8px; color: var(--accent);"><i class="fa-solid fa-rocket" style="margin-right: 8px;"></i>v1.2.0-web2apk</h3>
+                            <ul style="color: var(--text-main); margin-left: 20px; line-height: 1.6; font-size: 14px;">
+                                <li style="margin-bottom: 8px;"><b>Settings Reorganization:</b> Redesigned the Settings page with dedicated categories and logical sub-pages for improved organization.</li>
+                                <li style="margin-bottom: 8px;"><b>Navigation Adjustments:</b> Accessing Main Settings no longer hides the sidebar, keeping navigation seamless. Sub-menus now focus completely on their content.</li>
+                            </ul>
+                        </div>
+                        <div class="setting-item" style="flex-direction: column; align-items: flex-start;">
+                            <h3 style="margin-bottom: 8px; color: var(--accent);"><i class="fa-solid fa-rocket" style="margin-right: 8px;"></i>v1.1.0-web2apk</h3>
+                            <ul style="color: var(--text-main); margin-left: 20px; line-height: 1.6; font-size: 14px;">
+                                <li style="margin-bottom: 8px;"><b>Native Android Conversion:</b> Successfully migrated the web-based diary into a standalone Android APK using WebViews.</li>
+                                <li style="margin-bottom: 8px;"><b>Settings Navigation:</b> Added a sub-page back button to Settings for smoother navigation.</li>
+                                <li style="margin-bottom: 8px;"><b>Hidden Sidebar Mode:</b> The main sidebar is now hidden automatically when entering deeper level menus like Settings or Changelogs to provide more real-estate.</li>
+                                <li style="margin-bottom: 8px;"><b>Easter Egg Changelog:</b> Tripple-tap the app version to uncover this changelog!</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+        </main>
+    </div>
+
+    <!-- Hidden Input for File Import -->
+    <input type="file" id="import-file-input" accept=".json" style="display: none;">
+
+    <!-- Minimalist Export Modal -->
+    <div id="export-modal" class="modal-overlay hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;">
+        <div class="modal-content" style="background: var(--surface); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; width: 90%; max-width: 360px; box-shadow: 0 12px 32px rgba(0,0,0,0.5); transform: translateY(20px); transition: transform 0.3s ease;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; font-size: 18px; color: var(--text-primary);"><i class="fa-solid fa-download" style="color: var(--brand-color); margin-right: 8px;"></i> Export Diary</h3>
+                <button id="close-export-modal" class="icon-btn" style="padding: 4px;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">Select a date range to filter your export. Leave both fields blank to export your entire diary.</p>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px;">
+                <div style="position: relative; flex: 1;">
+                    <i class="fa-regular fa-calendar-minus" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                    <input type="text" id="export-from-date" placeholder="From date" style="width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 10px 10px 36px; color: var(--text-primary); font-family: inherit; font-size: 13px; cursor: pointer;">
+                </div>
+                <i class="fa-solid fa-arrow-right" style="color: var(--text-muted); font-size: 12px;"></i>
+                <div style="position: relative; flex: 1;">
+                    <i class="fa-regular fa-calendar-plus" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                    <input type="text" id="export-to-date" placeholder="To date" style="width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 10px 10px 36px; color: var(--text-primary); font-family: inherit; font-size: 13px; cursor: pointer;">
+                </div>
+            </div>
+
+            <button id="confirm-export-btn" class="settings-btn" style="width: 100%; background: var(--brand-color); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 500; cursor: pointer; display: flex; justify-content: center; gap: 8px;"><i class="fa-solid fa-file-export"></i> Download JSON</button>
+        </div>
+    </div>
+
+    <!-- Flatpickr JS -->
+    <script src="src/flatpickr.min.js"></script>
+    <script type="module" src="src/main.js?v=2"></script>
+</body>
+
+</html>

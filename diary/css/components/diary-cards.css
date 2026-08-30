@@ -1,0 +1,244 @@
+/* ================================================================
+   DIARY CARDS
+   ================================================================ */
+.entries-container {
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding-bottom: 40px;
+}
+
+.diary-card {
+    background: #1e2025; /* Solid fallback */
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 24px;
+    transition: transform var(--transition-normal), box-shadow 0.5s, border-color 0.5s;
+    animation: slideUp 0.5s ease;
+}
+
+@supports (backdrop-filter: blur(10px)) or (-webkit-backdrop-filter: blur(10px)) {
+    .diary-card {
+        background: var(--card-bg);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+}
+
+.diary-card:hover {
+    border-color: rgb(255 255 255 / 15%);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 20%);
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.card-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.tag {
+    background: rgb(99 102 241 / 15%);
+    color: var(--accent-light);
+    padding: 5px 14px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.tag.placeholder {
+    background: rgb(255 255 255 / 4%);
+    color: var(--text-muted);
+    animation: shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0%, 100% { opacity: 0.5; }
+    50%      { opacity: 1; }
+}
+
+.error-tag {
+    background: rgb(239 68 68 / 15%);
+    color: #fca5a5;
+}
+
+.time {
+    color: var(--text-muted);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+/* Icon button (shared) */
+.icon-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 8px;
+    border-radius: 50%;
+    transition: all var(--transition-normal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-btn:hover {
+    background: rgb(255 255 255 / 10%);
+    color: var(--text-main);
+}
+
+/* Dropdown menu */
+.card-actions {
+    position: relative;
+}
+
+.action-dropdown {
+    position: absolute;
+    top: 40px;
+    right: 0;
+    background: #1e2128;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 0 10px 40px rgb(0 0 0 / 50%);
+    z-index: 10;
+    min-width: 180px;
+    animation: dropdownIn 0.15s ease;
+}
+
+@keyframes dropdownIn {
+    from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.action-dropdown.hidden {
+    display: none;
+}
+
+.action-dropdown button {
+    background: none;
+    border: none;
+    color: var(--text-main);
+    padding: 10px 16px;
+    text-align: left;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: background var(--transition-fast);
+}
+
+.action-dropdown button:hover {
+    background: rgb(255 255 255 / 5%);
+}
+
+.action-dropdown button.delete-action {
+    color: #fca5a5;
+}
+
+.action-dropdown button.delete-action:hover {
+    background: rgb(239 68 68 / 10%);
+}
+
+/* Card body */
+.card-body h3 {
+    font-size: clamp(1.1rem, 2vw, 1.25rem);
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.card-body h3.placeholder {
+    color: var(--text-muted);
+    animation: shimmer 1.8s ease-in-out infinite;
+}
+
+.card-body p {
+    color: var(--text-body);
+    line-height: 1.7;
+    font-size: 15px;
+}
+
+/* Failed card */
+.failed-card {
+    border-color: rgb(239 68 68 / 25%);
+    background: rgb(239 68 68 / 2%);
+}
+
+.error-text {
+    color: #fca5a5 !important;
+}
+
+.retry-btn {
+    margin-top: 16px;
+    background: rgb(239 68 68 / 10%);
+    border: 1px solid rgb(239 68 68 / 30%);
+    color: #fca5a5;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background var(--transition-normal);
+}
+
+.retry-btn:hover {
+    background: rgb(239 68 68 / 20%);
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    animation: fadeInView 0.6s ease;
+}
+
+.empty-state i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.3;
+    display: block;
+}
+
+.empty-state h3 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--text-main);
+    opacity: 0.6;
+}
+
+.empty-state p {
+    font-size: 0.95rem;
+    opacity: 0.5;
+}

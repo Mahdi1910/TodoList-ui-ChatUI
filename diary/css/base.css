@@ -1,0 +1,159 @@
+/* ================================================================
+   AURA DIARY — Premium Dark Mode Design System
+   ================================================================ */
+
+/* ---- Design Tokens ---- */
+:root {
+    --bg-color: #0f1115;
+    --bg-gradient: radial-gradient(ellipse at 50% 0%, rgb(99 102 241 / 6%) 0%, transparent 60%);
+    --sidebar-bg: #16181d;
+    --card-bg: rgb(255 255 255 / 3%);
+    --card-border: rgb(255 255 255 / 8%);
+    --text-main: #f0f2f5;
+    --text-muted: #9aa0a6;
+    --text-body: #d1d5db;
+    --input-bg: rgb(0 0 0 / 20%);
+    --slider-bg: rgb(255 255 255 / 10%);
+    --mic-blue: #3b82f6;
+    --mic-blue-glow: rgb(59 130 246 / 40%);
+    --mic-red: #ef4444;
+    --mic-red-glow: rgb(239 68 68 / 40%);
+    --mic-yellow: #f59e0b;
+    --mic-yellow-glow: rgb(245 158 11 / 40%);
+    --accent: #6366f1;
+    --accent-light: #a5b4fc;
+    --accent-glow: rgb(99 102 241 / 20%);
+    
+    /* Surface mapping for elements */
+    --surface: var(--card-bg);
+    --border-color: var(--card-border);
+    --brand-color: var(--accent);
+
+    /* Focus ring */
+    --focus-ring: 0 0 0 2px var(--bg-color), 0 0 0 4px var(--accent);
+
+    /* Transitions */
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.2s ease;
+    --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---- Light Theme Tokens ---- */
+:root[data-theme="light"] {
+    --bg-color: #f8fafc;
+    --bg-gradient: radial-gradient(ellipse at 50% 0%, rgb(99 102 241 / 6%) 0%, transparent 60%);
+    --sidebar-bg: #ffffff;
+    --card-bg: #ffffff;
+    --card-border: #e2e8f0;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --text-body: #334155;
+    --input-bg: rgb(0 0 0 / 5%);
+    --slider-bg: rgb(0 0 0 / 15%);
+    
+    --surface: #ffffff;
+    --border-color: #e2e8f0;
+}
+
+/* ---- Custom Accent Colors ---- */
+:root[data-accent="ocean"] {
+    --accent: #0ea5e9;
+    --accent-light: #7dd3fc;
+    --accent-glow: rgb(14 165 233 / 20%);
+    --brand-color: var(--accent);
+}
+
+:root[data-accent="purple"] {
+    --accent: #a855f7;
+    --accent-light: #d8b4fe;
+    --accent-glow: rgb(168 85 247 / 20%);
+    --brand-color: var(--accent);
+}
+
+:root[data-accent="emerald"] {
+    --accent: #10b981;
+    --accent-light: #6ee7b7;
+    --accent-glow: rgb(16 185 129 / 20%);
+    --brand-color: var(--accent);
+}
+
+/* ---- Reset & Globals ---- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+html {
+    scroll-behavior: smooth;
+    overscroll-behavior-y: none;
+    background-color: var(--bg-color);
+}
+
+body {
+    font-family: Outfit, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Re-enable text selection where needed */
+input, textarea, .diary-card, .chat-bubble, .note-profile-card, .detail-summary {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+/* ---- Custom Scrollbar (Dark Theme) ---- */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 10%);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgb(255 255 255 / 18%);
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 10%) transparent;
+}
+
+/* ---- Focus Styles (Accessibility) ---- */
+:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: 8px;
+}
+
+/* Remove default outline */
+:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+}

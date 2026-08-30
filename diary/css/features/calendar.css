@@ -1,0 +1,81 @@
+/* ================================================================
+   CALENDAR
+   ================================================================ */
+.calendar-container {
+    max-width: 600px;
+    margin: 0 auto;
+    width: 100%;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 24px;
+}
+
+.cal-month-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.cal-month-header h2 {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+}
+
+.cal-day-name {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.cal-day {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    border: 1px solid transparent;
+    color: var(--text-muted);
+}
+
+.cal-day:hover {
+    background: rgb(255 255 255 / 5%);
+    color: var(--text-main);
+}
+
+.cal-day.empty {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.cal-day.has-entry {
+    background: rgb(99 102 241 / 15%);
+    border-color: rgb(99 102 241 / 25%);
+    color: var(--accent-light);
+    font-weight: 600;
+}
+
+.cal-day.has-entry:hover {
+    background: rgb(99 102 241 / 25%);
+    transform: scale(1.08);
+    box-shadow: 0 4px 12px rgb(99 102 241 / 20%);
+}
+
+.cal-day.today {
+    border-color: var(--accent);
+    color: var(--text-main);
+    font-weight: 600;
+}
