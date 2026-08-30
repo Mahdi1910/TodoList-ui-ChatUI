@@ -69,6 +69,6 @@ assert.match(chatControls, /label:\s*'Read Selected Text'[\s\S]*disabled:\s*!sel
 assert.match(readAloud, /export async function readSelectedText\(text\)[\s\S]*const sourceText = normalizeText\(text\);[\s\S]*sourceType: 'selection'/, 'Read Aloud must keep selection jobs isolated and use the supplied text');
 assert.match(liveAudio, /buildReadAloudInput\(this\.text\)/, 'Gemini Live Audio must receive the selected-text job source without substituting conversation text');
 
-assert.match(apiConfig, /CHATUI_VERSION = '2\.4'/, 'ChatUI Settings version must be 2.4');
+assert.match(apiConfig, /CHATUI_VERSION = '2\.5'/, 'ChatUI Settings version must be 2.5');
 
 console.log('ChatUI Plan 15 sent-message disclosure and Read Selected Text verification passed.');
