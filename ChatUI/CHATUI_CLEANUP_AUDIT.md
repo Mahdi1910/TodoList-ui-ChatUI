@@ -1468,6 +1468,291 @@ Normalize Gemini metadata into a stable ChatUI presentation/tool-metadata DTO im
 
 ---
 
+# Category 7 — Repeated validation/normalization/business rules, inconsistent error contracts, and unnecessary defensive complexity
+
+Status: **Audit complete. No fixes performed.**
+
+Category 7 was audited against current `main` at `2caf0577f97325e5797bb7b3906c55bb5ed0d893`. This category distinguishes useful defense-in-depth at trust boundaries from duplicated policy definitions. Re-validating untrusted input is often correct; independently redefining the same product rule in several modules is where drift becomes dangerous.
+
+## 1. Model + Thinking compatibility is normalized independently in four places
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/js/models/models.js`, approximately lines 45–55 — model lookup accepts `name`, `id`, or `shortName`.
+- `ChatUI/js/ui/model-thinking-menu.js`, approximately lines 20–32 and 112–132 — `getValidThinkingLevel()` plus selection-time normalization.
+- `ChatUI/js/storage/load.js`, around the Settings normalization portion of `loadState()` — startup independently resolves the model and corrects unsupported Thinking levels.
+- `ChatUI/js/settings/settings.js`, around the beginning of `initSettingsUI()` — repeats the model/Thinking correction on Settings initialization.
+- `ChatUI/js/api/gemini.js`, around `resolveThinkingLevel()` — repeats the same support/default check immediately before a request.
+
+**Finding:**
+
+The product rule is simple: resolve a model reference, then if the requested Thinking level is not supported, use that model's default. The same rule is independently expressed by storage load, Settings, the header selector, and Gemini request construction. This makes every future model/Thinking change a multi-file compatibility change.
+
+**Recommendation:**
+
+Put one canonical resolver in the Models domain, for example `resolveModelSelection(modelRef, thinkingLevel) -> { model, thinkingLevel }`. Startup, Settings, UI selection, and request construction should all consume that result. Persist/repair at the appropriate boundary, but do not redefine the rule.
+
+**Action type:** High-value business-rule consolidation.
+
+---
+
+## 2. Message chronological ordering is copied across modules and the tie-break rules already differ
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/storage/load.js`, top-level `sortMessages()` — sequence, then `createdAt`, then `id`.
+- `ChatUI/js/chat/message-actions.js`, approximately lines 10–20 — local `sortMessages()` with the same three-level ordering.
+- `ChatUI/js/chat/auto-title.js`, approximately lines 13–23 — `orderedMessages()` uses sequence then `createdAt`, but no final `id` tie-break.
+- `ChatUI/js/api/gemini.js`, near the start of `buildGeminiHistory()` — sequence then `createdAt`, also without the final `id` tie-break.
+
+**Finding:**
+
+Several behaviors need the canonical message order: rendering/repair, deleting the assistant paired with a user message, automatic-title pair extraction, and Gemini history. They currently carry local comparators, and two variants omit the deterministic final ID tie-break used by the other two.
+
+**Recommendation:**
+
+Create one pure `compareMessagesChronologically(a, b)` / `orderMessages(messages)` helper in the chat/message model layer and use it everywhere. Keep the stable `sequence` as primary authority and document the fallback order for legacy records.
+
+**Action type:** Determinism and duplicate-rule consolidation.
+
+---
+
+## 3. Todo mutation classification is hard-coded twice even though tool definitions are already centralized
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/js/todo/todo-bridge-client.js`, approximately lines 11–16 — literal `MUTATION_TOOLS` Set controls read-vs-mutation timeout behavior.
+- `ChatUI/js/todo/todo-mutation-replay-guard.js`, approximately lines 9–14 — a second literal `MUTATION_TOOLS` Set controls replay/duplicate protection.
+- `ChatUI/js/todo/todo-tool-definitions.js` — canonical Todo function declarations and `TODO_FUNCTION_NAMES` already exist here.
+
+**Finding:**
+
+The same ten mutation function names are independently maintained in the bridge and replay guard. If a future Todo mutation tool is added to declarations and only one Set is updated, the new operation can receive the wrong timeout behavior or, more seriously, bypass duplicate-mutation replay protection.
+
+**Recommendation:**
+
+Export one `TODO_MUTATION_FUNCTION_NAMES` Set or, better, one tool manifest containing `{ name, kind: 'read' | 'mutation', declaration }`. Derive Gemini declarations, timeout classification, replay protection, and executor metadata from that single source.
+
+**Action type:** Very-high-priority safety-rule consolidation.
+
+---
+
+## 4. Audio Read retention has an actual contradictory validation contract: `-1` is advertised and supported, but the Settings normalizer converts it to `1`
+
+**Priority:** Very High — current behavior defect
+
+**Locations:**
+- `ChatUI/html/settings-modal.html`, Audio Read retention row — the description says **“Use -1 to keep it indefinitely”** and the numeric input has `min="-1"`.
+- `ChatUI/js/voice/read-settings.js`, approximately lines 23–28 — `normalizeRetention()` clamps every finite value with `Math.max(1, Math.min(90, ...))`.
+- `ChatUI/js/voice/read-settings.js`, retention change handler near the bottom of `initReadSettingsUI()` — the clamped value is written back into the input and persisted.
+- `ChatUI/js/storage/read-audio.js`, approximately lines 7–15 and `applyReadAudioRetentionPolicy()` — the storage policy explicitly recognizes `-1` as indefinite retention.
+
+**Finding:**
+
+Entering `-1` in the current Settings UI cannot persist the advertised “keep indefinitely” option: UI normalization turns it into `1`. There is also a broader policy mismatch: Settings imposes `1..90`, while the storage function accepts `-1` or any non-negative integer. This is exactly the kind of drift created by multiple validators owning one rule.
+
+**Recommendation:**
+
+Create one exported Read Aloud retention contract—constants plus a pure validator/normalizer—and use it in Settings, persistence, migration/load, and retention execution. Decide the intended product range once (`-1` plus a bounded positive range, if 90 is intentional), and make HTML `min/max`, help text, normalization, and storage enforcement match it.
+
+**Action type:** Current bug plus validation-contract consolidation. Do not fix during this audit without explicit authorization.
+
+---
+
+## 5. Gemini HTTP/API error parsing exists in multiple incompatible implementations
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/api/gemini.js`, `parseApiError()` — creates an `Error` named `GeminiApiError` with `httpStatus`, `apiStatus`, `apiCode`, `details`, and `responseText`.
+- `ChatUI/js/api/gemini-utility.js`, approximately lines 10–25 — independently parses the same error envelope but keeps only `httpStatus` and `apiStatus`.
+- `ChatUI/js/api/gemini-files.js`, `GeminiFilesApiError` / `buildHttpError()` — independently parses the provider envelope into a richer typed error including operation and cause.
+- `ChatUI/js/api/text-api-key-pool.js` — failover/rate-limit policy consumes fields such as `httpStatus` and `apiStatus` from whichever error implementation reached it.
+
+**Finding:**
+
+The same Gemini REST error body is decoded by multiple modules, producing errors that look similar but carry different fields and classes. Downstream policy therefore relies on optional ad-hoc properties rather than one stable provider-error contract.
+
+**Recommendation:**
+
+Introduce a common `GeminiApiError` and `parseGeminiHttpError(response, context)` utility. Files API errors can extend it with `operation`; utility/chat transport can use the base type. Preserve `httpStatus`, provider status/code, details, response text, and cause consistently so failover/error classification has one dependable shape.
+
+**Action type:** Provider-error contract consolidation.
+
+---
+
+## 6. The low-level SSE framing/parser is implemented twice
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/api/gemini.js`, inside `streamGenerateContentRound()` — `TextDecoder`, buffer management, CR/LF splitting, `data:` filtering, `[DONE]`, JSON parsing, malformed-event tolerance.
+- `ChatUI/js/api/gemini-utility.js`, `readSseText()` — independently implements the same buffering/framing/tolerant parsing behavior for automatic-title utility requests.
+
+**Finding:**
+
+The two callers interpret Gemini events differently, which is valid, but the wire-level SSE framing is the same. Keeping two parsers means fixes for split UTF-8 chunks, line endings, malformed events, cancellation, or future SSE framing changes must be made twice.
+
+**Recommendation:**
+
+Extract a small low-level async SSE reader that yields decoded `data:` payloads or parsed JSON events. Keep normal chat's rich part/tool processing and utility text extraction separate on top of that primitive.
+
+**Action type:** Safe transport primitive consolidation with parser tests.
+
+---
+
+## 7. Abort/cancellation errors are rebuilt throughout the codebase instead of using one standard helper
+
+**Priority:** Medium/High
+
+**Locations / examples:**
+- `ChatUI/js/api/gemini.js` — `throwIfAborted()`.
+- `ChatUI/js/api/gemini-utility.js` — inline AbortError construction while reading SSE.
+- `ChatUI/js/api/gemini-files.js` — its own `abortError()` / `throwIfAborted()` helpers.
+- `ChatUI/js/api/text-api-key-pool.js` — another `abortError()` and abort-aware delay helper.
+- `ChatUI/js/chat/attachment-transport.js` — local AbortError construction.
+- `ChatUI/js/workspace/workspace-service.js` — local `throwIfAborted()`.
+- `ChatUI/js/todo/todo-bridge-client.js` — specialized AbortError with dispatch-state metadata.
+
+**Finding:**
+
+Most modules repeat the same DOMException/fallback Error boilerplate. This is unnecessary code and can lead to inconsistent messages or detection. Todo is a legitimate exception because it annotates whether a request might already have been dispatched.
+
+**Recommendation:**
+
+Add a tiny common abort utility such as `createAbortError(message)` and `throwIfAborted(signal, message)`. Use it for ordinary cancellation paths. Keep feature-specific wrappers—such as Todo's `todoDispatched` metadata—on top of the common primitive rather than deleting important semantics.
+
+**Action type:** Low-risk defensive-code reduction.
+
+---
+
+## 8. Gemini base URL cleanup is repeated with slightly different semantics
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/api/api-config.js`, `getCleanBaseUrl()` — trim/trailing-slash removal plus Google default.
+- `ChatUI/js/api/gemini-files.js` — local base-URL cleanup for Files endpoints.
+- `ChatUI/js/chat/attachment-transport.js`, `normalizedBaseUrl()` — local trim/trailing-slash normalization used for cache and remote-metadata identity.
+- `ChatUI/js/api/gemini-live-audio.js`, `buildLiveAudioWebSocketUrl()` — repeats default/cleanup and then converts HTTP(S) to WS(S), prefixes a scheme if missing, and appends the Live route.
+
+**Finding:**
+
+“Which Gemini host is this?” is represented by several local string-normalization functions. Slight differences matter because attachment metadata/cache keys compare normalized URLs for identity while HTTP and Live Audio build endpoints differently.
+
+**Recommendation:**
+
+Create one canonical Gemini base-URL normalizer in a transport/config utility. Build explicit `geminiHttpEndpoint(base, path)` and `geminiWebSocketEndpoint(base, path)` adapters on top of it. Cache/persistence comparisons should use the exact same canonical base representation.
+
+**Action type:** Endpoint-policy consolidation.
+
+---
+
+## 9. Attachment validation mixes business validation, user notification, compatibility wrappers, and mutation
+
+**Priority:** Medium/High
+
+**Locations:**
+- `ChatUI/js/composer/attachments.js`, approximately lines 35–105 — `getAttachmentValidationError()`, `validateAttachmentFile()`, backward-compatible `validateFile()`, `validateAttachmentSet()`, and `tryAddAttachmentFile()`.
+- `ChatUI/js/composer/recorder.js` — recording limits reuse the attachment size constants (good) but failure paths may alert + throw, while later stop/preparation paths can alert + resolve `null`.
+
+**Finding:**
+
+The core attachment rule itself is reasonably centralized, but its API has several behavioral contracts: return `{ valid, error }`, return boolean, optionally `alert()`, mutate global attachments and return boolean, or throw after already displaying an alert. Callers must know not only the rule but which presentation side effects a helper performs.
+
+**Recommendation:**
+
+Make attachment validation pure: one function returns a structured validation result and never displays UI or mutates state. Keep `addAttachment()` as the mutation boundary, and let Composer/Recorder/Voice decide how to present a failure. Remove the backward-compatible boolean facade once its callers have migrated.
+
+**Action type:** Validation/UI-side-effect separation and API simplification.
+
+---
+
+## 10. MIME normalization has one good registry, but downstream code still recreates fallback rules
+
+**Priority:** Medium/High
+
+**Locations:**
+- Canonical input registry: `ChatUI/js/composer/attachment-types.js` — extension/MIME aliases, support list, `getGeminiAttachmentMimeType()`, and presentation helpers.
+- `ChatUI/js/chat/attachment-transport.js` — independently resolves MIME through `fileApiMimeType || type || mimeType || blob.type || application/octet-stream`.
+- `ChatUI/js/storage/records.js` / `load.js` — storage converts between `type` and `mimeType` aliases.
+- `ChatUI/js/chat/message-tools.js` — generated-tool-file presentation has another MIME-to-label/extension decision table.
+
+**Finding:**
+
+The composer has a strong canonical registry for user files, but downstream layers still need local MIME fallback chains because the internal attachment model is not normalized strongly enough. Generated tool files are a distinct source, but their presentation mapping is another independent MIME policy.
+
+**Recommendation:**
+
+Pair Category 6's canonical Attachment DTO with one canonical MIME accessor. User-file acceptance stays in `attachment-types.js`; transport receives one resolved MIME; generated tool files can use a separate presentation map while sharing generic MIME normalization. Avoid making every consumer understand `type` versus `mimeType` aliases.
+
+**Action type:** Normalization-boundary consolidation.
+
+---
+
+## 11. Custom tool providers do not share one base result/error envelope
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/todo/todo-tool-executor.js`, `failure()` — failures include `ok`, `overview`, `error`, and `meta.mutationOccurred`.
+- `ChatUI/js/workspace/workspace-tool-executor.js` / `workspace-service.js` — failures generally use `{ ok: false, error: { code, message } }`.
+- `ChatUI/js/tools/function-tool-registry.js` — generic unsupported functions return yet another minimal `{ ok: false, error }` result.
+- `ChatUI/js/api/gemini.js` — generic custom-tool flow mainly decides failure through `result?.ok === false` and forwards provider-specific bodies.
+
+**Finding:**
+
+Provider-specific extra data is useful—Todo needs mutation metadata for replay safety—but there is no documented common base contract. Generic code therefore knows only the `ok` convention while provider/UI code must defensively inspect optional shapes.
+
+**Recommendation:**
+
+Define a minimal shared `ToolResult` contract: `{ ok, data?, error?: { code, message, details? }, meta? }`. Todo can extend `meta`/`overview`; Workspace can remain simpler. Registry-level unsupported/disabled results should use the same base constructor/helpers.
+
+**Action type:** Cross-provider error/result contract normalization.
+
+---
+
+## 12. Error handling has no clear layer policy, causing alert/throw/result/silent-failure combinations
+
+**Priority:** High
+
+**Locations / examples:**
+- `ChatUI/js/composer/attachments.js` — validation may alert and return a result.
+- `ChatUI/js/composer/recorder.js` — some failures alert then throw, while stop/preparation failures may alert and resolve `null`.
+- `ChatUI/js/voice/read-settings.js`, `ui/model-thinking-menu.js`, and other Settings controllers — catch persistence errors and call `alert()` directly.
+- `ChatUI/js/chat/auto-title.js` — intentionally catches background failure, logs a warning, and returns `false`.
+- `ChatUI/js/workspace/workspace-service.js` — throws typed domain errors; its tool adapter converts them to result envelopes.
+- `ChatUI/js/todo/todo-tool-executor.js` — returns provider result envelopes while rethrowing AbortError.
+- Storage modules generally reject/throw and leave presentation to callers.
+
+**Finding:**
+
+Different policies are individually defensible, but the layering rule is undocumented and inconsistently applied. Domain/helper code sometimes owns user presentation, while other domain code throws; some APIs communicate failure as `null` or `false`; tools use result envelopes. This increases double-notification risk and makes it difficult to know whether a caught error has already been shown to the user.
+
+**Recommendation:**
+
+Document and enforce a simple layer policy: persistence/domain/transport return or throw structured failures without UI; UI controllers display them once; tool-provider adapters convert domain failures to `ToolResult`; deliberate best-effort background work uses an explicit status result and logs at one boundary. Keep AbortError as cancellation, not a user-visible failure.
+
+**Action type:** Cross-cutting error-boundary cleanup; migrate incrementally rather than rewriting all errors at once.
+
+---
+
+## Category 7 patterns checked and intentionally NOT flagged as unnecessary defense
+
+- Workspace path/name checks at live-service and backup/restore boundaries are appropriate defense-in-depth. Backup files are untrusted input; those checks should remain even after shared invariants are extracted.
+- Todo's Gemini JSON-schema declarations do **not** replace authoritative Todo-side business validation. Model-facing schemas are guidance/shape validation; the Todo application must still enforce its own rules.
+- `ChatUI/js/tools/custom-tool-limits.js` is a good example of the desired architecture: one module owns normalize/validate/error text for the round-limit rule, and callers reuse it.
+- `ChatUI/js/api/text-api-key-input.js` line-break normalization and `text-api-key-pool.js` credential normalization are different responsibilities; they should not be merged merely because both use the word “normalize.”
+- Gemini File recovery and key-failover `canReplay`/“generation started” guards are safety mechanisms preventing duplicate visible output or tool effects. Their conservatism should be preserved during cleanup.
+- Strict full-backup validation is appropriate for untrusted restore files and should not be weakened merely to shorten code.
+- `safeCall()` around Live Audio callbacks is useful isolation: one consumer callback should not crash the underlying WebSocket session.
+- Multiple validation **layers** can be correct when they sit at different trust boundaries. The cleanup target is duplicated ownership of the same policy, not the existence of verification itself.
+
+---
+
 # Next category
 
-Not started yet: **Category 7 — repeated validation/normalization/business rules, inconsistent error contracts, and unnecessary defensive complexity.**
+Not started yet: **Category 8 — repeated DOM rendering/state synchronization, event-listener lifecycle, and avoidable runtime work.**
