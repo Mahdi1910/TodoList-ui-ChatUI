@@ -797,6 +797,281 @@ Introduce a structured generation-result object and a shared generation transact
 
 ---
 
+# Category 5 — Global state ownership, async lifecycle/race risks, and hidden cross-module side effects
+
+Status: **Audit complete. No fixes performed.**
+
+Category 5 was re-read against the current `main` ChatUI source. `main` has moved to `2caf0577f97325e5797bb7b3906c55bb5ed0d893` because of unrelated To-Do work, while the ChatUI audit branch remains documentation-only. The findings below are about current ChatUI ownership and asynchronous behavior, not the unrelated To-Do merge.
+
+## 1. `state` and `runtime` are exported mutable singleton objects with no ownership or notification boundary
+
+**Priority:** Very High
+
+**Location:** `ChatUI/js/state/store.js`.
+
+**Finding:**
+
+The store exports the live `state` and `runtime` objects directly. `setState()` and `setRuntime()` are shallow `Object.assign(...)` wrappers, while `updateChat()` directly replaces `state.chats`. Nested objects, arrays, Sets, DOM objects, MediaRecorder instances, AbortControllers, attachments, and feature-specific modal pointers all live behind the same globally imported singleton.
+
+There is no subscription mechanism, reducer/action ownership, revision number, transaction boundary, or read-only snapshot. A module can therefore read global state and later act on assumptions that another module has already changed.
+
+**Recommendation:**
+
+Do not replace the whole state system in one rewrite. First define explicit mutation APIs for the highest-risk domains: generation, chats, composer attachments/recording, API profiles, and modal targets. Gradually stop exporting mutable implementation details where practical. A small change-notification mechanism can then replace manually threaded UI refresh callbacks.
+
+**Action type:** Foundational state-ownership cleanup; incremental migration recommended.
+
+---
+
+## 2. Generic `setState()` contains a hidden API-profile business rule
+
+**Priority:** High
+
+**Location:** `ChatUI/js/state/store.js` — `synchronizeApiProfiles()` and `setState()`.
+
+**Finding:**
+
+Calling the generic store function with an `api` patch can silently rewrite the active object inside `api.textProfiles`. This exists to keep legacy active aliases synchronized with the selected Text API profile, but it means the supposedly generic store setter has feature-specific Gemini credential semantics.
+
+A caller updating API state is not merely assigning the supplied object; an additional domain mutation is performed implicitly.
+
+**Recommendation:**
+
+Move profile synchronization behind an explicit API-domain operation such as `updateActiveTextProfileState(...)` or the existing profile/key-pool facade. Keep the generic state primitive free of feature-specific business rules once callers have migrated.
+
+**Action type:** Hidden-side-effect removal; preserve current profile semantics.
+
+---
+
+## 3. Generation state has multiple sources of truth and multiple owners
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/js/state/store.js` — `runtime.isGenerating`, `runtime.currentGenerationId`, `runtime.activeAbortController`, plus per-chat `isGenerating` values.
+- `ChatUI/js/chat/generation-lifecycle.js` — begins/finishes generation and mutates global plus chat state.
+- `ChatUI/js/chat/generation-runner.js` and `ChatUI/js/chat/regenerate.js` — each installs the Stop button handler and writes the global AbortController.
+- `ChatUI/js/chat/send-message.js` and `ChatUI/js/voice/live-voice-controller.js` — gate their own behavior by reading the same global generation flags.
+
+**Finding:**
+
+One logical generation is represented simultaneously by a global boolean, a global generation ID, a global AbortController, a per-chat `isGenerating` flag, and DOM button callbacks. These values are coordinated by convention rather than owned by one generation-session object.
+
+**Why it is risky:**
+
+A future change can clear or replace one representation without updating the others. The global lock also makes unrelated features such as Composer and Live Voice depend on internal generation bookkeeping.
+
+**Recommendation:**
+
+Introduce one explicit `GenerationSession`/generation-controller record that owns ID, chat ID, AbortController and status. Derive `isGenerating` UI state from that owner rather than storing several writable copies. Keep the current one-generation-at-a-time product rule unless a separate feature request changes it.
+
+**Action type:** High-value source-of-truth consolidation.
+
+---
+
+## 4. Custom-tool execution depends on ambient module-global generation context
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/tools/custom-tool-generation-context.js` — module-global `current` object.
+- `ChatUI/js/chat/streaming.js` — calls `beginCustomToolGenerationContext(...)` and later clears it.
+- `ChatUI/js/tools/function-tool-registry.js` — reads `getCustomToolGenerationContext()` while executing To-Do functions.
+
+**Finding:**
+
+The user-turn ID, generation mode, and generation-attempt ID are not passed through the call chain as explicit data. Instead Streaming installs them in an ambient singleton and the tool registry retrieves them later from a different module.
+
+This works because ChatUI currently enforces one active generation, but it creates a hidden dependency between streaming lifecycle and custom-tool execution and makes isolated tests/concurrent future work harder.
+
+**Recommendation:**
+
+Pass generation context explicitly from the generation/streaming call into `executeCustomFunctionCall(...)` and then to provider executors. Keep the module-global context only as a temporary compatibility bridge while callers migrate, then remove it.
+
+**Action type:** Hidden-context removal and dependency clarification.
+
+---
+
+## 5. Send failure can roll back the entire chat collection to an old snapshot
+
+**Priority:** Very High
+
+**Location:** `ChatUI/js/chat/send-message.js`.
+
+**Finding:**
+
+Before adding/saving a user turn, Send captures `previousChats = state.chats` and `previousActiveChatId`. If `persistNewUserTurn(...)` fails, the catch path restores the complete old chats array and old active-chat ID with `setState({ chats: previousChats, activeChatId: previousActiveChatId })`.
+
+**Why this is a race risk:**
+
+Persistence is asynchronous. While that write is pending, another operation can legitimately change a different chat or metadata—for example pinning/renaming another chat or a background automatic title. If the user-turn persistence later fails, restoring the whole old array can erase those newer unrelated in-memory changes.
+
+**Recommendation:**
+
+Rollback only the mutation owned by the failed Send transaction: remove the newly inserted user message/new chat if it is still the same transaction version, restore only its attachment ownership, and change `activeChatId` only if this Send operation still owns the current navigation state. A chat/entity revision or transaction token would make this compare-before-rollback explicit.
+
+**Action type:** Very-high-priority transactional rollback hardening.
+
+---
+
+## 6. Several optimistic persistence rollbacks are not version-aware and can overwrite newer user actions
+
+**Priority:** Very High
+
+**Locations / examples:**
+- `ChatUI/js/sidebar/sidebar-actions.js` — Pin/Unpin saves `previousPinned`; a failed asynchronous persist later writes that old value back.
+- `ChatUI/js/voice/read-settings.js` — `persistAudioRead()` snapshots the entire previous `audioRead` object and restores it on persistence failure.
+- `ChatUI/js/chat/auto-title.js` — correctly re-checks ownership after the network title request, but if `persistChatMetadata()` fails after the auto title was applied in memory, the catch path restores the earlier title snapshot without checking whether a newer rename occurred during that persistence wait.
+
+**Finding:**
+
+The common pattern is “optimistically mutate → await persistence → on failure restore an old snapshot.” The rollback does not verify that the field/entity is still in the state produced by that operation.
+
+**Why this matters:**
+
+If a second user action occurs before the first persistence promise rejects, the older failure handler can undo the newer action. This is especially risky when a rollback restores a whole object rather than one field.
+
+**Recommendation:**
+
+Use compare-before-rollback: assign each optimistic mutation a revision/token and restore only if the current entity still carries that operation's revision/value. Alternatively serialize writes per entity/setting group. Do not blindly restore stale snapshots after an `await`.
+
+**Action type:** Cross-cutting asynchronous consistency fix.
+
+---
+
+## 7. Normal assistant generation can leave memory/DOM ahead of IndexedDB after a persistence failure
+
+**Priority:** Very High
+
+**Location:** `ChatUI/js/chat/generation-runner.js`.
+
+**Related contrasting behavior:** `ChatUI/js/chat/regenerate.js` has explicit rollback behavior when a replacement assistant has not been durably committed.
+
+**Finding:**
+
+Normal generation updates the assistant message in global chat state and renders the final row before `persistChatMessage(...)` runs in the `finally` block. If that persistence fails, the code records `persistenceError`, logs it, finishes the generation lifecycle, and throws the error—but it does not remove/revert the final assistant or mark it as “not saved.”
+
+**Why this is dangerous:**
+
+The current UI can display an apparently completed assistant answer that does not exist durably and can disappear after reload. The normal-generation and regeneration paths therefore have different durability semantics.
+
+**Recommendation:**
+
+Make assistant durability explicit. Either persist before marking the final result durable in UI, or retain the visible answer with an explicit `unsaved`/retryable state and recovery action. Use the same generation transaction abstraction proposed in Category 4 so normal and regenerate paths share a documented durability contract.
+
+**Action type:** Data-consistency/lifecycle hardening.
+
+---
+
+## 8. Live Voice uses the global Composer draft/attachment state as its request transport
+
+**Priority:** Very High
+
+**Locations:**
+- `ChatUI/js/voice/live-voice-controller.js` — recorded voice turns call `stopAudioRecording({ attach: true, ... })` and later call the normal `sendMessage(...)` path.
+- `ChatUI/js/composer/recorder.js` — `attach: true` inserts the recorded file into the global Composer attachment collection.
+- `ChatUI/js/chat/send-message.js` — reads the current Composer Markdown and **all** `runtime.attachedFiles`, then clears that shared attachment collection.
+
+**Finding:**
+
+A Live Voice turn does not build an explicit voice request payload. It temporarily inserts its recording into the same global attachment state used by an unsent typed Composer draft, then invokes normal Send.
+
+**Why this is an ownership problem:**
+
+The Voice controller's `pendingUserVoiceFile` points to one recording, but `sendMessage()` consumes whatever text and attachments happen to be in the shared Composer at that moment. Voice and Composer therefore do not have independent ownership of pending input.
+
+**Recommendation:**
+
+Refactor Send so the core transaction accepts an explicit request object `{ text, attachments, source }`. The Composer adapter supplies its current draft, while Live Voice supplies only the recorded voice turn (plus any intentionally supported context). Do not use the global Composer attachment collection as an inter-feature transport mechanism.
+
+**Action type:** High-priority state-ownership separation.
+
+---
+
+## 9. Workspace mutation refresh handlers can overlap and complete out of order
+
+**Priority:** High
+
+**Locations:**
+- `ChatUI/js/workspace/workspace-service.js` — every mutation dispatches `workspace:changed` through `window.dispatchEvent(...)`.
+- `ChatUI/js/workspace/workspace-ui.js` — `window.addEventListener('workspace:changed', event => void handleWorkspaceChanged(event))` and asynchronous `handleWorkspaceChanged()`.
+
+**Finding:**
+
+Each Workspace mutation starts an asynchronous refresh that clears and repopulates shared `childrenCache`, reads/writes shared `selectedNode`, resolves paths, renders the tree/selection, and may re-run search. The listener intentionally does not await or serialize previous handlers.
+
+**Why this is a race risk:**
+
+Two rapid mutations can have two `handleWorkspaceChanged()` calls in flight simultaneously. Network/IndexedDB timing can allow the older refresh to finish after the newer one and render/cache state based on an earlier event.
+
+**Recommendation:**
+
+Serialize Workspace refreshes or assign a monotonic refresh revision. Before committing cache/selection/render results after an `await`, verify that the operation is still the newest refresh. Keep the current query-value stale-search check; it is already a good example of this pattern.
+
+**Action type:** Async refresh ordering hardening.
+
+---
+
+## 10. `window` CustomEvents have become an undocumented ambient event bus
+
+**Priority:** High
+
+**Locations / examples:**
+- `ChatUI/js/workspace/workspace-service.js` publishes `workspace:changed`.
+- `ChatUI/js/settings/settings.js` publishes `workspace:theme-changed`.
+- `ChatUI/js/workspace/workspace-ui.js` listens to `workspace:changed`, `workspace:theme-changed`, and `chat:view-opened`.
+- Other application modules publish navigation/view lifecycle events consumed outside their feature folder.
+
+**Finding:**
+
+Cross-feature synchronization is carried through string-named browser events with ad-hoc `detail` payloads. Producers and consumers do not share one explicit event contract/module, so discovering a side effect requires repository-wide string search.
+
+**Recommendation:**
+
+Create a small application-event boundary (for example `app-events.js` plus feature-specific helpers) that defines event names, payload shapes, and subscribe/unsubscribe functions. Browser `CustomEvent` can remain the underlying mechanism if useful; the problem is ambient, undocumented ownership rather than CustomEvent itself.
+
+**Action type:** Cross-module contract cleanup.
+
+---
+
+## 11. Sidebar/UI synchronization depends on manually threaded callbacks instead of state change ownership
+
+**Priority:** High
+
+**Locations / examples:**
+- `ChatUI/js/chat/send-message.js` accepts `updateSidebarCallback` and manually invokes it.
+- `ChatUI/js/chat/generation-runner.js` passes the callback through generation/finalization.
+- `ChatUI/js/chat/regenerate.js` passes it through regeneration.
+- `ChatUI/js/chat/auto-title.js` optionally invokes it after background title persistence.
+- `ChatUI/js/sidebar/sidebar-actions.js` and project flows receive/pass the same callback pattern.
+
+**Finding:**
+
+Because the central store has no change notification mechanism, domain/business functions must be told how to refresh one particular UI surface. Correct sidebar freshness therefore depends on every mutation path remembering to accept, forward, and invoke an optional callback.
+
+**Why it is architecture drift:**
+
+A state mutation and its UI invalidation are separated by manually propagated function parameters across unrelated layers. Background actions can silently omit a refresh if they were invoked without the callback.
+
+**Recommendation:**
+
+Add a small store/event subscription for chat/project metadata changes or let the Sidebar own a listener to explicit chat/project events. Business functions should report state changes, not receive a Sidebar rendering function.
+
+**Action type:** Hidden UI-coupling removal.
+
+---
+
+## Category 5 patterns checked and intentionally NOT flagged as problems
+
+- `ChatUI/js/chat/chat-loader.js` uses a per-chat `pendingLoads` Map to deduplicate concurrent lazy-load requests. That is useful race protection and should be preserved.
+- Workspace search re-checks the current search-input value after its asynchronous query returns, preventing an older search result from replacing a newer query. That stale-result guard is good and should be reused for broader Workspace refreshes.
+- `auto-title.js` uses `pendingChatIds` and re-reads title ownership after the network request before applying an automatic title. Those protections are good; the finding above is specifically the later persistence-rollback window.
+- Live Voice uses session IDs, recording-turn IDs, and generation-job identity checks extensively to ignore stale asynchronous callbacks. Those guards are important and should survive any controller decomposition.
+- Read Selected Text stores the selected chat ID and clears stale selection when the active chat changes. Its small module-local selection snapshot is deliberate feature state, not a reason to move everything into the global store.
+- Application-lifetime document/window listeners initialized once during bootstrap are not inherently leaks. The audit only flags them when they create hidden cross-feature contracts or unsynchronized asynchronous work.
+
+---
+
 # Next category
 
-Not started yet: **Category 5 — global state ownership, async lifecycle/race risks, and hidden cross-module side effects.**
+Not started yet: **Category 6 — duplicated data representations, persistence/schema migration debt, and compatibility layers that increase long-term maintenance cost.**
