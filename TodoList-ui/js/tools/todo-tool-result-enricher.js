@@ -65,26 +65,24 @@ function decorateTaskResults(value, taskById, allTasks, seen = new WeakSet()) {
   Object.values(value).forEach(item => decorateTaskResults(item, taskById, allTasks, seen));
 }
 
-function collectCreateResultIds(value, output, seen = new WeakSet()) {
-  if (!value || typeof value !== 'object') return;
-  if (seen.has(value)) return;
-  seen.add(value);
-  if (Array.isArray(value)) {
-    value.forEach(item => collectCreateResultIds(item, output, seen));
-    return;
-  }
-  if (Number.isInteger(value.inputIndex) && typeof value.id === 'string' && value.id) output.add(value.id);
-  Object.values(value).forEach(item => collectCreateResultIds(item, output, seen));
+function addId(output, value) {
+  if (typeof value === 'string' && value) output.add(value);
+}
+
+function directCreateTaskIds(result) {
+  const output = new Set();
+  const data = result?.data;
+  (Array.isArray(data?.items) ? data.items : []).forEach(item => addId(output, item?.id));
+  (Array.isArray(data?.succeeded) ? data.succeeded : []).forEach(item => addId(output, item?.id));
+  addId(output, data?.failed?.result?.data?.id);
+  return output;
 }
 
 function directTaskIds(functionName, args, result) {
+  if (functionName === 'todo_create_tasks') return directCreateTaskIds(result);
   const output = new Set();
   if (functionName === 'todo_update_tasks') {
-    (Array.isArray(args?.tasks) ? args.tasks : []).forEach(task => {
-      if (typeof task?.id === 'string' && task.id) output.add(task.id);
-    });
-  } else if (functionName === 'todo_create_tasks') {
-    collectCreateResultIds(result?.data, output);
+    (Array.isArray(args?.tasks) ? args.tasks : []).forEach(task => addId(output, task?.id));
   }
   return output;
 }
@@ -92,7 +90,6 @@ function directTaskIds(functionName, args, result) {
 function observedTaskSideEffects(functionName, args, result, beforeTasks, currentTasks) {
   if (!['todo_create_tasks', 'todo_update_tasks'].includes(functionName)) return null;
   const beforeById = new Map((beforeTasks || []).filter(task => task?.id).map(task => [task.id, task]));
-  const currentById = new Map((currentTasks || []).filter(task => task?.id).map(task => [task.id, task]));
   const directIds = directTaskIds(functionName, args, result);
 
   const completedTaskIds = [];
