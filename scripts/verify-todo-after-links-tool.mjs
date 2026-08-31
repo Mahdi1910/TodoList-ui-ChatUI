@@ -203,6 +203,36 @@ enrichTodoToolResult({
 assert.deepEqual(rewiredResult.data.todoSideEffects.afterRewiredTaskIds, ['task-downstream']);
 assert.deepEqual(rewiredResult.data.todoSideEffects.scheduleChangedTaskIds, ['task-downstream']);
 
+const partialCreateResult = {
+  ok: false,
+  data: {
+    succeeded: [],
+    failed: {
+      inputIndex: 0,
+      result: {
+        data: {
+          id: 'task-direct-create',
+          finalTask: { id: 'task-direct-create', title: 'Direct create' }
+        }
+      }
+    }
+  },
+  meta: { mutationOccurred: true }
+};
+const partialCreateCurrent = [
+  { id: 'task-direct-create', title: 'Direct create', completed: false, after: null },
+  { id: 'task-repeat-side-effect', title: 'Repeat result', completed: false, after: null }
+];
+enrichTodoToolResult({
+  functionName: 'todo_create_tasks',
+  args: { tasks: [{ title: 'Direct create' }] },
+  result: partialCreateResult,
+  beforeTasks: [],
+  currentTasks: partialCreateCurrent
+});
+assert.deepEqual(partialCreateResult.data.todoSideEffects.createdRepeatOccurrenceIds, ['task-repeat-side-effect'],
+  'A directly created task from a partial result must never be mislabeled as a Repeat-created occurrence.');
+
 const definitions = await readFile(new URL('../ChatUI/js/todo/todo-tool-definitions.js', import.meta.url), 'utf8');
 assert.match(definitions, /const AFTER =/);
 assert.match(definitions, /after:\s*\{ \.\.\.AFTER, nullable: true/);
