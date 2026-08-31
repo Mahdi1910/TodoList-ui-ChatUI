@@ -25,8 +25,9 @@ assert.doesNotMatch(rootHtml, /interactive-widget=resizes-content/, 'outer shell
 assert.match(shellCss, /\.shell\s*\{[\s\S]*position:\s*relative;/, 'shell must provide a stable layout box for mobile navigation');
 assert.match(shellCss, /@media \(max-width: 768px\)[\s\S]*\.shell-nav\s*\{[\s\S]*position:\s*absolute;[\s\S]*bottom:\s*0;/, 'mobile app navigation must stay anchored to the shell layout bottom');
 assert.match(shellApp, /window\.visualViewport/, 'shell must observe the visual viewport for keyboard occlusion');
-assert.match(shellApp, /stageBottom - visibleBottom/, 'keyboard occlusion must be calculated relative to the ChatUI stage, not by moving the shell rail');
-assert.match(shellApp, /bridge\.setViewportInsets\('chat'/, 'shell must send keyboard occlusion only to ChatUI');
+assert.match(shellApp, /stageBottom - visibleBottom/, 'keyboard occlusion must be calculated relative to the embedded app stage, not by moving the shell rail');
+assert.match(shellApp, /for \(const app of \['chat', 'diary'\]\)[\s\S]*bridge\.setViewportInsets\(app/, 'shell must send keyboard occlusion to the embedded apps that consume viewport insets');
+assert.doesNotMatch(shellApp, /bridge\.setViewportInsets\(['"]todo['"]/, 'Todo must not receive the Chat/Diary keyboard-occlusion contract');
 assert.match(shellFrameBridge, /function setViewportInsets\([\s\S]*shell:viewport-insets/, 'frame bridge must expose viewport inset messages');
 assert.match(chatShellBridge, /case 'shell:viewport-insets':[\s\S]*applyShellViewportInsets/, 'embedded ChatUI must consume shell viewport insets');
 assert.match(chatShellBridge, /--shell-keyboard-occlusion-bottom/, 'embedded ChatUI must publish keyboard occlusion as a CSS variable');
