@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 const checks = [
   'scripts/verify-runtime-syntax.mjs',
   'scripts/verify-runtime-module-graph.mjs',
+  'scripts/verify-chatui-version.mjs',
   'scripts/verify-chatui-state-races.mjs',
   'scripts/verify-gemini-streaming-fixtures.mjs',
   'scripts/verify-todo-bridge-behavior.mjs',
