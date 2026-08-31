@@ -1,4 +1,4 @@
-export const DIARY_GEMINI_TASK_MODEL = 'gemini-3.5-flash';
+export const DIARY_GEMINI_TASK_MODEL = 'gemini-3.5-flash-lite';
 export const DIARY_GEMINI_SUMMARY_MODEL = 'gemini-3.7-flash';
 
 const GEMINI_GENERATE_CONTENT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -199,7 +199,7 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
     }
 }
 
-// Compatibility export for the existing card-actions import. The implementation now uses Gemini 3.5 Flash.
+// Compatibility export for the existing card-actions import. The implementation now uses Gemini 3.5 Flash-Lite.
 export const editTranscriptionWithGemma = editTranscriptionWithGemini;
 
 export async function expandSearchQuery(query, apiKey) {

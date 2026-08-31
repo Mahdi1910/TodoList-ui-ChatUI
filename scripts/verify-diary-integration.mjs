@@ -101,12 +101,13 @@ assert(worker.includes('diary\\/?$') || worker.includes('diary\\/?'));
 assert(server.includes('diary/?$'));
 assert(buildStatic.includes("'diary/src'"));
 
-assert.equal(DIARY_GEMINI_TASK_MODEL, 'gemini-3.5-flash', 'former Gemma Diary tasks must use Gemini 3.5 Flash');
+assert.equal(DIARY_GEMINI_TASK_MODEL, 'gemini-3.5-flash-lite', 'former Gemma Diary tasks must use Gemini 3.5 Flash-Lite');
 assert.equal(DIARY_GEMINI_SUMMARY_MODEL, 'gemini-3.7-flash', 'Diary summaries must use Gemini 3.7 Flash');
 assert(!geminiRest.includes('gemma-4-31b-it'), 'Diary runtime must not call Gemma 4 31B after the migration');
 assert(!geminiRest.includes('gemini-3-flash-preview'), 'Diary summaries must not retain the old Gemini 3 Flash Preview model');
+assert(!/DIARY_GEMINI_TASK_MODEL\s*=\s*'gemini-3\.5-flash'/.test(geminiRest), 'Diary task model must not regress to Gemini 3.5 Flash');
 assert(!/temperature\s*:/.test(geminiRest), 'Gemini 3.7 Flash migration must not retain the deprecated temperature override');
-assert(geminiRest.includes('responseMimeType: "application/json"') && geminiRest.includes('responseSchema'), 'Gemini 3.5 Flash structured-output tasks must keep schema-constrained JSON');
+assert(geminiRest.includes('responseMimeType: "application/json"') && geminiRest.includes('responseSchema'), 'Gemini 3.5 Flash-Lite structured-output tasks must keep schema-constrained JSON');
 assert(geminiRest.includes("part?.thought !== true"), 'Gemini 3.x response extraction must ignore thought-only parts');
 assert(microphone.includes('models/gemini-3.1-flash-live-preview'), 'this migration must not change the separate Gemini Live transcription model');
 
