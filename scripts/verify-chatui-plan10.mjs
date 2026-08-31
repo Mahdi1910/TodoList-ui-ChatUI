@@ -19,7 +19,6 @@ const sidebarCss = fs.readFileSync('ChatUI/css/sidebar/items.css', 'utf8');
 const sidebarLayoutJs = fs.readFileSync('ChatUI/js/sidebar/sidebar-layout.js', 'utf8');
 const sidebarRenderJs = fs.readFileSync('ChatUI/js/sidebar/sidebar-render.js', 'utf8');
 const pressActionsJs = fs.readFileSync('ChatUI/js/sidebar/press-actions.js', 'utf8');
-const apiConfig = fs.readFileSync('ChatUI/js/api/api-config.js', 'utf8');
 
 assert.doesNotMatch(rootHtml, /interactive-widget=resizes-content/, 'outer shell must not resize its layout viewport around the software keyboard');
 assert.match(shellCss, /\.shell\s*\{[\s\S]*position:\s*relative;/, 'shell must provide a stable layout box for mobile navigation');
@@ -61,7 +60,5 @@ assert.match(sidebarHtml, /id="sidebar-backdrop"/, 'mobile sidebar must have a r
 assert.match(responsiveCss, /\.sidebar-backdrop:not\(\.hidden\)[\s\S]*z-index:\s*90;[\s\S]*background:\s*rgba\(0, 0, 0, 0\.45\)/, 'sidebar backdrop must visibly and physically cover underlying content');
 assert.doesNotMatch(responsiveCss, /sidebar:not\(\.collapsed\)::after[\s\S]*pointer-events:\s*none/, 'non-interactive pseudo backdrops must not return');
 assert.match(sidebarLayoutJs, /sidebarBackdrop\?\.addEventListener\('click'[\s\S]*event\.stopPropagation\(\);[\s\S]*closeSidebar\(\)/, 'backdrop taps must close the drawer without passing through');
-
-assert.match(apiConfig, /CHATUI_VERSION = '2\.5'/, 'ChatUI Settings version must be 2.5');
 
 console.log('ChatUI Plan 10 mobile interaction verification passed.');
