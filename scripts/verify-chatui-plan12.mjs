@@ -8,7 +8,6 @@ const readSettingsJs = fs.readFileSync('ChatUI/js/voice/read-settings.js', 'utf8
 const messageControlsJs = fs.readFileSync('ChatUI/js/chat/message-controls.js', 'utf8');
 const actionMenuJs = fs.readFileSync('ChatUI/js/ui/action-menu.js', 'utf8');
 const sidebarCss = fs.readFileSync('ChatUI/css/sidebar/items.css', 'utf8');
-const apiConfig = fs.readFileSync('ChatUI/js/api/api-config.js', 'utf8');
 
 assert.match(composerCss, /\.composer-bar:has\(\.ProseMirror:focus-visible\)[\s\S]*border-color:\s*var\(--border-color\)[\s\S]*box-shadow:\s*none/, 'composer must keep its normal rounded surface while focused');
 assert.match(composerCss, /\.composer-bar \.composer-editor-host \.ProseMirror:focus-visible[\s\S]*outline:\s*none/, 'inner rectangular composer focus ring must remain suppressed');
@@ -36,7 +35,5 @@ assert.match(sidebarCss, /\.project-header-item\s*\{[\s\S]*grid-template-columns
 assert.match(sidebarCss, /\.project-header-item > \.project-collapse-icon\s*\{[\s\S]*grid-column:\s*3;/, 'project collapse chevron must stay on the trailing edge');
 assert.match(sidebarCss, /\.nested-project-chats::before\s*\{[\s\S]*background:\s*var\(--border-color\)/, 'nested project chats must retain the subtle hierarchy guide');
 assert.match(sidebarCss, /\.chat-item\.active\s*\{[\s\S]*font-weight:\s*500;/, 'selected chat state must remain intact');
-
-assert.match(apiConfig, /CHATUI_VERSION = '2\.5'/, 'ChatUI Settings version must be 2.5');
 
 console.log('ChatUI Plan 12 UI refinement verification passed.');

@@ -11,7 +11,6 @@ const composerCss = fs.readFileSync('ChatUI/css/chat/composer.css', 'utf8');
 const composerEditorCss = fs.readFileSync('ChatUI/css/chat/composer-editor.css', 'utf8');
 const responsiveCss = fs.readFileSync('ChatUI/css/responsive.css', 'utf8');
 const mainChatHtml = fs.readFileSync('ChatUI/html/main-chat.html', 'utf8');
-const apiConfig = fs.readFileSync('ChatUI/js/api/api-config.js', 'utf8');
 
 assert.equal(
   normalizePastedComposerText('first line\nsecond line\n\n'),
@@ -106,6 +105,5 @@ assert.match(
   /function handleComposerKeyDown\([\s\S]*event\.key !== 'Enter'[\s\S]*requestSubmit\(\)/,
   'normal keyboard submit behavior must remain intact outside the paste guard'
 );
-assert.match(apiConfig, /CHATUI_VERSION = '2\.5'/, 'ChatUI Settings version must be 2.5');
 
 console.log('ChatUI Plan 8 compact composer and paste-safety verification passed.');

@@ -6,7 +6,6 @@ const readSelection = fs.readFileSync('ChatUI/js/voice/read-selection.js', 'utf8
 const messagesCss = fs.readFileSync('ChatUI/css/chat/messages.css', 'utf8');
 const chatControls = fs.readFileSync('ChatUI/js/ui/chat-controls.js', 'utf8');
 const readAloud = fs.readFileSync('ChatUI/js/voice/read-aloud.js', 'utf8');
-const apiConfig = fs.readFileSync('ChatUI/js/api/api-config.js', 'utf8');
 
 assert.equal(
   READABLE_SELECTION_SELECTOR,
@@ -43,7 +42,5 @@ assert.match(
   'normal user prose must wrap naturally inside the bubble'
 );
 assert.match(messagesCss, /\.user-bubble pre,[\s\S]*\.user-bubble table \{ max-width:\s*100%; overflow-x:\s*auto; \}/, 'specialized code/table surfaces may keep local horizontal overflow');
-
-assert.match(apiConfig, /CHATUI_VERSION = '2\.5'/, 'ChatUI Settings version must be 2.5');
 
 console.log('ChatUI Plan 16 triple-click selection and sent-message wrapping verification passed.');

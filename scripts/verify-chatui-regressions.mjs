@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 const checks = [
   'scripts/verify-runtime-syntax.mjs',
   'scripts/verify-runtime-module-graph.mjs',
+  'scripts/verify-chatui-version.mjs',
   'scripts/verify-chatui-state-races.mjs',
   'scripts/verify-gemini-streaming-fixtures.mjs',
   'scripts/verify-todo-bridge-behavior.mjs',
@@ -23,6 +24,7 @@ const checks = [
   'scripts/verify-todo-tools.mjs',
   'scripts/verify-todo-after-duration.mjs',
   'scripts/verify-todo-task-links.mjs',
+  'scripts/verify-todo-after-links-tool.mjs',
   'scripts/verify-file-uri-recovery.mjs',
   'scripts/verify-integration.mjs'
 ];

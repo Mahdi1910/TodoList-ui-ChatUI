@@ -13,7 +13,6 @@ const leftSidebarHtml = fs.readFileSync('ChatUI/html/left-sidebar.html', 'utf8')
 const mainChatHtml = fs.readFileSync('ChatUI/html/main-chat.html', 'utf8');
 const rightSidebarHtml = fs.readFileSync('ChatUI/html/right-sidebar.html', 'utf8');
 const composerJs = fs.readFileSync('ChatUI/js/composer/composer.js', 'utf8');
-const apiConfig = fs.readFileSync('ChatUI/js/api/api-config.js', 'utf8');
 
 assert.match(
   mainCss,
@@ -42,7 +41,5 @@ assert.match(mainChatHtml, /Allow the AI to work with your Workspace files\./, '
 assert.match(voiceCss, /\.voice-mode-overlay\s*\{[\s\S]*env\(safe-area-inset-top,[\s\S]*env\(safe-area-inset-bottom,/, 'Live Voice must account for top and bottom device safe areas');
 assert.match(modalCss, /@media \(max-width: 767px\)[\s\S]*\.modal-overlay\s*\{[\s\S]*env\(safe-area-inset-top,[\s\S]*env\(safe-area-inset-right,[\s\S]*env\(safe-area-inset-bottom,[\s\S]*env\(safe-area-inset-left,/, 'mobile dialogs must keep safe-area-aware margins on every screen edge');
 assert.match(modalCss, /#search-modal \.modal-card\s*\{\s*width:\s*100%;/, 'Search dialog must fit the padded mobile modal viewport rather than touching screen edges');
-
-assert.match(apiConfig, /CHATUI_VERSION = '2\.5'/, 'ChatUI Settings version must be 2.5');
 
 console.log('ChatUI Plan 11 UI consistency verification passed.');

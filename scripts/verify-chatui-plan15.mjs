@@ -10,7 +10,6 @@ const chatControls = fs.readFileSync('ChatUI/js/ui/chat-controls.js', 'utf8');
 const readAloud = fs.readFileSync('ChatUI/js/voice/read-aloud.js', 'utf8');
 const liveAudio = fs.readFileSync('ChatUI/js/api/gemini-live-audio.js', 'utf8');
 const activityRenderer = fs.readFileSync('ChatUI/js/chat/activity-renderer.js', 'utf8');
-const apiConfig = fs.readFileSync('ChatUI/js/api/api-config.js', 'utf8');
 
 function channelToLinear(value) {
   const channel = value / 255;
@@ -68,7 +67,5 @@ assert.match(chatControls, /const selectedText = getSelectedReadText\(\);/, 'cha
 assert.match(chatControls, /label:\s*'Read Selected Text'[\s\S]*disabled:\s*!selectedText[\s\S]*onSelect:\s*\(\) => readSelectedText\(selectedText\)/, 'Read Selected Text must enable from and speak the exact captured snapshot');
 assert.match(readAloud, /export async function readSelectedText\(text\)[\s\S]*const sourceText = normalizeText\(text\);[\s\S]*sourceType: 'selection'/, 'Read Aloud must keep selection jobs isolated and use the supplied text');
 assert.match(liveAudio, /buildReadAloudInput\(this\.text\)/, 'Gemini Live Audio must receive the selected-text job source without substituting conversation text');
-
-assert.match(apiConfig, /CHATUI_VERSION = '2\.5'/, 'ChatUI Settings version must be 2.5');
 
 console.log('ChatUI Plan 15 sent-message disclosure and Read Selected Text verification passed.');

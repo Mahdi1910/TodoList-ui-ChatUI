@@ -91,6 +91,27 @@ export function normalizePriority(value) {
   return value === 'none' ? '' : value;
 }
 
+export function normalizeAfter(value, label = 'after') {
+  if (value == null) return null;
+  const source = assertPlainObject(value, label);
+  if (Object.prototype.hasOwnProperty.call(source, 'resolvedAt')) {
+    fail(`${label}.resolvedAt is read-only. Todo sets it when the dependency resolves.`);
+  }
+  const taskId = normalizeId(source.taskId, `${label}.taskId`);
+  const hours = Number(source.hours);
+  const minutes = Number(source.minutes);
+  if (!Number.isInteger(hours) || hours < 0 || hours > 24) {
+    fail(`${label}.hours must be an integer from 0 to 24.`);
+  }
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 59) {
+    fail(`${label}.minutes must be an integer from 0 to 59.`);
+  }
+  if (hours === 0 && minutes === 0) {
+    fail(`${label} must delay by at least 1 minute.`);
+  }
+  return { taskId, hours, minutes };
+}
+
 export function normalizePosition(value, label = 'position') {
   if (value == null) return null;
   const source = assertPlainObject(value, label);
@@ -260,7 +281,8 @@ export function normalizeTaskCreateInput(input) {
       dueDate: schedule.dueDate,
       dueTime: schedule.dueTime,
       reminders: source.reminders == null ? [] : normalizeReminders(source.reminders),
-      repeat: schedule.repeat
+      repeat: schedule.repeat,
+      after: source.after == null ? null : normalizeAfter(source.after)
     },
     completed: source.completed === true,
     position: normalizePosition(source.position),
@@ -281,6 +303,7 @@ export function normalizeTaskUpdateInput(current, input) {
   if (Object.prototype.hasOwnProperty.call(source, 'priority')) patch.priority = normalizePriority(source.priority);
   if (Object.prototype.hasOwnProperty.call(source, 'tagIds')) patch.tags = normalizeIdArray(source.tagIds, 'tagIds', { max: 50 });
   if (Object.prototype.hasOwnProperty.call(source, 'reminders')) patch.reminders = normalizeReminders(source.reminders);
+  if (Object.prototype.hasOwnProperty.call(source, 'after')) patch.after = normalizeAfter(source.after);
 
   const touchesSchedule = ['dueDate', 'dueTime', 'repeat'].some(key => Object.prototype.hasOwnProperty.call(source, key));
   let scheduleResolution = null;
