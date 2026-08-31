@@ -1,3 +1,8 @@
+import {
+  captureTodoTaskSnapshot,
+  enrichTodoToolResult
+} from '../tools/todo-tool-result-enricher.js';
+
 const SHELL_CHANNEL = 'mahdi-app-shell';
 const SHELL_VERSION = 1;
 const IS_EMBEDDED = new URLSearchParams(window.location.search).get('embedded') === '1';
@@ -115,7 +120,15 @@ export function initializeTodoEmbeddedBridge({ settingsComponent, appState, todo
         case 'shell:todo-tool-request': {
           if (!todoToolExecutor?.executeRequest) throw new Error('Todo tool executor is unavailable.');
           const requestId = String(payload.requestId || '');
-          const result = await todoToolExecutor.executeRequest(payload);
+          const beforeTasks = captureTodoTaskSnapshot(appState?.tasks || []);
+          const rawResult = await todoToolExecutor.executeRequest(payload);
+          const result = enrichTodoToolResult({
+            functionName: String(payload.functionName || ''),
+            args: payload.args && typeof payload.args === 'object' ? payload.args : {},
+            result: rawResult,
+            beforeTasks,
+            currentTasks: appState?.tasks || []
+          });
           const responsePayload = { requestId, result };
           if (!postTodoShellMessage('todo:tool-response', responsePayload)) {
             postTodoShellMessage('todo:tool-response', oversizedResult(requestId, result));

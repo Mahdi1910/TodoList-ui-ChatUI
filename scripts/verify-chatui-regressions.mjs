@@ -23,6 +23,7 @@ const checks = [
   'scripts/verify-todo-tools.mjs',
   'scripts/verify-todo-after-duration.mjs',
   'scripts/verify-todo-task-links.mjs',
+  'scripts/verify-todo-after-links-tool.mjs',
   'scripts/verify-file-uri-recovery.mjs',
   'scripts/verify-integration.mjs'
 ];
