@@ -199,6 +199,9 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
     }
 }
 
+// Compatibility export for the existing card-actions import. The implementation now uses Gemini 3.5 Flash.
+export const editTranscriptionWithGemma = editTranscriptionWithGemini;
+
 export async function expandSearchQuery(query, apiKey) {
     const url = buildGenerateContentUrl(DIARY_GEMINI_TASK_MODEL, apiKey);
 
