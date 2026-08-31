@@ -1,0 +1,48 @@
+name: Diary Integration Check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  diary-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify Diary integration invariants
+        run: node scripts/verify-diary-integration.mjs
+      - name: Check Diary and Shell JavaScript syntax
+        run: |
+          find diary/src -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+          node --check shell/js/protocol.js
+          node --check shell/js/router.js
+          node --check shell/js/frame-manager.js
+          node --check shell/js/app-shell.js
+          node --check worker.js
+      - name: Build safe runtime bundle
+        run: node scripts/build-static.mjs
+      - name: Verify Diary runtime assets
+        run: |
+          test -f dist/diary/index.html
+          test -f dist/diary/src/main.js
+          test -f dist/diary/src/embedded/shell-bridge.js
+          test -f dist/diary/src/platform/storage-namespace.mjs
+          test -f dist/diary/css/embedded.css
+      - name: Verify Diary public route and child asset separation
+        run: |
+          python server.py --port 8765 > /tmp/diary-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID' EXIT
+          sleep 1
+          curl -fsS http://127.0.0.1:8765/diary > /tmp/diary-shell.html
+          curl -fsS http://127.0.0.1:8765/diary/index.html > /tmp/diary-child.html
+          curl -fsS http://127.0.0.1:8765/diary/src/main.js > /tmp/diary-main.js
+          grep -q 'id="app-shell"' /tmp/diary-shell.html
+          grep -q 'Aura Diary' /tmp/diary-child.html
+          grep -q "storage-namespace.mjs" /tmp/diary-main.js
+          test "$(curl -s -o /tmp/diary-missing.js -w '%{http_code}' http://127.0.0.1:8765/diary/src/definitely-missing.js)" = "404"

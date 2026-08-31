@@ -28,4 +28,6 @@ jobs:
           test -f dist/index.html
           test -f dist/ChatUI/embedded.html
           test -f dist/TodoList-ui/index.html
+          test -f dist/diary/index.html
+          test -f dist/diary/src/embedded/shell-bridge.js
           test -f dist/shell/js/frame-bridge.js
