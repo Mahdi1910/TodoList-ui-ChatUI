@@ -2,19 +2,27 @@ import { createFrameManager } from './frame-manager.js';
 import { createFrameBridge } from './frame-bridge.js';
 import { createShellRouter, parseShellRoute } from './router.js';
 
-const navTodo = document.getElementById('shell-nav-todo');
-const navChat = document.getElementById('shell-nav-chat');
+const APP_META = Object.freeze({
+  todo: { label: 'To-Do', navId: 'shell-nav-todo', statusId: null },
+  chat: { label: 'ChatUI', navId: 'shell-nav-chat', statusId: 'shell-chat-status' },
+  diary: { label: 'Diary', navId: 'shell-nav-diary', statusId: 'shell-diary-status' }
+});
+
+const navItems = new Map(Object.entries(APP_META).map(([app, meta]) => [app, document.getElementById(meta.navId)]));
 const settingsButton = document.getElementById('shell-open-settings');
-const chatStatus = document.getElementById('shell-chat-status');
 const toast = document.getElementById('shell-toast');
 const shellStage = document.getElementById('shell-stage');
 
 let activeApp = 'todo';
 const appearances = new Map();
-const titles = new Map([['todo', 'To-Do'], ['chat', 'ChatUI']]);
+const titles = new Map(Object.entries(APP_META).map(([app, meta]) => [app, meta.label]));
 let toastTimer = null;
 let viewportSyncFrame = 0;
-let lastChatKeyboardOcclusion = -1;
+let lastKeyboardOcclusion = -1;
+
+function appLabel(app) {
+  return APP_META[app]?.label || app;
+}
 
 function showToast(message) {
   if (!toast) return;
@@ -50,19 +58,19 @@ function applyShellAppearance(app) {
 }
 
 function updateTitle() {
-  document.title = titles.get(activeApp) || (activeApp === 'chat' ? 'ChatUI' : 'To-Do');
+  document.title = titles.get(activeApp) || appLabel(activeApp);
 }
 
 function updateNavigationState() {
-  navTodo?.setAttribute('aria-current', activeApp === 'todo' ? 'page' : 'false');
-  navChat?.setAttribute('aria-current', activeApp === 'chat' ? 'page' : 'false');
-  settingsButton?.setAttribute('aria-label', `Open ${activeApp === 'chat' ? 'ChatUI' : 'To-Do'} settings`);
+  for (const [app, nav] of navItems) nav?.setAttribute('aria-current', activeApp === app ? 'page' : 'false');
+  settingsButton?.setAttribute('aria-label', `Open ${appLabel(activeApp)} settings`);
   if (settingsButton) settingsButton.disabled = frameManager.getState(activeApp) !== 'READY';
 }
 
 const frameManager = createFrameManager({
   onStateChange(app, state) {
-    if (app === 'chat') chatStatus?.classList.toggle('visible', state === 'FAILED');
+    const status = document.getElementById(APP_META[app]?.statusId || '');
+    status?.classList.toggle('visible', state === 'FAILED');
     if (app === activeApp) updateNavigationState();
   }
 });
@@ -72,20 +80,15 @@ const bridge = createFrameBridge(frameManager, {
   onReady(app, payload) {
     if (payload.appearance) appearances.set(app, payload.appearance);
     if (payload.title) titles.set(app, payload.title);
-
     bridge.requestAppearance(app);
 
     if (app === 'chat') {
       const current = router.getCurrentRoute();
-      if (current.app === 'chat') {
-        bridge.navigateChatRoute(current, 'ready-sync');
-      } else {
-        const lastPath = router.rememberChatFromReady(payload.currentChatId || null);
-        bridge.navigateChatRoute(parseShellRoute(lastPath), 'ready-sync');
-      }
-      syncChatViewportInsets(true);
+      if (current.app === 'chat') bridge.navigateChatRoute(current, 'ready-sync');
+      else bridge.navigateChatRoute(parseShellRoute(router.rememberChatFromReady(payload.currentChatId || null)), 'ready-sync');
     }
 
+    if (app === 'chat' || app === 'diary') syncViewportInsetsFor(app, true);
     if (app === activeApp) {
       applyShellAppearance(app);
       updateTitle();
@@ -93,13 +96,13 @@ const bridge = createFrameBridge(frameManager, {
     }
   },
   onError(app, payload) {
-    if (app === activeApp) showToast(`${app === 'chat' ? 'ChatUI' : 'To-Do'} failed to start: ${payload.message || 'unknown error'}`);
+    if (app === activeApp) showToast(`${appLabel(app)} failed to start: ${payload.message || 'unknown error'}`);
   },
   onCommandError(app, payload) {
-    showToast(`${app === 'chat' ? 'ChatUI' : 'To-Do'}: ${payload.message || 'command failed'}`);
+    showToast(`${appLabel(app)}: ${payload.message || 'command failed'}`);
   },
   onCommandTimeout(app, command) {
-    showToast(`${app === 'chat' ? 'ChatUI' : 'To-Do'} did not respond to ${command}.`);
+    showToast(`${appLabel(app)} did not respond to ${command}.`);
   },
   onChatRouteChange(payload) {
     router.handleChatChildRoute(payload);
@@ -118,30 +121,36 @@ const bridge = createFrameBridge(frameManager, {
   }
 });
 
-function getChatKeyboardOcclusion() {
+function getKeyboardOcclusion() {
   if (!window.matchMedia('(max-width: 768px)').matches || !shellStage) return 0;
   const viewport = window.visualViewport;
   if (!viewport) return 0;
   const stageBottom = shellStage.getBoundingClientRect().bottom;
   const visibleBottom = viewport.offsetTop + viewport.height;
   const occlusion = Math.max(0, stageBottom - visibleBottom);
-  // Ignore small browser-chrome/rounding changes. A software keyboard creates a
-  // much larger occlusion and should move ChatUI's composer, not the shell rail.
   return occlusion >= 80 ? Math.round(occlusion) : 0;
 }
 
-function syncChatViewportInsets(force = false) {
-  const keyboardOcclusionBottom = getChatKeyboardOcclusion();
-  if (!force && keyboardOcclusionBottom === lastChatKeyboardOcclusion) return;
-  lastChatKeyboardOcclusion = keyboardOcclusionBottom;
-  bridge.setViewportInsets('chat', { keyboardOcclusionBottom });
+function syncViewportInsetsFor(app, force = false) {
+  const keyboardOcclusionBottom = getKeyboardOcclusion();
+  if (!force && keyboardOcclusionBottom === lastKeyboardOcclusion) return;
+  if (frameManager.getState(app) === 'READY') bridge.setViewportInsets(app, { keyboardOcclusionBottom });
 }
 
-function scheduleChatViewportSync() {
+function syncPersistentViewportInsets(force = false) {
+  const keyboardOcclusionBottom = getKeyboardOcclusion();
+  if (!force && keyboardOcclusionBottom === lastKeyboardOcclusion) return;
+  lastKeyboardOcclusion = keyboardOcclusionBottom;
+  for (const app of ['chat', 'diary']) {
+    if (frameManager.getState(app) === 'READY') bridge.setViewportInsets(app, { keyboardOcclusionBottom });
+  }
+}
+
+function scheduleViewportSync() {
   if (viewportSyncFrame) return;
   viewportSyncFrame = window.requestAnimationFrame(() => {
     viewportSyncFrame = 0;
-    syncChatViewportInsets();
+    syncPersistentViewportInsets();
   });
 }
 
@@ -149,10 +158,7 @@ function activateRoute(route, meta = {}) {
   const previousApp = activeApp;
   activeApp = route.app;
 
-  if (meta.source === 'rail') {
-    (activeApp === 'chat' ? navChat : navTodo)?.focus({ preventScroll: true });
-  }
-
+  if (meta.source === 'rail') navItems.get(activeApp)?.focus({ preventScroll: true });
   frameManager.activate(activeApp);
   if (previousApp !== activeApp) {
     bridge.setActive(previousApp, false);
@@ -164,30 +170,41 @@ function activateRoute(route, meta = {}) {
   updateNavigationState();
   applyShellAppearance(activeApp);
   updateTitle();
-
-  if (route.app === 'chat' && meta.source !== 'child') {
-    bridge.navigateChatRoute(route, meta.source || 'shell');
-  }
-  scheduleChatViewportSync();
+  if (route.app === 'chat' && meta.source !== 'child') bridge.navigateChatRoute(route, meta.source || 'shell');
+  scheduleViewportSync();
 }
 
 router = createShellRouter(activateRoute);
 
-navTodo?.addEventListener('click', () => router.goTodo());
-navChat?.addEventListener('click', () => router.goChat());
+navItems.get('todo')?.addEventListener('click', () => router.goTodo());
+navItems.get('chat')?.addEventListener('click', () => router.goChat());
+navItems.get('diary')?.addEventListener('click', () => router.goDiary());
 settingsButton?.addEventListener('click', () => {
   if (frameManager.getState(activeApp) !== 'READY') {
-    showToast(`${activeApp === 'chat' ? 'ChatUI' : 'To-Do'} is still loading.`);
+    showToast(`${appLabel(activeApp)} is still loading.`);
     return;
   }
   bridge.openSettings(activeApp);
 });
 
-window.visualViewport?.addEventListener('resize', scheduleChatViewportSync);
-window.visualViewport?.addEventListener('scroll', scheduleChatViewportSync);
-window.addEventListener('resize', scheduleChatViewportSync);
-window.addEventListener('orientationchange', scheduleChatViewportSync);
+// Preserve the existing native Android contract: the APK may call the top-level
+// window.handleAndroidBack(). When Diary is active, delegate synchronously to
+// its same-origin iframe; otherwise allow Android to perform its default action.
+window.handleAndroidBack = function() {
+  if (activeApp !== 'diary') return false;
+  try {
+    const handler = frameManager.getFrame('diary')?.contentWindow?.handleAndroidBack;
+    return typeof handler === 'function' ? Boolean(handler()) : false;
+  } catch (_) {
+    return false;
+  }
+};
+
+window.visualViewport?.addEventListener('resize', scheduleViewportSync);
+window.visualViewport?.addEventListener('scroll', scheduleViewportSync);
+window.addEventListener('resize', scheduleViewportSync);
+window.addEventListener('orientationchange', scheduleViewportSync);
 
 router.start();
 frameManager.startAll();
-scheduleChatViewportSync();
+scheduleViewportSync();

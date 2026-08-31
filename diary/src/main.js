@@ -1,7 +1,7 @@
-import { initNavigation } from './features/navigation.js';
+import './platform/storage-namespace.mjs';
+import { initNavigation, activateDiaryView } from './features/navigation.js';
 import { initCalendar } from './features/calendar.js';
 import { initMicrophone } from './features/microphone.js';
-
 import { initAiNotes } from './features/ai-notes.js';
 import { initSettings, applyVisualSettings, performBackup } from './features/settings.js';
 import { initSearch } from './features/search.js';
@@ -11,80 +11,85 @@ import { checkAndGenerateSummaries } from './features/summarization-engine.js';
 import { initSummariesUi } from './features/summaries-ui.js';
 import { processPendingBackgroundRecordings } from './features/background-recordings.js';
 import { updateDateDisplay } from './state.js';
+import { initDiaryEmbeddedBridge } from './embedded/shell-bridge.js';
+
+async function resumeDiary() {
+    updateDateDisplay();
+    await processPendingBackgroundRecordings();
+}
+
+async function runAutoBackupCheck() {
+    const freq = localStorage.getItem('auto_backup_frequency');
+    if (!['every_open', 'every_day', 'every_week'].includes(freq)) return;
+
+    const lastBackupStr = localStorage.getItem('last_auto_backup_timestamp');
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    let shouldBackup = false;
+
+    if (freq === 'every_open') {
+        shouldBackup = true;
+    } else if (freq === 'every_day') {
+        shouldBackup = lastBackupStr !== todayStr;
+    } else if (freq === 'every_week') {
+        const targetDay = parseInt(localStorage.getItem('auto_backup_day') || '0', 10);
+        shouldBackup = now.getDay() === targetDay && lastBackupStr !== todayStr;
+    }
+
+    if (!shouldBackup) return;
+    await performBackup(true);
+    localStorage.setItem('last_auto_backup_timestamp', todayStr);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Initialize global UI listeners (e.g. dropdowns clicking outside)
-    document.addEventListener('click', () => {
-        document.querySelectorAll('.action-dropdown').forEach(drop => drop.classList.add('hidden'));
-        document.querySelectorAll('.chat-popup').forEach(popup => popup.classList.add('hidden'));
-    });
-    bindCardActions();
-
-    // 1.2. Handle App Resuming from Background
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            processPendingBackgroundRecordings();
-            updateDateDisplay();
-        }
+    const embeddedBridge = initDiaryEmbeddedBridge({
+        openSettings: () => activateDiaryView('view-settings'),
+        onActive: resumeDiary
     });
 
-    // 1.5. Fix for Android WebView double-tap keyboard issue
-    document.addEventListener('focus', (e) => {
-        const isTextInput = e.target.tagName === 'INPUT' && ['text', 'search', 'password', 'email', 'number'].includes(e.target.type);
-        const isTextarea = e.target.tagName === 'TEXTAREA';
-        
-        if (isTextInput || isTextarea) {
-            if(window.AndroidBridge && window.AndroidBridge.showKeyboard) {
+    try {
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.action-dropdown').forEach(drop => drop.classList.add('hidden'));
+            document.querySelectorAll('.chat-popup').forEach(popup => popup.classList.add('hidden'));
+        });
+        bindCardActions();
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') void resumeDiary();
+        });
+
+        // Preserve the native Android WebView single-tap keyboard workaround.
+        document.addEventListener('focus', event => {
+            const isTextInput = event.target.tagName === 'INPUT' && ['text', 'search', 'password', 'email', 'number'].includes(event.target.type);
+            const isTextarea = event.target.tagName === 'TEXTAREA';
+            if ((isTextInput || isTextarea) && window.AndroidBridge?.showKeyboard) {
                 window.AndroidBridge.showKeyboard();
             }
-        }
-    }, true);
+        }, true);
 
-    // 2. Initialize modular features
-    initNavigation();
-    initCalendar();
-    initMicrophone();
+        initNavigation();
+        initCalendar();
+        initMicrophone();
+        initAiNotes();
+        initSettings();
+        initSearch();
+        initSummariesUi();
 
-    initAiNotes();
-    initSettings();
-    initSearch();
-    initSummariesUi();
+        applyVisualSettings();
+        const launchView = localStorage.getItem('launch_view') || 'today';
+        const navBtn = document.getElementById(`nav-${launchView}`);
+        if (navBtn) navBtn.click();
 
-    // 2.5 Apply UI & Personalization Settings
-    applyVisualSettings();
-    const launchView = localStorage.getItem('launch_view') || 'today';
-    const navBtn = document.getElementById(`nav-${launchView}`);
-    if (navBtn) navBtn.click();
+        // The Shell may use Diary as soon as essential UI/settings initialization is complete.
+        embeddedBridge?.reportReady();
 
-    // 3. Background maintenance
-    cleanupOldAudioFiles();
-    checkAndGenerateSummaries(); // Automatically summarize past days
-    processPendingBackgroundRecordings();
-
-    // 4. Check Auto-Backup Triggers
-    const freq = localStorage.getItem('auto_backup_frequency');
-    if (freq === 'every_open' || freq === 'every_day' || freq === 'every_week') {
-        const lastBackupStr = localStorage.getItem('last_auto_backup_timestamp');
-        const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
-
-        let shouldBackup = false;
-
-        if (freq === 'every_open') {
-            shouldBackup = true;
-        } else if (freq === 'every_day') {
-            if (lastBackupStr !== todayStr) shouldBackup = true;
-        } else if (freq === 'every_week') {
-            const targetDay = parseInt(localStorage.getItem('auto_backup_day') || '0', 10);
-            if (now.getDay() === targetDay && lastBackupStr !== todayStr) {
-                shouldBackup = true;
-            }
-        }
-
-        if (shouldBackup) {
-            performBackup(true).then(() => {
-                localStorage.setItem('last_auto_backup_timestamp', todayStr);
-            }).catch(err => console.error("Auto backup failed on launch:", err));
-        }
+        // Non-blocking maintenance must never delay app:ready.
+        void cleanupOldAudioFiles().catch(error => console.error('Audio cleanup failed:', error));
+        void checkAndGenerateSummaries().catch(error => console.error('Summary maintenance failed:', error));
+        void processPendingBackgroundRecordings().catch(error => console.error('Background recording import failed:', error));
+        void runAutoBackupCheck().catch(error => console.error('Auto backup failed on launch:', error));
+    } catch (error) {
+        console.error('Aura Diary startup failed:', error);
+        embeddedBridge?.reportError(error);
     }
 });

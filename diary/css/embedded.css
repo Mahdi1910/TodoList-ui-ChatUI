@@ -1,0 +1,38 @@
+html.diary-embedded {
+  --shell-keyboard-occlusion-bottom: 0px;
+}
+
+html.diary-embedded body {
+  height: 100dvh;
+}
+
+@media (max-width: 768px) {
+  html.diary-embedded .sidebar {
+    padding-bottom: 6px;
+  }
+
+  html.diary-embedded .main-content {
+    padding-bottom: 56px;
+  }
+
+  html.diary-embedded .app-container.hide-sidebar .main-content {
+    padding-bottom: 0;
+  }
+
+  html.diary-embedded #nav-settings {
+    display: none !important;
+  }
+
+  html.diary-embedded[data-shell-keyboard-open="true"] .sidebar {
+    display: none !important;
+  }
+
+  html.diary-embedded[data-shell-keyboard-open="true"] .main-content {
+    padding-bottom: 0 !important;
+  }
+
+  html.diary-embedded[data-shell-keyboard-open="true"] .scrollable-content {
+    padding-bottom: calc(24px + var(--shell-keyboard-occlusion-bottom));
+    scroll-padding-bottom: calc(24px + var(--shell-keyboard-occlusion-bottom));
+  }
+}
