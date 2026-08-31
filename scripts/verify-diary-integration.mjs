@@ -10,6 +10,10 @@ import {
   renderBasicBoldHtml,
   safeFontAwesomeClass
 } from '../diary/src/platform/html-safety.mjs';
+import {
+  DIARY_GEMINI_TASK_MODEL,
+  DIARY_GEMINI_SUMMARY_MODEL
+} from '../diary/src/features/gemini-rest.js';
 
 const root = process.cwd();
 const read = relative => readFile(path.join(root, relative), 'utf8');
@@ -58,7 +62,7 @@ assert.equal(renderBasicBoldHtml('Hello **world** <script>x</script>'), 'Hello <
 assert.equal(safeFontAwesomeClass('fa-cloud-sun'), 'fa-cloud-sun');
 assert.equal(safeFontAwesomeClass('fa-cloud" onload="x'), 'fa-cloud');
 
-const [main, bridge, background, renderer, cardActions, aiNotes, summaries, embeddedCss, rootHtml, appShell, router, worker, server, buildStatic] = await Promise.all([
+const [main, bridge, background, renderer, cardActions, aiNotes, summaries, embeddedCss, rootHtml, appShell, router, worker, server, buildStatic, geminiRest, microphone] = await Promise.all([
   read('diary/src/main.js'),
   read('diary/src/embedded/shell-bridge.js'),
   read('diary/src/features/background-recordings.js'),
@@ -72,7 +76,9 @@ const [main, bridge, background, renderer, cardActions, aiNotes, summaries, embe
   read('shell/js/router.js'),
   read('worker.js'),
   read('server.py'),
-  read('scripts/build-static.mjs')
+  read('scripts/build-static.mjs'),
+  read('diary/src/features/gemini-rest.js'),
+  read('diary/src/features/microphone.js')
 ]);
 
 assert(main.trimStart().startsWith("import './platform/storage-namespace.mjs';"));
@@ -95,4 +101,13 @@ assert(worker.includes('diary\\/?$') || worker.includes('diary\\/?'));
 assert(server.includes('diary/?$'));
 assert(buildStatic.includes("'diary/src'"));
 
-console.log('Diary storage, rendering, Android lifecycle, iframe, and routing verification passed.');
+assert.equal(DIARY_GEMINI_TASK_MODEL, 'gemini-3.5-flash', 'former Gemma Diary tasks must use Gemini 3.5 Flash');
+assert.equal(DIARY_GEMINI_SUMMARY_MODEL, 'gemini-3.7-flash', 'Diary summaries must use Gemini 3.7 Flash');
+assert(!geminiRest.includes('gemma-4-31b-it'), 'Diary runtime must not call Gemma 4 31B after the migration');
+assert(!geminiRest.includes('gemini-3-flash-preview'), 'Diary summaries must not retain the old Gemini 3 Flash Preview model');
+assert(!/temperature\s*:/.test(geminiRest), 'Gemini 3.7 Flash migration must not retain the deprecated temperature override');
+assert(geminiRest.includes('responseMimeType: "application/json"') && geminiRest.includes('responseSchema'), 'Gemini 3.5 Flash structured-output tasks must keep schema-constrained JSON');
+assert(geminiRest.includes("part?.thought !== true"), 'Gemini 3.x response extraction must ignore thought-only parts');
+assert(microphone.includes('models/gemini-3.1-flash-live-preview'), 'this migration must not change the separate Gemini Live transcription model');
+
+console.log('Diary storage, rendering, Android lifecycle, iframe, routing, and Gemini model verification passed.');
