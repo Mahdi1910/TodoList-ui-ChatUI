@@ -20,6 +20,16 @@ const REMINDER = {
   },
   required: ['minutesBefore']
 };
+const AFTER = {
+  type: 'OBJECT',
+  description: 'Pending After dependency. Do not invent the predecessor ID: use a canonical task ID returned by Todo. The task stays without a concrete date/time until Todo resolves it from the predecessor actual completion time plus this delay. hours is 0..24 and minutes is 0..59; they cannot both be 0. resolvedAt is Todo-owned read-only history and is never supplied here.',
+  properties: {
+    taskId: { ...ID, description: 'Canonical predecessor task ID returned by Todo.' },
+    hours: { type: 'INTEGER', minimum: 0, maximum: 24, description: 'Whole delay hours, 0..24.' },
+    minutes: { type: 'INTEGER', minimum: 0, maximum: 59, description: 'Whole delay minutes, 0..59.' }
+  },
+  required: ['taskId', 'hours', 'minutes']
+};
 const REPEAT = {
   type: 'OBJECT',
   description: 'Repeat rule. Dates use YYYY-MM-DD. Human months are 1..12.',
@@ -59,17 +69,21 @@ const REPEAT = {
 };
 
 const TASK_MUTABLE = {
-  title: { type: 'STRING', description: 'Task title, max 500 characters.' },
+  title: {
+    type: 'STRING',
+    description: 'Raw task title, max 500 characters. It may contain strict internal task-link tokens such as [[task:task-abc123]]. To create a completion link, first obtain the target canonical task ID from Todo, preserve the rest of the raw title, and insert exactly [[task:<ID>]]. One side containing the token is enough for bidirectional completion synchronization. Linked tasks keep all other settings independently. Remove an exact token from the raw title to unlink; never guess IDs.'
+  },
   description: { type: 'STRING', description: 'Task description, max 4000 characters. Empty string clears it.' },
   projectId: { ...NULLABLE_ID, description: 'Root Project ID. null means Inbox/unassigned. A subtask inherits its parent Project; changing a current subtask project without parentTaskId makes it a root task.' },
   parentTaskId: { ...NULLABLE_ID, description: 'Root task ID to make this a subtask. null makes it a root task. Nested subtasks are not allowed.' },
   priority: { type: 'STRING', enum: ['none', 'low', 'medium', 'high'] },
   tagIds: { type: 'ARRAY', items: ID, description: 'Complete desired Tag ID list. [] clears Tags.' },
-  dueDate: { type: 'STRING', nullable: true, description: 'YYYY-MM-DD or null. If time or Repeat remains, Todo resolves missing date to today.' },
-  dueTime: { type: 'STRING', nullable: true, description: 'hh:mm AM/PM such as 05:30 PM, or null to clear.' },
-  reminders: { type: 'ARRAY', items: REMINDER, description: 'Complete reminder list. [] clears reminders.' },
-  repeat: { ...REPEAT, nullable: true, description: 'Repeat rule or null to clear Repeat.' },
-  completed: { type: 'BOOLEAN', description: 'Desired final completion state.' },
+  dueDate: { type: 'STRING', nullable: true, description: 'YYYY-MM-DD or null. If time or Repeat remains, Todo resolves missing date to today. Explicit Date/Time/Repeat scheduling without an after field replaces an existing After dependency.' },
+  dueTime: { type: 'STRING', nullable: true, description: 'hh:mm AM/PM such as 05:30 PM, or null to clear. Explicit Date/Time/Repeat scheduling without an after field replaces an existing After dependency.' },
+  reminders: { type: 'ARRAY', items: REMINDER, description: 'Complete reminder list. [] clears reminders. Pending After may keep reminders so they become relative to its eventual resolved due time.' },
+  repeat: { ...REPEAT, nullable: true, description: 'Repeat rule or null to clear Repeat. Pending unresolved After and active Repeat do not coexist; Todo owns that normalization.' },
+  after: { ...AFTER, nullable: true, description: 'After dependency or null to clear it. Supplying a pending After lets Todo clear the concrete date/time/Repeat until the predecessor completes. Never compute the future due time yourself and never send resolvedAt.' },
+  completed: { type: 'BOOLEAN', description: 'Desired final completion state. Completing one task can also complete task-link peers, create future Repeat occurrences, resolve downstream After schedules, or rewire skipped pending After links. Todo owns all of those side effects.' },
   position: POSITION
 };
 
@@ -114,7 +128,7 @@ const taxonomyUpdate = label => ({
 export const TODO_FUNCTION_DECLARATIONS = [
   {
     name: 'todo_find_tasks',
-    description: 'Find/read Todo tasks and subtasks. Use this first when an existing task ID is unknown. Project and Tag filters include descendants by default. Broad results are compact summaries (max 20); full details are max 10 IDs per call. Results are deterministic and paginated.',
+    description: 'Find/read Todo tasks and subtasks. Use this first when an existing task ID is unknown, especially before creating After dependencies or [[task:<ID>]] completion links. Returned task rows keep raw title tokens and also expose displayTitle, read-only completedAt, and After state when present. Project and Tag filters include descendants by default. Broad results are compact summaries (max 20); full details are max 10 IDs per call. Results are deterministic and paginated.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -140,7 +154,7 @@ export const TODO_FUNCTION_DECLARATIONS = [
   },
   {
     name: 'todo_create_tasks',
-    description: 'Create 1-10 tasks/subtasks. One call handles full task fields, scheduling, reminders, Repeat, completion and optional manual position. To create a new parent and new child, create the parent first, then use its returned real ID. Repeat completion can create a new occurrence ID.',
+    description: 'Create 1-10 tasks/subtasks. One call handles full task fields, absolute scheduling, After dependencies, reminders, Repeat, completion, strict [[task:<canonical task ID>]] title links, and optional manual position. A pending After task is intentionally unscheduled until Todo resolves it; do not invent a due time. To create a new parent and new child, create the parent first, then use its returned real ID. Completing during creation may also complete linked tasks, create Repeat occurrences, resolve After dependents, or rewire skipped pending After links; trust the authoritative Todo result.',
     parameters: mutationEnvelope('tasks', {
       type: 'OBJECT',
       properties: { title: TASK_MUTABLE.title, ...TASK_MUTABLE },
@@ -149,7 +163,7 @@ export const TODO_FUNCTION_DECLARATIONS = [
   },
   {
     name: 'todo_update_tasks',
-    description: 'Update 1-10 existing tasks/subtasks by canonical ID. Omitted fields stay unchanged; null/[] clears supported values. Can reparent/move, reorder, complete/activate, change Project/Tags/schedule/reminders/Repeat. Results report every stage and final authoritative task; partial commits are explicit.',
+    description: 'Update 1-10 existing tasks/subtasks by canonical ID. Omitted fields stay unchanged; null/[] clears supported values. Can reparent/move, reorder, complete/activate, change Project/Tags, absolute schedule, After, reminders, Repeat, or raw title task links. Supplying After expresses a dependency; Todo calculates/resolves/rewires it. Supplying Date/Time/Repeat without After replaces an existing dependency. When editing [[task:<ID>]] links, preserve the rest of the raw title and use only canonical IDs returned by Todo. Completion may have linked-task, Repeat, and After side effects owned by Todo. Results report authoritative state and partial commits explicitly.',
     parameters: mutationEnvelope('tasks', {
       type: 'OBJECT',
       properties: { id: ID, ...TASK_MUTABLE },
