@@ -1,3 +1,41 @@
+export const DIARY_GEMINI_TASK_MODEL = 'gemini-3.5-flash';
+export const DIARY_GEMINI_SUMMARY_MODEL = 'gemini-3.7-flash';
+
+const GEMINI_GENERATE_CONTENT_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+function buildGenerateContentUrl(model, apiKey) {
+    return `${GEMINI_GENERATE_CONTENT_BASE}/${model}:generateContent?key=${apiKey}`;
+}
+
+function extractCandidateText(data) {
+    const parts = data?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) return '';
+
+    return parts
+        .filter(part => part?.thought !== true && typeof part?.text === 'string')
+        .map(part => part.text)
+        .join('')
+        .trim();
+}
+
+function parseStructuredCandidate(data, label) {
+    let jsonString = extractCandidateText(data);
+    if (!jsonString) return null;
+
+    const startIndex = jsonString.indexOf('{');
+    const endIndex = jsonString.lastIndexOf('}');
+    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+        jsonString = jsonString.substring(startIndex, endIndex + 1);
+    }
+
+    try {
+        return JSON.parse(jsonString);
+    } catch (parseErr) {
+        console.error(`Failed to parse ${label} JSON output:`, parseErr, jsonString);
+        return null;
+    }
+}
+
 export async function enhanceTranscription(rawText, apiKey) {
     if (localStorage.getItem('disable_auto_enhance') === 'true') {
         const words = rawText.split(' ').slice(0, 5).join(' ');
@@ -11,8 +49,7 @@ export async function enhanceTranscription(rawText, apiKey) {
     const disableTitle = localStorage.getItem('disable_title_generation') === 'true';
     const disableTags = localStorage.getItem('disable_tag_generation') === 'true';
     const customPrompt = localStorage.getItem('custom_enhance_prompt');
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key=${apiKey}`;
+    const url = buildGenerateContentUrl(DIARY_GEMINI_TASK_MODEL, apiKey);
 
     let instructionText = "Improve the grammar and clarity of the text while preserving the original meaning and language.";
     if (customPrompt && customPrompt.trim().length > 0) {
@@ -42,7 +79,7 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
         schemaProperties.title = { type: "STRING", description: "A short, catchy title for the entry." };
         schemaRequired.push("title");
     }
-    
+
     if (!disableTags) {
         schemaProperties.tags = { type: "ARRAY", items: { type: "STRING" }, description: "1 to 3 relevant tags." };
         schemaRequired.push("tags");
@@ -79,50 +116,28 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
             throw new Error(`API Error: ${response.status} - ${errorText}`);
         }
 
-        const data = await response.json();
-        
-        // Extract the JSON response from the model
-        if (data && data.candidates && data.candidates.length > 0) {
-            let jsonString = data.candidates[0].content.parts[0].text;
-            
-            // Clean up the string in case the model ignored instructions and included markdown/reasoning
-            // Find the first { and last } to extract the JSON object
-            const startIndex = jsonString.indexOf('{');
-            const endIndex = jsonString.lastIndexOf('}');
-            
-            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-                jsonString = jsonString.substring(startIndex, endIndex + 1);
-            }
+        const result = parseStructuredCandidate(await response.json(), 'Gemini enhancement');
+        if (!result) return null;
 
-            try {
-                const result = JSON.parse(jsonString);
-                
-                // Fallback title generation if disabled
-                let finalTitle = result.title;
-                if (!finalTitle || disableTitle) {
-                    const words = result.improved_text ? result.improved_text.split(' ').slice(0, 5).join(' ') : rawText.split(' ').slice(0, 5).join(' ');
-                    finalTitle = words + "...";
-                }
-
-                return {
-                    title: finalTitle,
-                    tags: result.tags || [],
-                    improvedText: result.improved_text || rawText
-                };
-            } catch (parseErr) {
-                console.error("Failed to parse Gemma JSON output:", parseErr, jsonString);
-                return null;
-            }
+        let finalTitle = result.title;
+        if (!finalTitle || disableTitle) {
+            const words = result.improved_text ? result.improved_text.split(' ').slice(0, 5).join(' ') : rawText.split(' ').slice(0, 5).join(' ');
+            finalTitle = words + "...";
         }
-        return null;
+
+        return {
+            title: finalTitle,
+            tags: result.tags || [],
+            improvedText: result.improved_text || rawText
+        };
     } catch (error) {
         console.error("Error enhancing transcription:", error);
         return null;
     }
 }
 
-export async function editTranscriptionWithGemma(originalText, originalTitle, originalTags, voiceInstruction, apiKey) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key=${apiKey}`;
+export async function editTranscriptionWithGemini(originalText, originalTitle, originalTags, voiceInstruction, apiKey) {
+    const url = buildGenerateContentUrl(DIARY_GEMINI_TASK_MODEL, apiKey);
 
     const prompt = `
 You are an intelligent diary editor. Apply the user's voice instruction to the existing diary entry below.
@@ -170,29 +185,14 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
             throw new Error(`API Error: ${response.status} - ${errorText}`);
         }
 
-        const data = await response.json();
-        
-        if (data && data.candidates && data.candidates.length > 0) {
-            let jsonString = data.candidates[0].content.parts[0].text;
-            const startIndex = jsonString.indexOf('{');
-            const endIndex = jsonString.lastIndexOf('}');
-            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-                jsonString = jsonString.substring(startIndex, endIndex + 1);
-            }
+        const result = parseStructuredCandidate(await response.json(), 'Gemini edit');
+        if (!result) return null;
 
-            try {
-                const result = JSON.parse(jsonString);
-                return {
-                    title: result.title || originalTitle,
-                    tags: result.tags || originalTags,
-                    improvedText: result.improved_text || originalText
-                };
-            } catch (parseErr) {
-                console.error("Failed to parse Gemma edit output:", parseErr, jsonString);
-                return null;
-            }
-        }
-        return null;
+        return {
+            title: result.title || originalTitle,
+            tags: result.tags || originalTags,
+            improvedText: result.improved_text || originalText
+        };
     } catch (error) {
         console.error("Error editing transcription:", error);
         return null;
@@ -200,7 +200,7 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
 }
 
 export async function expandSearchQuery(query, apiKey) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key=${apiKey}`;
+    const url = buildGenerateContentUrl(DIARY_GEMINI_TASK_MODEL, apiKey);
 
     const prompt = `
 You are an intelligent search assistant. The user wants to search their personal diary for the phrase: "${query}"
@@ -217,10 +217,10 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
             responseSchema: {
                 type: "OBJECT",
                 properties: {
-                    terms: { 
-                        type: "ARRAY", 
+                    terms: {
+                        type: "ARRAY",
                         items: { type: "STRING" },
-                        description: "List of synonymous or related search terms." 
+                        description: "List of synonymous or related search terms."
                     }
                 },
                 required: ["terms"]
@@ -239,25 +239,8 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
             throw new Error(`API Error: ${response.status}`);
         }
 
-        const data = await response.json();
-        
-        if (data && data.candidates && data.candidates.length > 0) {
-            let jsonString = data.candidates[0].content.parts[0].text;
-            const startIndex = jsonString.indexOf('{');
-            const endIndex = jsonString.lastIndexOf('}');
-            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-                jsonString = jsonString.substring(startIndex, endIndex + 1);
-            }
-
-            try {
-                const result = JSON.parse(jsonString);
-                return result.terms || [];
-            } catch (parseErr) {
-                console.error("Failed to parse Gemma search expansion:", parseErr);
-                return [];
-            }
-        }
-        return [];
+        const result = parseStructuredCandidate(await response.json(), 'Gemini search expansion');
+        return result?.terms || [];
     } catch (error) {
         console.error("Error expanding search query:", error);
         return [];
@@ -265,8 +248,7 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
 }
 
 export async function filterEntriesForAINote(noteTitle, noteDesc, entriesArray, apiKey) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key=${apiKey}`;
-
+    const url = buildGenerateContentUrl(DIARY_GEMINI_TASK_MODEL, apiKey);
     const entriesText = entriesArray.map(e => `[ID: ${e.id}] Title: ${e.title}\nContent: ${e.content}`).join('\n\n');
 
     const prompt = `
@@ -290,10 +272,10 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
             responseSchema: {
                 type: "OBJECT",
                 properties: {
-                    matched_ids: { 
-                        type: "ARRAY", 
+                    matched_ids: {
+                        type: "ARRAY",
                         items: { type: "STRING" },
-                        description: "List of entry IDs that belong in the folder." 
+                        description: "List of entry IDs that belong in the folder."
                     }
                 },
                 required: ["matched_ids"]
@@ -312,25 +294,8 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
             throw new Error(`API Error: ${response.status}`);
         }
 
-        const data = await response.json();
-        
-        if (data && data.candidates && data.candidates.length > 0) {
-            let jsonString = data.candidates[0].content.parts[0].text;
-            const startIndex = jsonString.indexOf('{');
-            const endIndex = jsonString.lastIndexOf('}');
-            if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-                jsonString = jsonString.substring(startIndex, endIndex + 1);
-            }
-
-            try {
-                const result = JSON.parse(jsonString);
-                return result.matched_ids || [];
-            } catch (parseErr) {
-                console.error("Failed to parse Gemma AI Notes matching:", parseErr);
-                return [];
-            }
-        }
-        return [];
+        const result = parseStructuredCandidate(await response.json(), 'Gemini AI Notes matching');
+        return result?.matched_ids || [];
     } catch (error) {
         console.error("Error filtering entries for AI note:", error);
         return [];
@@ -338,23 +303,15 @@ CRITICAL INSTRUCTION: You must respond ONLY with a raw, valid JSON object. Do NO
 }
 
 /**
- * Generic text generation utilizing Gemini 3 Flash Preview (or fallback to Gemma).
- * Used heavily by the Summarization Engine.
+ * Generic Gemini 3.7 Flash text generation used by the summarization engine.
  */
 export async function generateGeminiContent(prompt, apiKeyOverride = null) {
     const apiKey = apiKeyOverride || localStorage.getItem('gemini_api_key');
     if (!apiKey) throw new Error("Missing API Key");
 
-    // Can use Gemini 3.1 Flash Preview as instructed in previous contexts, or stick to the Gemma model.
-    // We will use the exact model string researched by the subagent:
-    const model = 'gemini-3-flash-preview'; 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
+    const url = buildGenerateContentUrl(DIARY_GEMINI_SUMMARY_MODEL, apiKey);
     const requestBody = {
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-            temperature: 0.4
-        }
+        contents: [{ role: "user", parts: [{ text: prompt }] }]
     };
 
     const response = await fetch(url, {
@@ -368,11 +325,9 @@ export async function generateGeminiContent(prompt, apiKeyOverride = null) {
         throw new Error(`API Error: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
-    if (data && data.candidates && data.candidates.length > 0) {
-        return data.candidates[0].content.parts[0].text;
-    }
-    
+    const text = extractCandidateText(await response.json());
+    if (text) return text;
+
     throw new Error("No valid response generated from Gemini");
 }
 
@@ -382,8 +337,8 @@ export async function transcribeAudioFile(blob, mimeType, apiKey) {
         reader.onloadend = async () => {
             try {
                 const base64Data = reader.result.split(',')[1];
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent?key=${apiKey}`;
-                
+                const url = buildGenerateContentUrl(DIARY_GEMINI_TASK_MODEL, apiKey);
+
                 const requestBody = {
                     contents: [{
                         role: "user",
@@ -405,9 +360,9 @@ export async function transcribeAudioFile(blob, mimeType, apiKey) {
                     throw new Error(`API Error: ${response.status} - ${errorText}`);
                 }
 
-                const data = await response.json();
-                if (data && data.candidates && data.candidates.length > 0) {
-                    resolve(data.candidates[0].content.parts[0].text);
+                const text = extractCandidateText(await response.json());
+                if (text) {
+                    resolve(text);
                 } else {
                     reject(new Error("No transcription received"));
                 }
@@ -419,5 +374,3 @@ export async function transcribeAudioFile(blob, mimeType, apiKey) {
         reader.readAsDataURL(blob);
     });
 }
-
-
