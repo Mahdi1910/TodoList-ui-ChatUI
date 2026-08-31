@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 DIST = ROOT / "dist"
-SHELL_ROUTE = re.compile(r"^/(?:$|todo-list-ui/?$|chat-ui/?$|chat-ui/chat/[^/]+/?$|workspace(?:/.*)?$)")
+SHELL_ROUTE = re.compile(r"^/(?:$|todo-list-ui/?$|chat-ui/?$|chat-ui/chat/[^/]+/?$|workspace(?:/.*)?$|diary/?$)")
 
 
 class CombinedAppHandler(SimpleHTTPRequestHandler):

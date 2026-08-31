@@ -12,6 +12,12 @@ const FRAME_CONFIG = Object.freeze({
     panelId: 'chat-frame-panel',
     src: '/ChatUI/embedded.html?embedded=1',
     expectedPath: '/ChatUI/embedded.html'
+  },
+  diary: {
+    frameId: 'diary-frame',
+    panelId: 'diary-frame-panel',
+    src: '/diary/index.html?embedded=1',
+    expectedPath: '/diary/index.html'
   }
 });
 
@@ -126,9 +132,7 @@ export function createFrameManager({ onStateChange } = {}) {
     record.readyPayload = payload;
     updatePanel(record, 'READY');
     const pending = record.queue.splice(0);
-    for (const message of pending) {
-      record.frame.contentWindow?.postMessage(message, window.location.origin);
-    }
+    for (const message of pending) record.frame.contentWindow?.postMessage(message, window.location.origin);
     return true;
   }
 
@@ -165,9 +169,7 @@ export function createFrameManager({ onStateChange } = {}) {
   }
 
   function waitForReadyOrFailed(record, timeoutMs) {
-    if (record.state === 'READY' || record.state === 'FAILED') {
-      return Promise.resolve({ state: record.state, payload: record.readyPayload });
-    }
+    if (record.state === 'READY' || record.state === 'FAILED') return Promise.resolve({ state: record.state, payload: record.readyPayload });
     return new Promise((resolve, reject) => {
       let settled = false;
       const finish = value => {
@@ -246,10 +248,9 @@ export function createFrameManager({ onStateChange } = {}) {
 
   function getState(app) { return records.get(app)?.state || 'NOT_CREATED'; }
   function getReadyPayload(app) { return records.get(app)?.readyPayload || null; }
+  function getFrame(app) { return records.get(app)?.frame || null; }
 
-  for (const record of records.values()) {
-    record.frame.addEventListener('load', () => handleLoad(record));
-  }
+  for (const record of records.values()) record.frame.addEventListener('load', () => handleLoad(record));
   document.querySelectorAll('[data-frame-retry]').forEach(button => {
     button.addEventListener('click', () => retry(button.dataset.frameRetry));
   });
@@ -265,6 +266,7 @@ export function createFrameManager({ onStateChange } = {}) {
     activate,
     appFromWindow,
     getState,
-    getReadyPayload
+    getReadyPayload,
+    getFrame
   };
 }

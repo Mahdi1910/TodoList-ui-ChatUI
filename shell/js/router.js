@@ -2,6 +2,7 @@ const TODO_PATH = '/todo-list-ui';
 const CHAT_HOME_PATH = '/chat-ui';
 const CHAT_PREFIX = '/chat-ui/chat/';
 const WORKSPACE_ROOT_PATH = '/workspace';
+const DIARY_PATH = '/diary';
 const LAST_CHAT_KEY = 'mahdi-shell:last-chat-route';
 
 function cleanPath(pathname) {
@@ -47,17 +48,17 @@ export function buildWorkspacePublicPath(workspacePath = '/') {
   return `${WORKSPACE_ROOT_PATH}/${segments.map(segment => encodeURIComponent(segment)).join('/')}`;
 }
 
+function baseRoute(app, surface, path) {
+  return { app, surface, path, chatId: null, messageId: null, workspacePath: null, needsReplace: false };
+}
+
 export function parseShellRoute(pathname = window.location.pathname, hash = window.location.hash) {
   const path = cleanPath(pathname);
-  if (path === '/' || path === '') {
-    return { app: 'todo', surface: 'todo', path: TODO_PATH, chatId: null, messageId: null, workspacePath: null, needsReplace: true };
-  }
-  if (path === TODO_PATH) {
-    return { app: 'todo', surface: 'todo', path: TODO_PATH, chatId: null, messageId: null, workspacePath: null, needsReplace: false };
-  }
-  if (path === CHAT_HOME_PATH) {
-    return { app: 'chat', surface: 'chat', path: CHAT_HOME_PATH, chatId: null, messageId: null, workspacePath: null, needsReplace: false };
-  }
+  if (path === '/' || path === '') return { ...baseRoute('todo', 'todo', TODO_PATH), needsReplace: true };
+  if (path === TODO_PATH) return baseRoute('todo', 'todo', TODO_PATH);
+  if (path === DIARY_PATH) return baseRoute('diary', 'diary', DIARY_PATH);
+  if (path === CHAT_HOME_PATH) return baseRoute('chat', 'chat', CHAT_HOME_PATH);
+
   if (path.startsWith(CHAT_PREFIX)) {
     const encoded = path.slice(CHAT_PREFIX.length);
     if (encoded && !encoded.includes('/')) {
@@ -87,7 +88,7 @@ export function parseShellRoute(pathname = window.location.pathname, hash = wind
     };
   }
 
-  return { app: 'todo', surface: 'todo', path: TODO_PATH, chatId: null, messageId: null, workspacePath: null, needsReplace: true };
+  return { ...baseRoute('todo', 'todo', TODO_PATH), needsReplace: true };
 }
 
 function routeUrl(route) {
@@ -148,6 +149,7 @@ export function createShellRouter(onRoute) {
 
   function goTodo() { return write(TODO_PATH, { source: 'rail' }); }
   function goChat() { return write(lastChatPath || CHAT_HOME_PATH, { source: 'rail' }); }
+  function goDiary() { return write(DIARY_PATH, { source: 'rail' }); }
 
   function handleChatChildRoute(payload = {}) {
     const surface = payload.surface === 'workspace' ? 'workspace' : 'chat';
@@ -190,6 +192,7 @@ export function createShellRouter(onRoute) {
     start,
     goTodo,
     goChat,
+    goDiary,
     handleChatChildRoute,
     rememberChatFromReady,
     getLastChatRoute,
